@@ -11,7 +11,7 @@ Wait until the bar is fully on before inserting. Leave remote/buttons alone duri
 | `INSTALL_STATUS.txt`: `INSTALLED_PENDING_REBOOT_TEST` | Installed; now test a reboot without USB. |
 | `ALREADY_INSTALLED_LOGS_EXPORTED` | Exact installation verified; logs copied to `JBLInstall/runtime`. No key sequence replayed by reinsertion. |
 | `TRIAL_NOT_SUCCESSFUL_NO_INSTALL` | The trial did not qualify, so a new helper was not installed. Read `trial/STATUS.txt` and `trial/latest.log`. |
-| `STOPPED_LONG_PRESS_NOT_CONFIRMED` | The key handler did not confirm the long press. This occurred once before a successful retry on the test device. With controls normal, allow the bar to settle, remove/reinsert USB and wait two minutes without touching remote/buttons. Do not loop retries if it keeps failing. |
+| `STOPPED_LONG_PRESS_NOT_CONFIRMED` | The key handler did not confirm the long press. This happened once on my bar before a successful retry. With controls normal, allow the bar to settle, remove/reinsert USB and wait two minutes without touching remote/buttons. Do not loop retries if it keeps failing. |
 | `FIRMWARE_MISMATCH`, `CLI_MISMATCH`, or variants ending `_NO_CHANGE` | Unsupported executable. Stop; keep identity guards intact. |
 | `EXISTING_AUTOSCRIPT_PRESERVED_NO_INSTALL` / `INSTALLED_VERSION_CONFLICT` | Another hook/version exists. Do not overwrite it blindly. |
 | `runtime/STATUS.txt`: `STANDARD_SELECTED` | The action confirmed Standard Mode. Check the boot ID in `latest.log`. |

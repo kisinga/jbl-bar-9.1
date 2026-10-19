@@ -1,8 +1,14 @@
-# JBL Bar 9.1: automatic Standard Mode
+# JBL Bar 9.1 Smart Mode Off — automatic USB workaround
 
-Install once from USB. The soundbar then switches Smart Mode off automatically after it wakes, including after a mains restart. You can remove the USB after installation.
+I built this to stop manually turning off Smart Mode every time I power on my JBL Bar 9.1. Install once from USB, and the helper automatically selects Standard Mode after the bar wakes, including after a mains restart. You can remove the USB after installation.
 
-**Experimental, owner-tested on one supported firmware build.** Cold boot followed by delayed power-on is confirmed. Repeated standby/CEC wakes and other firmware builds are not yet validated. This is an independent community project, not a JBL product.
+**Experimental: I have tested this on my own bar and one supported firmware build.** I confirmed a cold boot followed by delayed power-on. I have not yet validated repeated standby/CEC wakes or other firmware builds. I am not affiliated with JBL.
+
+## The work I built on
+
+The foundation is **[touch MAX's 8 January 2024 JBL 9.1 AutoScript article](https://touch-max.ru/vzlom/zapusk-ssh-na-proshivke-jbl-9-1)** and its linked **[almirus/jbl9.1 repository](https://github.com/almirus/jbl9.1)**. They published the USB execution approach before this project and explicitly invited work on keeping Smart Mode off. I used that entry point; I did not discover it.
+
+My contribution is the build-specific Smart-to-Standard automation: checking the current mode, confirming the normal key sequence and release, restoring temporary console settings, and making the helper wait through startup and standby. [Full attribution and related work](docs/CREDITS.md).
 
 ## Download
 
@@ -15,7 +21,7 @@ Use the **install ZIP above**, rather than GitHub's “Source code” archive. I
 ## What you need
 
 - A **JBL Bar 9.1 True Wireless Surround** on the supported build. The recorded firmware label is **23.06.41.80**; the installer checks exact executable hashes automatically. The display version was not independently verified. See [compatibility](docs/COMPATIBILITY.md).
-- A working **FAT32 USB flash drive**, with one partition as the first USB disk. A 512 MiB FAT32 partition worked in our test; that size is not a requirement established by testing. Back up files before formatting a drive.
+- A working **FAT32 USB flash drive**, with one partition as the first USB disk. I tested a 512 MiB FAT32 partition; I have not established that this size is required. Back up files before formatting a drive.
 - A computer to unzip/copy files and read status files, plus the soundbar remote.
 
 You do not need to download firmware, run commands, solder, install developer tools, or leave a computer or network service running.
@@ -73,7 +79,16 @@ This is a persistent automation workaround: it reapplies Standard after wake. It
 - [What has actually been tested](docs/VALIDATION.md)
 - [Development, tests and reproducible ZIPs](CONTRIBUTING.md)
 - [Credits and prior work](docs/CREDITS.md)
+- [Community discussions and my ready-to-post introduction](docs/COMMUNITY.md)
 
 Report your model, firmware label, cold-boot/standby results and relevant **text status/log files** through [Issues](https://github.com/kisinga/jbl-bar9-standard-mode/issues). Do not upload full firmware, backups, memory dumps or personal/network information.
 
-JBL documents the manual key sequence and reset to Smart Mode on every power-on in its [support article](https://support.jbl.com/howto/jbl-bar-9-1-lacking-dialogue-too-much-surround-us/000017755.html). The USB execution mechanism builds on [almirus/touch MAX's published work](https://github.com/almirus/jbl9.1). This project contributes the guarded Bar 9.1 automation and startup handling; it does not claim to have discovered AutoScript.
+## Frequently asked questions
+
+**Can I permanently disable JBL Bar 9.1 Smart Mode?** I install a persistent helper that reapplies Standard Mode after wake. It survives the tested reboot, but it does not change JBL's own saved default. The helper can be uninstalled.
+
+**Does the USB need to stay plugged in?** No. I use it for installation, log collection and removal. The helper waits indefinitely in standby without USB.
+
+**Is this a firmware update or a JBL One / Home Assistant integration?** No firmware update or ongoing app/network service is required. I use the bar's existing USB AutoScript mechanism and command handler. Support is limited to the exact Bar 9.1 build listed above.
+
+JBL documents the manual key sequence and reset to Smart Mode on every power-on in its [support article](https://support.jbl.com/howto/jbl-bar-9-1-lacking-dialogue-too-much-surround-us/000017755.html).

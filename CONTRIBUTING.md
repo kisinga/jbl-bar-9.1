@@ -25,6 +25,6 @@ Optional descriptor validation against a legally obtained extracted ARM BusyBox 
 - `tests/`: portable fixture suite and pinned revision 5 file hashes.
 - `research/`: public index plus ignored local-only artifacts; see its README.
 
-`main` and tag `v0.1.0` preserve the first owner-confirmed revision 5. Experimental latency work belongs on a separate branch and must not replace that tested download until hardware validation. A new payload requires updated checksums, installer expectations, ownership/upgrade handling, tests and a fresh hardware result. The baseline verifier must not be casually bypassed to publish an untested change.
+`main` and tag `v0.1.0` preserve the revision 5 I first confirmed on my bar. Experimental latency work belongs on a separate branch and must not replace that tested download until hardware validation. A new payload requires updated checksums, installer expectations, ownership/upgrade handling, tests and a fresh hardware result. The baseline verifier must not be casually bypassed to publish an untested change.
 
 Report results with the issue template. Keep proprietary images, full device logs, credentials, personal paths and tool caches out of commits and releases.
