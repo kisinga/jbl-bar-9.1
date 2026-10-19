@@ -1,5 +1,8 @@
 # JBL Bar 9.1: automatic Standard Mode
 
+> **Working branch: faster-wake candidate (revision 6), hardware untested.**
+> The downloads below remain the confirmed revision 5. See [latency work](research/notes/LATENCY.md) for candidate changes and local build instructions.
+
 Install once from USB. The soundbar then switches Smart Mode off automatically after it wakes, including after a mains restart. You can remove the USB after installation.
 
 **Experimental, owner-tested on one supported firmware build.** Cold boot followed by delayed power-on is confirmed. Repeated standby/CEC wakes and other firmware builds are not yet validated. This is an independent community project, not a JBL product.

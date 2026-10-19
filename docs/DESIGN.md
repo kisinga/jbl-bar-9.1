@@ -1,5 +1,7 @@
 # Design and research findings
 
+This page describes confirmed revision 5. The working branch changes polling and initial settling time only; see [revision 6 latency notes](../research/notes/LATENCY.md).
+
 `AutoScript/AutoScript` invokes the USB dispatcher. `setup.sh` verifies the payload, executable identity, storage and absence of conflicting hooks. It runs a bounded trial before installing `/var/JBLStandard` and atomically activating `/var/AutoScript.TSS`.
 
 At boot, `run.sh` closes inherited sockets and starts a read-only watcher. It polls every five seconds, waits indefinitely for three consistent awake samples, then runs `once.sh`. The bounded runner performs its own identity/readiness checks and delegates to `controller.sh` and `helper.sh`. Current Standard Mode is a no-op. A failure can disable subsequent attempts rather than repeatedly sending keys.

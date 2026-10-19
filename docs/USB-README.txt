@@ -1,5 +1,5 @@
-JBL BAR 9.1 — AUTOMATIC STANDARD MODE, v0.1.0 (device revision 5)
-Experimental; confirmed on one supported bar after a cold boot.
+JBL BAR 9.1 — AUTOMATIC STANDARD MODE, v0.2.0-dev.1 (device revision 6)
+LATENCY CANDIDATE — not yet tested on hardware. The confirmed release is v0.1.0.
 Full guide: https://github.com/kisinga/jbl-bar9-standard-mode
 
 REQUIREMENTS
@@ -19,7 +19,8 @@ An initial long-press failure was observed once; a later insertion succeeded.
 Remove USB, disconnect mains 60 seconds, reconnect and let LOAD finish.
 Power on whenever you want; allow 60 seconds for Smart Mode to switch off.
 The helper waits indefinitely in standby. No two-minute standby wait is needed.
-The confirmed release completed about 35 seconds after detecting power-on.
+Candidate target: about 18 seconds after detecting power-on; not measured yet.
+Revision5 measured about 35 seconds. All key-release checks remain unchanged.
 Check audio, volume, mute and standby. Repeated/CEC wakes are not fully validated.
 If already Standard, no action/message is needed. USB need not stay attached.
 

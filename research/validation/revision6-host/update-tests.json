@@ -1,0 +1,51 @@
+{
+  "scope": "Actual dispatcher/setup/uninstaller with synthetic revision5 payload with a fixture-only expected manifest and stubbed new hardware trial; temp filesystem and mount metadata.",
+  "dispatcher_sha256": "77c1ee9b48085a7165ffccc6ce64701e0e33959a696367cb6c260a0a4c9ba7e0",
+  "cases": [
+    {
+      "case": "upgrade",
+      "update_status": "SETUP_FINISHED",
+      "exit": 0
+    },
+    {
+      "case": "changed_old_manifest",
+      "update_status": "UNKNOWN_REV5_PRESERVED",
+      "exit": 1
+    },
+    {
+      "case": "changed_old_files",
+      "update_status": "CHANGED_REV5_PRESERVED",
+      "exit": 1
+    },
+    {
+      "case": "changed_old_hook",
+      "update_status": "OLD_HOOK_CHANGED",
+      "exit": 1
+    },
+    {
+      "case": "unknown_owner",
+      "update_status": "SETUP_FINISHED",
+      "exit": 1
+    },
+    {
+      "case": "failed_trial",
+      "update_status": "SETUP_FINISHED",
+      "exit": 1
+    },
+    {
+      "case": "bad_new_payload",
+      "update_status": "NEW_PAYLOAD_CHANGED",
+      "exit": 1
+    },
+    {
+      "case": "rollback_rev5",
+      "update_status": "ROLLBACK_FINISHED",
+      "exit": 0
+    },
+    {
+      "case": "outer_busy",
+      "update_status": "NO_STATUS",
+      "exit": 0
+    }
+  ]
+}

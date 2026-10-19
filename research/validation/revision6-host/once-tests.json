@@ -1,0 +1,56 @@
+{
+  "scope": "Host one-shot lifecycle fixtures with stubbed controller; actual controller separately tested. Does not prove firmware hooks run or standby behavior.",
+  "runner_sha256": "cde5aaf6f67a7c52cc237476b141c59e8e0286405ae977f481162c145be5bace",
+  "cases": [
+    {
+      "case": "success_then_wake",
+      "status": "STANDARD_SELECTED",
+      "exit": 0
+    },
+    {
+      "case": "already_standard",
+      "status": "ALREADY_STANDARD_NO_CHANGE",
+      "exit": 0
+    },
+    {
+      "case": "asleep",
+      "status": "NOT_READY_NO_CHANGE",
+      "exit": 0
+    },
+    {
+      "case": "bad_firmware",
+      "status": "FIRMWARE_MISMATCH",
+      "exit": 1
+    },
+    {
+      "case": "bad_cli",
+      "status": "CLI_MISMATCH",
+      "exit": 1
+    },
+    {
+      "case": "failed_controller",
+      "status": "STOPPED_INPUT_RELEASE_NOT_CONFIRMED",
+      "exit": 1
+    },
+    {
+      "case": "disable_write_fails",
+      "status": "STOPPED_INPUT_RELEASE_NOT_CONFIRMED",
+      "exit": 1
+    },
+    {
+      "case": "duplicate",
+      "status": "NO_STATUS",
+      "exit": 0
+    },
+    {
+      "case": "rollback",
+      "status": "NO_STATUS",
+      "exit": 0
+    },
+    {
+      "case": "payload_changed",
+      "status": "PAYLOAD_MISMATCH",
+      "exit": 1
+    }
+  ]
+}

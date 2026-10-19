@@ -1,0 +1,265 @@
+{
+  "scope": "Host BusyBox; host procfs. Actual package startup prefix. Revision4 negative controls reproduce early exit; revision6 must continue with sockets closed and regular file preserved. No soundbar boot proof.",
+  "busybox_sha256": "b8744863758c9e192ecc6aa758699b3ee865bf1df3727f7f6eff12021ea51ca3",
+  "run_sha256": "aaa5af3e5457b715a8aad018a258fe4841f2a35076a4952b8b3993299d035b00",
+  "cases": [
+    {
+      "revision": 4,
+      "inherited_socket_count": 0,
+      "inherited_fds": [
+        55
+      ],
+      "exit": 0,
+      "reached_worker": true,
+      "regular_file_preserved": true,
+      "remaining_sockets": 0
+    },
+    {
+      "revision": 4,
+      "inherited_socket_count": 1,
+      "inherited_fds": [
+        3,
+        55
+      ],
+      "exit": 1,
+      "reached_worker": false,
+      "regular_file_preserved": false,
+      "remaining_sockets": null
+    },
+    {
+      "revision": 4,
+      "inherited_socket_count": 2,
+      "inherited_fds": [
+        3,
+        4,
+        55
+      ],
+      "exit": 1,
+      "reached_worker": false,
+      "regular_file_preserved": false,
+      "remaining_sockets": null
+    },
+    {
+      "revision": 4,
+      "inherited_socket_count": 4,
+      "inherited_fds": [
+        3,
+        4,
+        5,
+        6,
+        55
+      ],
+      "exit": 1,
+      "reached_worker": false,
+      "regular_file_preserved": false,
+      "remaining_sockets": null
+    },
+    {
+      "revision": 4,
+      "inherited_socket_count": 8,
+      "inherited_fds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        55
+      ],
+      "exit": 1,
+      "reached_worker": false,
+      "regular_file_preserved": false,
+      "remaining_sockets": null
+    },
+    {
+      "revision": 4,
+      "inherited_socket_count": 12,
+      "inherited_fds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        55
+      ],
+      "exit": 1,
+      "reached_worker": false,
+      "regular_file_preserved": false,
+      "remaining_sockets": null
+    },
+    {
+      "revision": 4,
+      "inherited_socket_count": 20,
+      "inherited_fds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        55
+      ],
+      "exit": 1,
+      "reached_worker": false,
+      "regular_file_preserved": false,
+      "remaining_sockets": null
+    },
+    {
+      "revision": 6,
+      "inherited_socket_count": 0,
+      "inherited_fds": [
+        55
+      ],
+      "exit": 0,
+      "reached_worker": true,
+      "regular_file_preserved": true,
+      "remaining_sockets": 0
+    },
+    {
+      "revision": 6,
+      "inherited_socket_count": 1,
+      "inherited_fds": [
+        3,
+        55
+      ],
+      "exit": 0,
+      "reached_worker": true,
+      "regular_file_preserved": true,
+      "remaining_sockets": 0
+    },
+    {
+      "revision": 6,
+      "inherited_socket_count": 2,
+      "inherited_fds": [
+        3,
+        4,
+        55
+      ],
+      "exit": 0,
+      "reached_worker": true,
+      "regular_file_preserved": true,
+      "remaining_sockets": 0
+    },
+    {
+      "revision": 6,
+      "inherited_socket_count": 4,
+      "inherited_fds": [
+        3,
+        4,
+        5,
+        6,
+        55
+      ],
+      "exit": 0,
+      "reached_worker": true,
+      "regular_file_preserved": true,
+      "remaining_sockets": 0
+    },
+    {
+      "revision": 6,
+      "inherited_socket_count": 8,
+      "inherited_fds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        55
+      ],
+      "exit": 0,
+      "reached_worker": true,
+      "regular_file_preserved": true,
+      "remaining_sockets": 0
+    },
+    {
+      "revision": 6,
+      "inherited_socket_count": 12,
+      "inherited_fds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        55
+      ],
+      "exit": 0,
+      "reached_worker": true,
+      "regular_file_preserved": true,
+      "remaining_sockets": 0
+    },
+    {
+      "revision": 6,
+      "inherited_socket_count": 20,
+      "inherited_fds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        55
+      ],
+      "exit": 0,
+      "reached_worker": true,
+      "regular_file_preserved": true,
+      "remaining_sockets": 0
+    },
+    {
+      "case": "readlink_failure_present",
+      "exit": 1,
+      "reached_worker": false
+    },
+    {
+      "case": "busybox_missing",
+      "exit": 1,
+      "reached_worker": false
+    }
+  ]
+}

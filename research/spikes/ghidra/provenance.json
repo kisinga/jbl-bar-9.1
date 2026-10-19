@@ -1,0 +1,10 @@
+{
+  "origin": "original local spikes/jbl-firmware/ghidra_scripts",
+  "status": "archived unchanged research helpers; not release dependencies or newly validated tools",
+  "files": {
+    "DecompileMulti.java": "bfca6f9137441c362c1ccfc500b09ffdc298c60e5a019d60b65bfea2ede11abf",
+    "FuncRange.java": "58e181b1cba19f808cba341ff8a58485c75156da44b3961a8c3493f91c943914",
+    "FindMovwRefs.java": "decd4306c62e6f51b059e15513ce550677b5fa19a5f937b4e58db6061ee93fc7",
+    "FindPCRelString.java": "8bab62c8c2566b0e2ef2390d5a3171dea024b32fcb0cff5e839c074e003849b1"
+  }
+}

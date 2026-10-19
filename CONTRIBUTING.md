@@ -1,5 +1,7 @@
 # Development
 
+On `work/faster-wake`, the builder pins an **untested revision 6 candidate** and emits `v0.2.0-dev.1` archives. The original revision 5 baseline remains in the fixtures and on `main`/`v0.1.0`. See [latency notes](research/notes/LATENCY.md); descriptions of the owner-tested release below refer to revision 5.
+
 Keep the release small: readable shell scripts and two USB ZIPs. Preserve the working behavior and firmware identity guards. Do not add support for a build by merely changing its hash: its fields, event ABI and restoration behavior need validation.
 
 ## Build and test

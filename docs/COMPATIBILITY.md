@@ -1,5 +1,7 @@
 # Compatibility
 
+Working-branch note: revision 6 uses the same firmware identities but is hardware untested. Its automatic upgrade accepts exact revision 5; the confirmed v0.1.0 release described below upgrades exact development revision 4. Each requires its matching uninstall package.
+
 | Item | Supported / observed |
 | --- | --- |
 | Model | JBL Bar 9.1 True Wireless Surround |
