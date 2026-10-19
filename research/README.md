@@ -1,6 +1,6 @@
 # Research workspace
 
-The public repository contains the implementation, reproducible tests and a concise evidence record in `docs/`. The working branch also carries research notes for continued latency and wake testing.
+The public repository contains the implementation, reproducible tests and a concise evidence record in the root `README.md`. The working branch also carries research notes for continued latency and wake testing.
 
 The original project materials have been consolidated into these **local-only, Git-ignored** directories:
 

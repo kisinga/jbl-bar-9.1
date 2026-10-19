@@ -20,7 +20,9 @@ Optional descriptor validation against a legally obtained extracted ARM BusyBox 
 ## Layout
 
 - `usb/`: exact installable device source, with CRLF-preserved launcher/hook.
-- `docs/`: owner instructions, architecture, evidence and limitations.
+- `README.md`: installation, removal, compatibility, troubleshooting, evidence and credits.
+- `COMMUNITY.md`: discussion links and a first-person draft.
+- `USB-README.txt` / `ROLLBACK.txt`: short guides included in the ZIPs.
 - `tools/`: release builder and test runner.
 - `tests/`: portable fixture suite and pinned revision 5 file hashes.
 - `research/`: public index plus ignored local-only artifacts; see its README.

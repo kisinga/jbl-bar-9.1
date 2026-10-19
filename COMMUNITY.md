@@ -21,21 +21,17 @@ I could not verify Reddit's current subreddit rules or the posts' locked/archive
 
 **Title: JBL Bar 9.1: I made a USB workaround that turns Smart Mode off after startup**
 
-I got tired of holding mute and pressing volume-up every time I turned on my JBL Bar 9.1, so I put together a reversible USB-installed workaround.
+I got tired of manually disabling Smart Mode whenever I turned on my JBL Bar 9.1, so I made a reversible USB-installed workaround.
 
-I install it once, remove the USB, and a small helper waits until the bar is fully awake before switching to Standard Mode. It waits indefinitely in standby. I confirmed a mains restart followed by delayed power-on on my own bar; the release took about 35 seconds after detecting power-on. The logs confirmed the mode change, released keys and restored console settings.
+Install once, remove USB, and the helper waits indefinitely in standby before selecting Standard Mode after wake. I confirmed a mains restart followed by delayed power-on on my bar; it took about 35 seconds after detecting power-on.
 
-The foundation is [touch MAX's AutoScript write-up](https://touch-max.ru/vzlom/zapusk-ssh-na-proshivke-jbl-9-1) and the linked [almirus/jbl9.1 project](https://github.com/almirus/jbl9.1). Credit for that USB entry point belongs to the earlier work. I added the guarded Smart Mode procedure and persistent startup handling.
+I built on [touch MAX's AutoScript article](https://touch-max.ru/vzlom/zapusk-ssh-na-proshivke-jbl-9-1) and [almirus/jbl9.1](https://github.com/almirus/jbl9.1). Credit for the USB entry point belongs to that earlier work.
 
-I have published the source, ready-to-copy install/uninstall ZIPs, requirements, checksums and troubleshooting here:
+Source, install/uninstall ZIPs and instructions: https://github.com/kisinga/jbl-bar9-standard-mode
 
-https://github.com/kisinga/jbl-bar9-standard-mode
+This is experimental and checks one exact Bar 9.1 firmware build. It installs a persistent helper and temporarily changes console fields in RAM; it does not flash firmware. My first install needed a retry, and an earlier development version stalled startup, so keep the uninstall ZIP. Repeated standby/CEC wakes remain unverified. USB removal alone does not uninstall it.
 
-This is experimental and limited to one exact Bar 9.1 firmware build. The recorded version is 23.06.41.80; the scripts check executable hashes and refuse other builds. I am not claiming support for other JBL models or every standby/CEC path. My first installation attempt needed a retry, and an earlier development version caused a startup stall, so I include removal/recovery instructions and keep the confirmed release separate from new experiments.
-
-No firmware image is flashed. It does install a persistent helper and temporarily change command-console fields in RAM before restoring them. USB removal alone does not uninstall it; the matching uninstall ZIP does.
-
-If you try it on a compatible bar, I would appreciate your firmware label and cold-boot/standby results. I have a faster candidate in a separate branch, but I have not yet tested it on hardware.
+If you try it, I would appreciate your firmware label and cold-boot/standby results.
 
 ## What I would link
 
