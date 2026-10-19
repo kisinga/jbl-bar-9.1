@@ -1,5 +1,5 @@
 * text=auto
 *.sh text eol=lf
 *.py text eol=lf
-usb/AutoScript/AutoScript -text
-usb/JBLInstall/payload/hook.expected -text
+usb/AutoScript/AutoScript -text whitespace=cr-at-eol
+usb/JBLInstall/payload/hook.expected -text whitespace=cr-at-eol
