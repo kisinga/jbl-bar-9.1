@@ -1,0 +1,1 @@
+Synthetic bdpprog identity fixture. No vendor firmware.

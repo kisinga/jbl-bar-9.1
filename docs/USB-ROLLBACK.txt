@@ -1,0 +1,20 @@
+REMOVE THE PERSISTENT HELPER
+
+Extract the matching v0.1.0 UNINSTALL ZIP to a clean FAT32 USB root.
+Alternatively create an empty file named ROLLBACK (no extension) inside
+JBLInstall on the installation USB. Make sure it is not ROLLBACK.txt.
+
+Insert into the powered bar and wait 100 seconds. Return USB to your computer
+and check JBLInstall/UNINSTALL_STATUS.txt for UNINSTALLED or ALREADY_UNINSTALLED.
+Remove USB and restart normally. Installed files are backed up on USB.
+
+If HOOK_DISABLED_REBOOT_TO_FINISH_UNINSTALL appears, reboot with rollback USB
+connected, then once fully on remove/reinsert it, wait and check status again.
+Unknown/changed hooks are preserved. If LOAD remains unusually long or controls
+fail, prepare rollback USB on the computer; insert into the powered bar first.
+If still unresponsive, disconnect mains and reconnect with rollback USB present.
+Do not interrupt power during a normal installation/removal. If recovery fails,
+stop experiments and seek device-specific help. Removing USB alone cannot undo
+installation. Keep the ROLLBACK flag on a recovery USB.
+
+Guide: https://github.com/kisinga/jbl-bar9-standard-mode/blob/main/docs/TROUBLESHOOTING.md

@@ -1,0 +1,6 @@
+/build/
+/dist/
+/research/private/
+__pycache__/
+*.pyc
+.DS_Store

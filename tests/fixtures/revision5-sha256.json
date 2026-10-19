@@ -1,0 +1,14 @@
+{
+  "AutoScript/AutoScript": "a98a4673cf9cbe9b08757873de2da974274dd22f8cdb028b87b347f72fa0f7ec",
+  "JBLInstall/install.sh": "51c3065fdc81c759ed6557e23a27b295ac9e38d08da750f18669a0c5cc6eeb64",
+  "JBLInstall/uninstall.sh": "368a880e611f8f3732c7cb27e68e14880731b370254eb2e63de9d00bb91783cd",
+  "JBLInstall/collect-storage.sh": "a5ae39e4c0a1134531d80d91b1e4cb1a93f31cb3e05b693c7b8abd469a88f5bd",
+  "JBLInstall/setup.sh": "294b5f0ae5f8f963ef61a524978ff567e518c19356eb3d9a3fdf2dd235b596ec",
+  "JBLInstall/payload/helper.sh": "ca1d2dd6d7b8ccc1590946432d04334d5a8f88c2320acbae447967d0a43a8644",
+  "JBLInstall/payload/controller.sh": "3a166012981c6ab5bac8372e7a34e2df4a10ba6b8dc7a61ba6a68a9c07c79176",
+  "JBLInstall/payload/hook.expected": "87cf62cefa6b584547f2769662295c3e84d97b30b06e8ee871e50cfceeb92581",
+  "JBLInstall/payload/OWNER.txt": "af31957ab40b3fe78e95aef489d58e7179efb6f80ed0654320f78a210a73fa8d",
+  "JBLInstall/payload/run.sh": "99615997df7979413ea6dd3016aef96de0388a72ee26727ebb9d7c96373a2d8f",
+  "JBLInstall/payload/checksums.txt": "214c8b621d92f5d528bf6a256f3e058bcda23438fdc05677ca242ba50ee95c80",
+  "JBLInstall/payload/once.sh": "8f3c3895195ba90f57ed5650f16e82a0d83d9b4d483cbd9550484114377f4b67"
+}
