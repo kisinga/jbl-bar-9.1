@@ -52,8 +52,8 @@ def validate():
 
 def build():
     files = validate()
-    files['README.txt'] = (ROOT / 'docs/USB-README.txt').read_bytes()
-    files['ROLLBACK.txt'] = (ROOT / 'docs/USB-ROLLBACK.txt').read_bytes()
+    files['README.txt'] = (ROOT / 'USB-README.txt').read_bytes()
+    files['ROLLBACK.txt'] = (ROOT / 'ROLLBACK.txt').read_bytes()
     files['LICENSE.txt'] = (ROOT / 'LICENSE').read_bytes()
     out = ROOT / 'dist'
     out.mkdir(exist_ok=True)

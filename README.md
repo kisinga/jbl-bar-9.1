@@ -1,11 +1,12 @@
-# JBL Bar 9.1: automatic Standard Mode
+# JBL Bar 9.1 Smart Mode Off — automatic USB workaround
 
-> **Working branch: faster-wake candidate (revision 6), hardware untested.**
-> The downloads below remain the confirmed revision 5. See [latency work](research/notes/LATENCY.md) for candidate changes and local build instructions.
+> **Working branch: revision 6 is hardware untested.** Downloads below remain the confirmed revision 5. See [candidate changes and testing](CONTRIBUTING.md#faster-wake-candidate--revision-6). Revision 6 upgrades only the exact revision 5 installation and requires its own matching uninstall ZIP.
 
-Install once from USB. The soundbar then switches Smart Mode off automatically after it wakes, including after a mains restart. You can remove the USB after installation.
+I built this to stop manually turning off Smart Mode every time I power on my JBL Bar 9.1. Install once from USB, then remove the drive: the helper waits indefinitely in standby and selects Standard Mode after wake, including after the mains restart I tested.
 
-**Experimental, owner-tested on one supported firmware build.** Cold boot followed by delayed power-on is confirmed. Repeated standby/CEC wakes and other firmware builds are not yet validated. This is an independent community project, not a JBL product.
+**Experimental: tested on my own bar and one firmware build.** The confirmed release takes about **35 seconds after detecting power-on**. Repeated standby/CEC wakes and other builds remain unverified. I am not affiliated with JBL.
+
+The foundation is **[touch MAX's 8 January 2024 AutoScript article](https://touch-max.ru/vzlom/zapusk-ssh-na-proshivke-jbl-9-1)** and its linked **[almirus/jbl9.1 project](https://github.com/almirus/jbl9.1)**. They published the USB entry point and invited work on keeping Smart Mode off. I built on that work; I did not discover AutoScript.
 
 ## Download
 
@@ -13,70 +14,87 @@ Install once from USB. The soundbar then switches Smart Mode off automatically a
 - **[Uninstall ZIP](https://github.com/kisinga/jbl-bar9-standard-mode/releases/download/v0.1.0/jbl-bar9-standard-mode-v0.1.0-uninstall.zip)** — keep this available.
 - [Release notes and SHA-256 checksums](https://github.com/kisinga/jbl-bar9-standard-mode/releases/tag/v0.1.0)
 
-Use the **install ZIP above**, rather than GitHub's “Source code” archive. It already has the correct USB layout. No edits, account, IP address or device-specific configuration are needed.
+Use these ready-to-copy ZIPs, rather than GitHub's source archive. No configuration is needed. The separate [`work/faster-wake` branch](https://github.com/kisinga/jbl-bar9-standard-mode/tree/work/faster-wake) is an **untested hardware candidate**.
 
-## What you need
+## Requirements
 
-- A **JBL Bar 9.1 True Wireless Surround** on the supported build. The recorded firmware label is **23.06.41.80**; the installer checks exact executable hashes automatically. The display version was not independently verified. See [compatibility](docs/COMPATIBILITY.md).
-- A working **FAT32 USB flash drive**, with one partition as the first USB disk. A 512 MiB FAT32 partition worked in our test; that size is not a requirement established by testing. Back up files before formatting a drive.
-- A computer to unzip/copy files and read status files, plus the soundbar remote.
+- **JBL Bar 9.1 True Wireless Surround** with the [supported executables](#compatibility). The recorded firmware label is **23.06.41.80**; I have not independently verified the display version.
+- A working **FAT32 USB drive**, first partition on the first USB disk (`/mnt/sda1`). I tested a 512 MiB partition; that size is not an established requirement. Back up files before formatting.
+- A computer to extract ZIPs/read logs, and the soundbar remote.
 
-You do not need to download firmware, run commands, solder, install developer tools, or leave a computer or network service running.
+No firmware download, soldering, developer tools or ongoing computer/network service is required.
 
 ## Install
 
-1. Download **both ZIPs**, keeping the uninstall ZIP on your computer.
-2. Extract the **contents of the install ZIP** directly to the USB root. Do not put them inside an extra folder. Use a clean drive without another AutoScript package.
-3. Fully power on the bar and wait until it is playing normally. Insert the USB. Leave the remote/buttons alone for **2 minutes**; the automated mute sequence can briefly interrupt audio.
-4. You should see **SMART MODE OFF** if Smart Mode was on. Remove the USB and check `JBLInstall/INSTALL_STATUS.txt` on your computer: success is `INSTALLED_PENDING_REBOOT_TEST` or `ALREADY_INSTALLED_LOGS_EXPORTED`. If it says anything else, follow [troubleshooting](docs/TROUBLESHOOTING.md) before continuing.
-5. With USB removed, disconnect mains for **60 seconds**, reconnect, let LOAD finish, and turn the bar on whenever you want. Allow **60 seconds** for Smart Mode to switch off. Check audio, volume, mute and standby.
+1. Download both ZIPs, keeping the uninstall package on your computer.
+2. Extract the install ZIP's **contents directly to a clean USB root**, without an extra enclosing folder or another AutoScript package.
+3. Fully power on the bar and wait until it plays normally. Insert USB and leave controls alone for **2 minutes**. The automated mute sequence briefly interrupts audio.
+4. Expect **SMART MODE OFF** if Smart Mode was enabled. Return USB to the computer: `JBLInstall/INSTALL_STATUS.txt` should say `INSTALLED_PENDING_REBOOT_TEST` or `ALREADY_INSTALLED_LOGS_EXPORTED`. Otherwise see [troubleshooting](#troubleshooting).
+5. With USB removed, disconnect mains for **60 seconds**, reconnect, let LOAD finish, and turn the bar on whenever you want. Allow **60 seconds** for the change; check audio, volume, mute and standby.
 
-USB layout:
+The USB root must contain `AutoScript/AutoScript`, `JBLInstall/`, `README.txt`, `ROLLBACK.txt` and `manifest.json` (plus the license).
 
-```text
-USB root/
-├── AutoScript/
-│   └── AutoScript
-├── JBLInstall/
-│   ├── install.sh
-│   ├── setup.sh
-│   ├── uninstall.sh
-│   └── payload/…
-├── README.txt
-├── ROLLBACK.txt
-└── manifest.json
-```
+**There is no standby deadline.** Already in Standard Mode means no action or message is needed. Once a wake is handled, manually selecting Smart Mode is respected until the next observed standby/wake. Very short standby transitions may be missed.
 
-**The standby wait is indefinite.** There is no requirement to leave it in standby for two minutes: that was a validation test. Turn it on immediately or hours later. The confirmed release took about **35 seconds from detected power-on** to completing the change. It waits for the bar to be ready and checks that simulated keys are released.
+## Remove or recover
 
-If already in Standard Mode, it does nothing and may show no message. Once it has handled a wake, manually selecting Smart Mode is respected until the next observed standby/wake cycle. Very short standby transitions may be missed.
+**Removing USB does not uninstall the helper.** Extract the matching uninstall ZIP to a clean FAT32 USB root, insert into the powered bar and wait **100 seconds**. Check `JBLInstall/UNINSTALL_STATUS.txt` for `UNINSTALLED` or `ALREADY_UNINSTALLED`, then remove USB and restart.
 
-## Remove it
+Alternatively, add an empty `JBLInstall/ROLLBACK` file to the install USB, **without a `.txt` extension**. Removal waits for active work, backs up installed files to `JBLInstall/uninstalled-backup`, and preserves unknown hooks.
 
-Removing the USB **does not uninstall** the helper.
+For `HOOK_DISABLED_REBOOT_TO_FINISH_UNINSTALL`, reboot with rollback USB connected; once fully on, remove/reinsert it, wait 100 seconds and check again.
 
-1. Extract the **uninstall ZIP** to a clean FAT32 USB root.
-2. Insert it into the powered bar and wait **100 seconds**.
-3. Return USB to the computer. Confirm `JBLInstall/UNINSTALL_STATUS.txt` says `UNINSTALLED` or `ALREADY_UNINSTALLED`.
-4. Remove USB and restart the bar. Smart Mode returns to JBL's normal behavior.
+If LOAD persists or controls stop responding, insert the rollback USB and allow removal to finish. If controls remain unresponsive, disconnect mains and reconnect with rollback USB inserted, then check removal logs. Do not interrupt a normal install/uninstall. If rollback fails to restore normal boot, stop repeated experiments and seek device-specific recovery help.
 
-Alternatively, create an empty file named `ROLLBACK` **without an extension** inside `JBLInstall` on the installation USB. [Full removal and recovery instructions](docs/TROUBLESHOOTING.md#remove-or-recover).
+## Compatibility
 
-## What it changes
+The installer checks these exact SHA-256 identities; a matching version label alone is insufficient:
 
-The installer adds a small helper under `/var/JBLStandard` and its startup hook `/var/AutoScript.TSS`. It waits for an awake state, checks the current mode, temporarily enables the existing command handler, sends the normal mute-hold/volume-up sequence, verifies Standard Mode and key release, then restores the command-handler settings. It uses temporary process-memory writes for those settings; it does not flash a firmware image or patch executable instructions.
+| Executable | SHA-256 |
+| --- | --- |
+| `bdpprog` | `86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441c90b63` |
+| `cli` | `8910fb852d2f994a519615fede404fbb036e3a8f5264cc69cdff57038af3c78f` |
 
-This is a persistent automation workaround: it reapplies Standard after wake. It does not make JBL's own saved default permanent. Firmware updates may remove it or cause the build checks to refuse operation. It runs with the device's system privileges; keep the uninstall package available. Earlier development revisions caused a startup stall or unresponsive controls, so use the release package rather than old experimental files.
+It also requires the expected writable `/var` environment. Do not bypass identity guards or assume other JBL models work. Firmware updates may remove the helper or invalidate its checks. v0.1.0 supports fresh installation, reinsertion of its exact installed version, and the recognized previous revision 4; other versions/hooks are preserved.
 
-## Documentation and contributions
+## Troubleshooting
 
-- [Compatibility and exact supported hashes](docs/COMPATIBILITY.md)
-- [Troubleshooting, status files and recovery](docs/TROUBLESHOOTING.md)
-- [How it works and where RE findings helped](docs/DESIGN.md)
-- [What has actually been tested](docs/VALIDATION.md)
-- [Development, tests and reproducible ZIPs](CONTRIBUTING.md)
-- [Credits and prior work](docs/CREDITS.md)
+No new `install.log` or `update.log` usually means the USB launcher did not run: check FAT32, root layout and that `JBLInstall/ROLLBACK` is absent. Start installation only once the bar plays normally.
 
-Report your model, firmware label, cold-boot/standby results and relevant **text status/log files** through [Issues](https://github.com/kisinga/jbl-bar9-standard-mode/issues). Do not upload full firmware, backups, memory dumps or personal/network information.
+| Result | Next step |
+| --- | --- |
+| `TRIAL_NOT_SUCCESSFUL_NO_INSTALL` | No new helper installed; read `trial/STATUS.txt` and `trial/latest.log`. |
+| `STOPPED_LONG_PRESS_NOT_CONFIRMED` | Happened once on my bar. If controls work, let it settle and retry insertion once, leaving controls alone. Stop if repeated. |
+| `FIRMWARE_MISMATCH` / `CLI_MISMATCH` | Unsupported build; keep the guards intact. |
+| `EXISTING_AUTOSCRIPT_PRESERVED_NO_INSTALL` / `INSTALLED_VERSION_CONFLICT` | Another hook/version exists; do not overwrite blindly. |
+| `runtime/STATUS.txt`: `STANDARD_SELECTED` | Mode change confirmed; check its boot ID. |
+| `runtime/WATCH_STATUS.txt`: `STANDARD_THIS_WAKE` | This wake was handled successfully. |
+| `runtime/DISABLED` | A guard stopped further action. Collect logs and uninstall. Reinsertion does not clear it. |
 
-JBL documents the manual key sequence and reset to Smart Mode on every power-on in its [support article](https://support.jbl.com/howto/jbl-bar-9-1-lacking-dialogue-too-much-surround-us/000017755.html). The USB execution mechanism builds on [almirus/touch MAX's published work](https://github.com/almirus/jbl9.1). This project contributes the guarded Bar 9.1 automation and startup handling; it does not claim to have discovered AutoScript.
+`UPDATE_STATUS.txt=SETUP_FINISHED` alone is not success: check `INSTALL_STATUS.txt` and `install.log`'s `EXIT=`. An upgrade's uninstall status can refer to the previous version.
+
+For wake logs, reinsert the same install USB for **15 seconds**. Read `JBLInstall/runtime/watch.log`, `latest.log`, `last-attempt/result.txt` and `last-attempt/JBLTest/result.txt`. Compare boot IDs/uptime; the wall clock may be wrong. Older component header numbers can be normal. Reinsertion exports logs without replaying the sequence.
+
+Report model, displayed firmware (or unknown), timing, control behavior and cold-boot/standby/CEC results in [Issues](https://github.com/kisinga/jbl-bar9-standard-mode/issues). Attach relevant text logs after reviewing them; omit full dumps and personal/network information.
+
+## How it works
+
+I install `/var/JBLStandard` and the `/var/AutoScript.TSS` startup hook. The watcher checks readiness and mode, temporarily enables existing console fields in RAM, sends the normal mute-hold/volume-up sequence, verifies Standard Mode and released keys, then restores those fields. It does not flash firmware or patch executable instructions.
+
+This persists the automation, **not JBL's saved default**. It runs with system privileges. Earlier development versions caused a startup stall or unresponsive controls; the confirmed revision includes inherited-socket cleanup and handling for disappearing process descriptors. Use the packaged release and keep its rollback ZIP.
+
+## Validation
+
+On **19 October 2026**, I confirmed a mains restart followed by delayed power-on. The watcher started at uptime 8.13 seconds, detected awake at 134.67, and completed at 169.22: **34.55 seconds**. Logs recorded mode `3 → 0`, released keys and `CONSOLE_RESTORED=1`. I removed USB for this test; logs alone do not independently establish its absence.
+
+My first installation needed a retry. This evidence covers one post-install wake, not every standby/CEC path. **102 host checks passed**, and anonymous release downloads matched a reproducible fresh-clone build. Host checks do not replace hardware testing.
+
+## Credits
+
+- **touch MAX and [almirus/jbl9.1](https://github.com/almirus/jbl9.1/tree/master/AutoScript):** USB execution, persistent-storage groundwork and the community invitation above. The article is credited to `admin` and links that GitHub handle; I make no claim about their personal identity. It also acknowledges earlier MediaTek/Blu-ray AutoScript work.
+- **JBL:** [documents the manual sequence and Smart Mode reset on power-on](https://support.jbl.com/howto/jbl-bar-9-1-lacking-dialogue-too-much-surround-us/000017755.html).
+- **SimenCodes:** [related Smart Mode automation in JBL_Soundbar](https://github.com/MrBearPresident/JBL_Soundbar/pull/6), merged 11 November 2024 and tested on Bar 1000. This is separate network-based prior work, not evidence this USB package supports that model.
+
+I added build-specific mode/readiness analysis, guarded key automation, release/readback checks, console restoration and persistent standby handling, using REA/Ghidra and shell tests. I claim no world first. The MIT license covers my distributed code/docs, not vendor firmware or linked upstream material; neither upstream firmware nor SSH payloads are bundled.
+
+[Development and reproducible builds](CONTRIBUTING.md) · [Community links and my post draft](COMMUNITY.md) · [Research archive index](research/README.md)
