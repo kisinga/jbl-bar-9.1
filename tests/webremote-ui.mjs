@@ -6,8 +6,10 @@ import {fileURLToPath} from 'node:url';
 const {chromium} = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = new URL('../', import.meta.url);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-const initial = () => ({available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, source_state:0, hostname:'jbl.local', csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,atmos:1,rear:2,rear_docked:true,night:false}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,media_ready:true,audio:'Disconnected',name:'My speaker'}});
-let state = initial(), calls = [], delay = 300, failure = '', offline = false, getDelay = 0, advertisedControls = null;
+const systemFixture = () => ({sample:1,cpu_percent:18.2,cpu_cores:2,load_average:[0.21,0.14,0.09],memory:{total_bytes:268435456,available_bytes:146800640,used_bytes:121634816},storage:{total_bytes:134217728,available_bytes:100663296,used_bytes:33554432},network:{receive_bytes_per_second:16384,transmit_bytes_per_second:1536},uptime_seconds:90300,processes:64,temperature_c:46.5});
+const eqFixture = () => ({available:true,enabled:false,gains_db:[0,0,0,0,0],frequencies_hz:[125,500,2000,4000,8000],status:'original'});
+const initial = () => ({eq:eqFixture(),system:systemFixture(),available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, source_state:0, hostname:'jbl.local', csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,atmos:1,rear:2,rear_docked:true,night:false}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,media_ready:true,audio:'Disconnected',name:'My speaker'}});
+let state = initial(), calls = [], lastPayload = null, delay = 300, failure = '', offline = false, getDelay = 0, advertisedControls = null;
 const streams=new Set(); let stateGets=0, streamGets=0, revision=0, lastSnapshot='';
 function snapshot() {
  state.media_controls=[];
@@ -42,9 +44,11 @@ const server = createServer(async (req, res) => {
     if (offline) { req.socket.destroy(); return; }
     if (req.method === 'POST') {
       let body = ''; for await (const chunk of req) body += chunk;
-      const {action} = JSON.parse(body); calls.push(action);
+      const payload = JSON.parse(body); lastPayload = payload; const {action} = payload; calls.push(action);
       await pause(delay);
       if (failure) { res.writeHead(409, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:failure,state})); return; }
+      if (action === 'eq_apply') {state.eq={...state.eq,enabled:payload.gains_db.some(value=>value!==0),gains_db:[...payload.gains_db],status:payload.gains_db.some(value=>value!==0)?'custom':'original'};}
+      if (action === 'eq_reset') state.eq={...eqFixture()};
       if (action === 'night_toggle') state.sound.night=!state.sound.night;
       // A2DP can remain Streaming while the app handles AVRCP Play/Pause.
       // Only a real receiver media session has an independently reported player state.
@@ -82,11 +86,103 @@ try {
   await page.waitForFunction(()=>document.querySelector('#connection').dataset.state==='online');
   check(stateGets===0 && streamGets===1,'initial state uses one push connection');
   check(await page.locator('h1').count()===1,'one clear page heading');
-  check(await page.locator('#eq-panel h2').textContent()==='Equalizer','dedicated equalizer section');
-  check((await page.locator('#eq-panel').textContent()).includes('In development') && (await page.locator('#eq-panel').textContent()).includes('No custom EQ applied'),'EQ preview honestly describes development status');
-  check(await page.locator('#eq-panel button,#eq-panel input,[role=slider]').count()===0,'EQ preview exposes no pretend controls');
+  check(await page.locator('#eq-panel h2').textContent()==='Front EQ','front-channel equalizer is explicit');
+  check((await page.locator('#eq-panel').textContent()).includes('Experimental') && (await page.locator('#eq-processing').textContent()).includes('custom DSP mode'),'EQ experimental processing mode is disclosed');
+  check(await page.locator('#eq-panel input[type=range]').count()===5 && await page.locator('#eq-panel input').evaluateAll(inputs=>inputs.every(input=>input.min==='-6'&&input.max==='0'&&input.step==='0.5')),'five real cuts-only half-decibel sliders');
+  check(await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-reset').isDisabled(),'unchanged original tuning offers no unnecessary write');
+  check(await page.locator('#eq-preset').inputValue()==='original','committed factory tuning selects Original preset');
+  await page.locator('#eq-preset').selectOption('less_bass');
+  check(calls.length===0 && state.eq.gains_db.every(value=>value===0) && await page.locator('#eq-slider-0').inputValue()==='-4' && await page.locator('#eq-slider-1').inputValue()==='-2','preset selection changes draft and graph only, without a POST');
+  check(await page.locator('#eq-apply').isEnabled() && (await page.locator('#eq-graph svg').getAttribute('aria-label')).includes('Unapplied'),'preset remains explicitly unapplied');
+  await page.locator('#eq-apply').click();await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Front EQ applied.');
+  check(JSON.stringify(lastPayload.gains_db)==='[-4,-2,0,0,0]' && await page.locator('#eq-preset').inputValue()==='less_bass','preset Apply commits the exact named curve and keeps selection');
+  await page.locator('#eq-slider-0').evaluate(input=>{input.value='-3.5';input.dispatchEvent(new Event('input',{bubbles:true}));});
+  check(await page.locator('#eq-preset').inputValue()==='custom','manual tuning of a preset switches to Custom');
+  await page.locator('#eq-preset').selectOption('custom');
+  check(await page.locator('#eq-slider-0').inputValue()==='-3.5','selecting Custom retains the current draft');
+  await page.locator('#eq-preset').selectOption('clear_dialogue');
+  check(await page.locator('#eq-slider-0').inputValue()==='-3' && await page.locator('#eq-slider-1').inputValue()==='-1' && await page.locator('#eq-slider-4').inputValue()==='-1','Clear dialogue uses a cuts-only draft');
+  await page.locator('#eq-preset').selectOption('softer_treble');
+  check(await page.locator('#eq-slider-3').inputValue()==='-2' && await page.locator('#eq-slider-4').inputValue()==='-3','Softer treble uses the specified upper-band cuts');
+  const callsBeforeMorePresets=calls.length;
+  for(const [name,values] of [['warm',[0,0,-1,-2,-3]],['bright',[-3,-2,-1,0,0]],['vocal_focus',[-4,-2,0,-1,-2]]]) {
+    await page.locator('#eq-preset').selectOption(name);
+    check(JSON.stringify(await page.locator('#eq-panel input[type=range]').evaluateAll(inputs=>inputs.map(input=>Number(input.value))))===JSON.stringify(values) && calls.length===callsBeforeMorePresets,'additional '+name+' preset sets the exact bounded draft without sending audio commands');
+  }
+  await page.locator('#eq-preset').selectOption('original');
+  check(await page.locator('#eq-apply').isEnabled() && state.eq.enabled,'Original remains a draft until Apply when custom EQ is active');
+  await page.locator('#eq-apply').click();await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Original tuning restored.');
+  check(!state.eq.enabled && lastPayload.gains_db.every(value=>value===0) && await page.locator('#eq-preset').inputValue()==='original','applying Original restores native processing');
+  calls=[];lastPayload=null;
+  await page.locator('#eq-slider-0').focus();await page.keyboard.press('ArrowLeft');
+  check(await page.locator('#eq-gain-0').textContent()==='-0.5 dB' && calls.length===0 && state.eq.gains_db[0]===0,'keyboard EQ edits a local draft without changing sound or volume');
+  check(await page.locator('#eq-apply').isEnabled() && (await page.locator('#eq-state').textContent()).includes('Unapplied'),'draft requires explicit Apply');
+  state.system.sample=2;await pause(100);
+  check(await page.locator('#eq-slider-0').inputValue()==='-0.5','ordinary live updates preserve the EQ draft');
+  await page.locator('#eq-apply').click();
+  check(await page.locator('#eq-slider-0').isDisabled() && await page.locator('#eq-preset').isDisabled() && await page.locator('[data-action=volume_up]').isDisabled(),'EQ presets and sliders share one global pending action guard');
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Front EQ applied.');
+  check(lastPayload.action==='eq_apply' && JSON.stringify(lastPayload.gains_db)==='[-0.5,0,0,0,0]' && state.eq.enabled,'Apply sends only the captured five-band draft');
+  check(await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-reset').isEnabled(),'applied EQ enables original-processing reset');
+  await page.locator('#eq-reset').click();await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Original tuning restored.');
+  check(lastPayload.action==='eq_reset' && !('gains_db' in lastPayload) && !state.eq.enabled,'Reset requests native original processing, not a flat custom preset');
+  await page.locator('#eq-slider-1').evaluate(input=>{input.value='-6';input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await page.locator('#eq-apply').click();await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Front EQ applied.');
+  await page.locator('#eq-slider-1').evaluate(input=>{input.value='0';input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await page.locator('#eq-apply').click();await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Original tuning restored.');
+  check(!state.eq.enabled && state.eq.gains_db.every(value=>value===0),'applying all zero gains restores original processing');
+  await page.locator('#eq-slider-2').evaluate(input=>{input.value='-1';input.dispatchEvent(new Event('input',{bubbles:true}));});
+  failure='EQ application refused';await page.locator('#eq-apply').click();await page.waitForFunction(()=>document.querySelector('#message').dataset.kind==='error');
+  check(!state.eq.enabled && await page.locator('#eq-slider-2').inputValue()==='-1' && await page.locator('#eq-apply').isEnabled(),'refused EQ preserves the unapplied draft without claiming success');
+  failure='';state.eq={...eqFixture(),enabled:true,gains_db:[-2,0,0,0,0],status:'custom'};await page.waitForFunction(()=>document.querySelector('#eq-slider-0').value==='-2');
+  check(await page.locator('#eq-slider-2').inputValue()==='0','new committed soundbar EQ replaces an obsolete local draft');
+  state.eq={available:false,enabled:true,gains_db:[-2,0,0,0,0],status:'reset_required'};await page.waitForFunction(()=>document.querySelector('#eq-slider-0').disabled);
+  check(await page.locator('#eq-reset').isEnabled() && await page.locator('#eq-apply').isDisabled() && (await page.locator('#eq-state').textContent()).includes('Reset required'),'reset-required state permits recovery but blocks further tuning');
+  state.eq={...eqFixture(),gains_db:[1,0,0,0,0]};await page.waitForFunction(()=>document.querySelector('#eq-gain-0').textContent==='—');
+  check(await page.locator('#eq-slider-0').isDisabled() && await page.locator('#eq-preset').isDisabled() && await page.locator('#eq-graph').isHidden(),'invalid boost readback disables presets rather than showing a false setting');
+  delete state.eq;await pause(100);
+  check(await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-reset').isDisabled() && (await page.locator('#eq-state').textContent()).includes('unavailable'),'older backend has no pretend active EQ controls');
+  state.eq=eqFixture();state.system=systemFixture();calls=[];lastPayload=null;await pause(100);
+
   check(await page.locator('.panel').first().evaluate(e=>getComputedStyle(e).animationName)==='none','reduced-motion preference removes entry animation');
   check(await page.locator('#volume').evaluate(e=>Number.parseFloat(getComputedStyle(e).fontSize))>await page.locator('#sound-heading').evaluate(e=>Number.parseFloat(getComputedStyle(e).fontSize)),'volume remains the primary visual control');
+
+  check(await page.locator('#system-heading').textContent()==='System monitor','system monitor groups device vitals');
+  check(await page.locator('#system-panel #wifi-panel').count()===1 && await page.locator('#wifi-panel.panel').count()===0,'Wi-Fi lives inside system monitor');
+  check(await page.locator('#cpu-value').textContent()==='18%' && await page.locator('#cpu-detail').textContent()==='2 cores','real aggregate CPU and core count shown');
+  check(await page.locator('#memory-value').textContent()==='45%' && (await page.locator('#memory-detail').textContent()).includes('256 MiB'),'memory used and total shown');
+  check(await page.locator('#storage-value').textContent()==='96 MiB free of 128 MiB' && await page.locator('#storage-progress').getAttribute('value')==='25','persistent storage usage shown');
+  check(await page.locator('#network-receive').textContent()==='16 KiB/s' && await page.locator('#network-transmit').textContent()==='1.5 KiB/s','real Wi-Fi byte rates shown');
+  check(await page.locator('#system-load').textContent()==='0.21 / 0.14 / 0.09' && await page.locator('#system-uptime').textContent()==='1d 1h 5m','load intervals and uptime readable');
+  check(await page.locator('#system-temperature').textContent()==='46.5 °C' && await page.locator('#system-processes').textContent()==='64','optional temperature and process count shown');
+  check(await page.locator('#cpu-chart').getAttribute('data-samples')==='1','first server sample starts real history');
+  await page.evaluate(()=>{render();render();});
+  check(await page.locator('#cpu-chart').getAttribute('data-samples')==='1','renders and duplicate action snapshots never fabricate history');
+  for(let n=2;n<=4;n++){state.system={...state.system,sample:n,cpu_percent:n*10};await page.waitForFunction(count=>document.querySelector('#cpu-chart').dataset.samples===String(count),n);}
+  check(await page.locator('#cpu-line').getAttribute('d')!=='' && (await page.locator('#cpu-chart').getAttribute('aria-label')).includes('4 real samples'),'bounded SVG graph has accessible real sample history');
+  state.system={sample:5,cpu_percent:null,memory:{total_bytes:100,available_bytes:200,used_bytes:-1},storage:{total_bytes:0,available_bytes:0,used_bytes:0},network:{receive_bytes_per_second:null,transmit_bytes_per_second:-1},load_average:[0,null,0]};
+  await page.waitForFunction(()=>document.querySelector('#cpu-value').textContent==='—');
+  check(await page.locator('#memory-value').textContent()==='—' && await page.locator('#network-receive').textContent()==='—' && await page.locator('#network-transmit').textContent()==='—','missing and invalid vitals never become invented zeros');
+  check(await page.locator('#storage-progress').isHidden() && await page.locator('#system-temperature-row').isHidden() && await page.locator('#system-processes-row').isHidden(),'unsupported readings and invalid storage stay unavailable');
+  check(await page.locator('#cpu-chart').getAttribute('data-samples')==='4','unavailable metric creates a history gap, not a zero');
+  state.system={...systemFixture(),sample:6,cpu_percent:0,memory:{...systemFixture().memory,estimated_available:true}};
+  await page.waitForFunction(()=>document.querySelector('#cpu-value').textContent==='0%');
+  check((await page.locator('#memory-available').textContent()).includes('estimated'),'fallback available-memory estimate is labelled');
+  check((await page.locator('#cpu-line').getAttribute('d')).split('M').length===3,'missing CPU sample breaks graph into separate segments');
+  await page.evaluate(()=>{const real=Date.now;try{Date.now=()=>real()+7000;render();}finally{Date.now=real;}});
+  check(await page.locator('#system-panel').getAttribute('data-state')==='stale' && (await page.locator('#system-note').textContent()).includes('stopped updating'),'stalled samples are marked stale');
+  await page.evaluate(()=>renderSystem({...current,available:false,system:{...current.system,sample:7}},true));
+  check(await page.locator('#system-panel').getAttribute('data-state')==='live' && await page.locator('#cpu-value').textContent()==='0%','system monitor remains usable while native controls are starting');
+  await page.evaluate(()=>{const real=Date.now;try{Date.now=()=>real()+7000;renderSystem({...current,system:{...current.system,sample:8}},true);}finally{Date.now=real;}});
+  check(await page.locator('#cpu-chart').getAttribute('data-samples')==='1','fresh sample after a long gap starts honest history');
+  delete state.system;await page.waitForFunction(()=>document.querySelector('#system-panel').dataset.state==='waiting');
+  check(await page.locator('#cpu-chart').getAttribute('data-samples')==='0' && await page.locator('#cpu-value').textContent()==='—','missing backend clears values and historical chart');
+  state.system=systemFixture();await page.waitForFunction(()=>document.querySelector('#cpu-chart').dataset.samples==='1');
+  // Feed distinct backend samples without waiting for a two-minute real-device capture.
+  await page.evaluate(()=>{for(let sample=2;sample<=70;sample++)renderSystem({...current,system:{...current.system,sample,cpu_percent:sample%100}},true);});
+  check(await page.locator('#cpu-chart').getAttribute('data-samples')==='60','history retains at most 60 unique samples');
+  await page.evaluate(()=>renderSystem({...current,system:{...current.system,sample:1}},true));
+  check(await page.locator('#cpu-chart').getAttribute('data-samples')==='1','backend sample reset starts a new history');
 
   const stale={...snapshot(),revision:revision-1,volume:200};
   for(const res of streams)res.write('data: '+JSON.stringify(stale)+'\n\n');
@@ -148,6 +244,8 @@ try {
   await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp');
   await page.waitForFunction(()=>document.querySelector('#connection').dataset.state==='offline');
   check(await plus.isDisabled(),'offline disables controls');
+  check(await page.locator('#eq-slider-0').isDisabled() && await page.locator('#eq-preset').isDisabled() && await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-reset').isDisabled(),'offline disables EQ presets, drafts and mutations');
+  check(await page.locator('#cpu-chart').getAttribute('data-samples')==='0' && await page.locator('#system-panel').getAttribute('data-state')==='offline' && await page.locator('#memory-value').textContent()==='—','offline clears graphs and readings rather than displaying false zeros');
   const atLoss=calls.length; offline=false;
   await page.locator('#refresh').click();
   await page.waitForFunction(()=>document.querySelector('#connection').dataset.state==='online');
@@ -156,6 +254,7 @@ try {
   state.power='Standby'; await page.locator('#refresh').click();
   await page.waitForFunction(()=>document.querySelector('#power').getAttribute('aria-label')==='Turn soundbar on');
   check(await plus.isDisabled() && await page.locator('#power').isEnabled(),'standby only permits power');
+  check(await page.locator('#eq-slider-0').isDisabled() && (await page.locator('#eq-state').textContent()).includes('Turn on'),'standby blocks EQ and explains why');
   check((await page.locator('#summary').textContent()).includes('standby'),'standby copy');
   state.available=false;state.power='Starting';state.error='Soundbar is starting';
   await page.locator('#refresh').click();
@@ -325,6 +424,17 @@ try {
   await pause(200);
   await mkdir(new URL('build/',root),{recursive:true});
   check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Bluetooth transport fits at 320px');
+  // Public screenshots contain explicit sample fixtures, never live device captures.
+  await page.evaluate(()=>{
+    const realNow=Date.now, end=realNow();
+    renderSystem({...current,system:null},true);
+    try {
+      for(let sample=1;sample<=60;sample++) {
+        Date.now=()=>end-(60-sample)*2000;
+        renderSystem({...current,system:{...current.system,sample,cpu_percent:18+Math.sin(sample*.34)*8+(sample%13===0?19:0),memory:{...current.system.memory,used_bytes:118000000+Math.sin(sample*.12)*4000000,available_bytes:150435456-Math.sin(sample*.12)*4000000}}},true);
+      }
+    } finally {Date.now=realNow;}
+  });
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-320.png',root)),fullPage:true});
   await page.setViewportSize({width:390,height:920});
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-new.png',root)),fullPage:true});

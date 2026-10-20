@@ -52,6 +52,8 @@ type bluetoothState struct {
 	Audio        string `json:"audio,omitempty"`
 }
 type state struct {
+	EQ            *frontEQState   `json:"eq,omitempty"`
+	System        *systemState    `json:"system,omitempty"`
 	Hostname      string          `json:"hostname,omitempty"`
 	MediaControls []string        `json:"media_controls,omitempty"`
 	Revision      uint64          `json:"revision"`
@@ -73,6 +75,8 @@ type state struct {
 	CSRF          string          `json:"csrf"`
 }
 type device struct {
+	eq         eqController
+	monitor    systemMonitor
 	mu         sync.Mutex
 	pid        int
 	start      string
@@ -320,7 +324,7 @@ func (d *device) bluetooth() *bluetoothState {
 func (d *device) snapshotLocked() state {
 	if e := d.identify(); e != nil {
 		d.revision++
-		return state{Revision: d.revision, WiFi: readWiFi(), Power: "Starting", Mode: "Unknown", Input: "Unknown", Error: e.Error()}
+		return state{System: d.monitor.sample(time.Now()), Revision: d.revision, WiFi: readWiFi(), Power: "Starting", Mode: "Unknown", Input: "Unknown", Error: e.Error()}
 	}
 	return d.snapshotCurrent()
 }
@@ -329,7 +333,7 @@ func (d *device) snapshotLocked() state {
 // console fields into a replacement firmware process.
 func (d *device) snapshotCurrent() state {
 	d.revision++
-	s := state{Revision: d.revision, Power: "Starting", Mode: "Unknown", Input: "Unknown", Hostname: discoveryHostname()}
+	s := state{System: d.monitor.sample(time.Now()), Revision: d.revision, Power: "Starting", Mode: "Unknown", Input: "Unknown", Hostname: discoveryHostname()}
 	if b, e := os.ReadFile("/proc/uptime"); e == nil {
 		v, _ := strconv.ParseFloat(strings.Fields(string(b))[0], 64)
 		s.Uptime = int64(v)
@@ -385,6 +389,7 @@ func (d *device) snapshotCurrent() state {
 		s.Error = "Soundbar restarted; refreshing"
 	}
 	s.MediaControls = mediaCommands(s)
+	s.EQ = d.frontEQStatus(s)
 	return s
 }
 func (d *device) snapshot() state { d.mu.Lock(); defer d.mu.Unlock(); return d.snapshotLocked() }
@@ -492,6 +497,11 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	_, simple := keys[action]
 	if !simple && action != "standard" && action != "night_toggle" {
 		return out, errors.New("unknown control")
+	}
+	if d.eq.active && action != "mute" && action != "volume_up" && action != "volume_down" && !strings.HasPrefix(action, "media_") {
+		if e := d.resetFrontEQ(ctx); e != nil {
+			return d.snapshotCurrent(), e
+		}
 	}
 	before := d.snapshotLocked()
 	if !before.Available {
@@ -722,7 +732,8 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 			return
 		}
 		var request struct {
-			Action string `json:"action"`
+			Action  string    `json:"action"`
+			GainsDB []float64 `json:"gains_db,omitempty"`
 		}
 		dec := json.NewDecoder(http.MaxBytesReader(w, q.Body, 256))
 		dec.DisallowUnknownFields()
@@ -738,7 +749,15 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 		// Finish key-release/restore even if a phone closes the page mid-command.
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		s, e := r.device.action(ctx, request.Action)
+		var s state
+		var e error
+		if request.Action == "eq_apply" || request.Action == "eq_reset" {
+			s, e = r.device.eqAction(ctx, request.Action, request.GainsDB)
+		} else if request.GainsDB != nil {
+			e = errors.New("band values require an EQ control")
+		} else {
+			s, e = r.device.action(ctx, request.Action)
+		}
 		s.CSRF = r.csrf
 		if e != nil {
 			writeJSON(w, 409, map[string]any{"error": e.Error(), "state": s})
@@ -799,11 +818,22 @@ func main() {
 		defer r.device.mu.Unlock()
 		closeBluetoothBridge()
 	}()
+	defer func() {
+		r.device.mu.Lock()
+		defer r.device.mu.Unlock()
+		c, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+		defer cancel()
+		if e := r.device.resetFrontEQ(c); e != nil {
+			log.Printf("EQ cleanup: %v", e)
+		}
+		closeEQParser()
+	}()
 	r.stop = ctx.Done()
 	go r.feed.run(ctx, r.device.snapshot)
 	go monitorWiFi(ctx)
 	go monitorCast(ctx)
 	go monitorDiscovery(ctx, r.network)
+	go r.monitorFrontEQ(ctx)
 	stopped := make(chan struct{})
 	go func() {
 		<-ctx.Done()

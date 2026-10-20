@@ -7,6 +7,17 @@ let current, csrf = '', online = false, active = null, queue = [], epoch = 0;
 let refreshing = false, stream = null, latestState = null, lastSync = 0, holdTimer, repeatTimer, heldButton;
 // A successful AVRCP request changes the next button action, not the reported stream state.
 let mediaIntent = null, mediaPeer = '', mediaAudio = '';
+let eqDraft = null, eqCommitted = '';
+const eqSliders = Array.from({length: 5}, (_, index) => $('eq-slider-' + index));
+const eqPresets = Object.freeze({
+  original: Object.freeze([0,0,0,0,0]),
+  less_bass: Object.freeze([-4,-2,0,0,0]),
+  clear_dialogue: Object.freeze([-3,-1,0,0,-1]),
+  softer_treble: Object.freeze([0,0,0,-2,-3]),
+  warm: Object.freeze([0,0,-1,-2,-3]),
+  bright: Object.freeze([-3,-2,-1,0,0]),
+  vocal_focus: Object.freeze([-4,-2,0,-1,-2]),
+});
 function mediaIdentity(s) {
   const bt = s?.bluetooth;
   return s?.input === 'Bluetooth' && bt?.connected ? JSON.stringify([bt.peer_name || '', bt.name || '']) : '';
@@ -66,6 +77,8 @@ function render() {
   updateSync();
   renderBluetooth(s, ready, awake);
   renderExtras(s, ready, awake);
+  renderSystem(s, online);
+  renderEQ(s, ready, awake);
 }
 function updateSync() {
   if (stream?.readyState === EventSource.OPEN && online) { $('last-seen').textContent = 'Live updates'; return; }
@@ -143,6 +156,8 @@ async function refresh() {
   }
 }
 function success(action, s) {
+  if (action === 'eq_reset' || (action === 'eq_apply' && s.eq?.enabled === false)) return 'Original tuning restored.';
+  if (action === 'eq_apply') return 'Front EQ applied.';
 	if (action === 'night_toggle') return 'Night mode ' + (s.sound?.night ? 'on.' : 'off.');
 	if (action === 'media_play') return 'Play requested.';
 	if (action === 'media_pause') return 'Pause requested.';
@@ -161,6 +176,8 @@ function success(action, s) {
   return sourceName(s) + ' selected.';
 }
 function pendingMessage() {
+  if (active === 'eq_apply') return 'Applying front EQ…';
+  if (active === 'eq_reset') return 'Restoring original tuning…';
 	if (active === 'night_toggle') return 'Changing night mode… audio may briefly mute.';
 	if (active?.startsWith('media_')) return 'Sending playback control…';
   if (isVolume(active)) return 'Adjusting volume' + (queue.length ? ' · ' + queue.length + ' queued' : '') + '…';
@@ -172,6 +189,7 @@ function pendingMessage() {
 function enqueue(action) {
   const button = buttons.find(b => b.dataset.action === action);
   if (!button || button.disabled || !csrf) return;
+  if (action === 'eq_apply' && !validEQGains(eqDraft)) return;
   if (isVolume(action) && queue.length && delta(queue[queue.length - 1]) === -delta(action)) queue.pop();
   else if (queue.length < 8) queue.push(action);
   else { feedback('Let the pending volume changes finish first.', 'pending'); return; }
@@ -181,13 +199,14 @@ function enqueue(action) {
 async function pump() {
   if (active || !queue.length || !online) return;
   active = queue.shift();
+  const gains = active === 'eq_apply' ? eqDraft?.slice() : null;
   epoch++;
   render();
   feedback(pendingMessage(), 'pending');
   const action = active;
   const requestPeer = mediaIdentity(current);
   try {
-    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify({action}), signal: AbortSignal.timeout(20000)});
+    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(action === 'eq_apply' ? {action, gains_db: gains} : {action}), signal: AbortSignal.timeout(20000)});
     const text = await response.text();
     let data;
     try { data = JSON.parse(text); } catch { throw new Error(text.trim() || 'Control unavailable. Refresh and try again.'); }
@@ -373,3 +392,143 @@ function renderExtras(s, ready, awake) {
   $('cast-eq-row').hidden = !hasGains;
   $('cast-eq').textContent = hasGains ? 'Low ' + gains[0] + ' dB · High ' + gains[1] + ' dB (read only)' : '';
 }
+
+
+// History belongs to this visible page, and advances only for real server samples.
+const monitorHistory = [];
+let monitorSample = null, monitorReceived = 0;
+const finitePositive = value => Number.isFinite(value) && value > 0;
+const finiteNonnegative = value => Number.isFinite(value) && value >= 0;
+function memoryReading(value) {
+  if (!value || !finitePositive(value.total_bytes) || !finiteNonnegative(value.available_bytes) || !finiteNonnegative(value.used_bytes) || value.available_bytes > value.total_bytes || value.used_bytes > value.total_bytes) return null;
+  return value;
+}
+function monitorBytes(value) { return (value / 1048576).toLocaleString(undefined, {maximumFractionDigits: 1}) + ' MiB'; }
+function monitorRate(value) {
+  if (!finiteNonnegative(value)) return '—';
+  const unit = value >= 1048576 ? 1048576 : value >= 1024 ? 1024 : 1;
+  return (value / unit).toLocaleString(undefined, {maximumFractionDigits: unit === 1 ? 0 : 1}) + (unit === 1048576 ? ' MiB/s' : unit === 1024 ? ' KiB/s' : ' B/s');
+}
+function monitorUptime(value) {
+  if (!finiteNonnegative(value)) return '—';
+  if (value < 60) return Math.floor(value) + 's';
+  return [value >= 86400 ? Math.floor(value / 86400) + 'd' : '', value >= 3600 ? Math.floor(value / 3600) % 24 + 'h' : '', Math.floor(value / 60) % 60 + 'm'].filter(Boolean).join(' ');
+}
+function drawMonitorChart(id, key, label) {
+  let line = '', area = '', segment = [];
+  const finish = () => {
+    if (!segment.length) return;
+    line += 'M' + segment.map(p => p.join(',')).join('L');
+    if (segment.length > 1) area += 'M' + segment[0][0] + ',72L' + segment.map(p => p.join(',')).join('L') + 'L' + segment.at(-1)[0] + ',72Z';
+    segment = [];
+  };
+  for (const point of monitorHistory) {
+    if (!Number.isFinite(point[key])) { finish(); continue; }
+    const x = Math.max(0, 300 - (monitorReceived - point.time) / 120000 * 300);
+    segment.push([Number(x.toFixed(2)), Number((70 - point[key] * .68).toFixed(2))]);
+  }
+  finish();
+  $(id + '-line').setAttribute('d', line);
+  $(id + '-area').setAttribute('d', area);
+  const last = monitorHistory.at(-1);
+  $(id + '-point').toggleAttribute('hidden', !Number.isFinite(last?.[key]));
+  if (Number.isFinite(last?.[key])) { $(id + '-point').setAttribute('cx', 300); $(id + '-point').setAttribute('cy', 70 - last[key] * .68); }
+  const valid = monitorHistory.filter(point => Number.isFinite(point[key]));
+  $(id + '-chart').dataset.samples = valid.length;
+  $(id + '-chart').setAttribute('aria-label', label + ' history: ' + (valid.length ? valid.length + ' real samples, latest ' + Math.round(valid.at(-1)[key]) + '%' : 'no samples available'));
+}
+function renderSystem(s, connected) {
+  const reported = s.system;
+  const valid = connected && Number.isSafeInteger(reported?.sample) && reported.sample >= 0;
+  const now = Date.now();
+  if (!valid) { monitorHistory.length = 0; monitorSample = null; monitorReceived = 0; }
+  const data = valid ? reported : {};
+  const cpu = finiteNonnegative(data.cpu_percent) && data.cpu_percent <= 100 ? data.cpu_percent : null;
+  const memory = memoryReading(data.memory), storage = memoryReading(data.storage);
+  const ram = memory ? memory.used_bytes / memory.total_bytes * 100 : null;
+  if (valid && data.sample !== monitorSample) {
+    if (monitorSample !== null && (data.sample < monitorSample || now - monitorReceived > 6500)) monitorHistory.length = 0;
+    monitorSample = data.sample; monitorReceived = now;
+    monitorHistory.push({time: now, cpu, ram});
+    while (monitorHistory.length > 60 || now - monitorHistory[0].time > 120000) monitorHistory.shift();
+  }
+  const stale = valid && now - monitorReceived > 6500;
+  $('system-panel').dataset.state = !connected ? 'offline' : stale ? 'stale' : valid ? 'live' : 'waiting';
+  $('system-status').textContent = !connected ? 'Offline' : stale ? 'Waiting for new data' : valid ? 'Live · every 2s' : 'Not available';
+  $('cpu-value').textContent = cpu === null ? '—' : Math.round(cpu) + '%';
+  $('cpu-detail').textContent = Number.isSafeInteger(data.cpu_cores) && data.cpu_cores > 0 ? data.cpu_cores + (data.cpu_cores === 1 ? ' core' : ' cores') : 'Cores not reported';
+  $('memory-value').textContent = ram === null ? '—' : Math.round(ram) + '%';
+  $('memory-detail').textContent = memory ? monitorBytes(memory.used_bytes) + ' / ' + monitorBytes(memory.total_bytes) : 'Usage not reported';
+  $('memory-available').textContent = memory ? monitorBytes(memory.available_bytes) + ' available' + (memory.estimated_available ? ' · estimated' : '') : 'Available memory not reported';
+  $('history-count').textContent = monitorHistory.length ? monitorHistory.length === 1 ? 'Collecting history' : monitorHistory.length + ' samples · 2 min window' : 'No samples yet';
+  drawMonitorChart('cpu', 'cpu', 'CPU'); drawMonitorChart('memory', 'ram', 'RAM');
+  $('storage-progress').hidden = !storage;
+  $('storage-progress').value = storage ? storage.used_bytes / storage.total_bytes * 100 : 0;
+  $('storage-detail').textContent = storage ? Math.round(storage.used_bytes / storage.total_bytes * 100) + '% used' : '—';
+  $('storage-value').textContent = storage ? monitorBytes(storage.available_bytes) + ' free of ' + monitorBytes(storage.total_bytes) : 'Usage not reported';
+  $('network-receive').textContent = monitorRate(data.network?.receive_bytes_per_second);
+  $('network-transmit').textContent = monitorRate(data.network?.transmit_bytes_per_second);
+  $('system-uptime').textContent = monitorUptime(data.uptime_seconds);
+  $('system-load').textContent = Array.isArray(data.load_average) && data.load_average.length === 3 && data.load_average.every(finiteNonnegative) ? data.load_average.map(value => value.toFixed(2)).join(' / ') : '—';
+  $('system-processes-row').hidden = !Number.isSafeInteger(data.processes) || data.processes < 0;
+  $('system-processes').textContent = data.processes ?? '—';
+  $('system-temperature-row').hidden = !Number.isFinite(data.temperature_c);
+  $('system-temperature').textContent = Number.isFinite(data.temperature_c) ? data.temperature_c.toFixed(1) + ' °C' : '—';
+  $('system-note').textContent = !connected ? 'Connection lost. Vitals will resume with fresh samples.' : stale ? 'These readings have stopped updating. Waiting for a fresh sample.' : valid ? 'Real device samples. History builds while this page is open.' : 'System vitals are not available from this version of the remote.';
+}
+
+// A stalled stream can stay open: age the label without fetching or adding samples.
+setInterval(() => { if (!document.hidden && monitorReceived && Date.now() - monitorReceived > 6500) renderSystem(current, online); }, 2000);
+
+
+function validEQGains(gains) {
+  return Array.isArray(gains) && gains.length === 5 && gains.every(value => Number.isFinite(value) && value >= -6 && value <= 0 && Number.isInteger(value * 2));
+}
+function eqGain(value) { return (value === 0 ? '0' : value.toFixed(1).replace(/\.0$/, '')) + ' dB'; }
+function renderEQ(s, ready, awake) {
+  const eq = s.eq || {};
+  const valid = validEQGains(eq.gains_db);
+  const key = JSON.stringify([s.csrf || csrf, eq.enabled, valid ? eq.gains_db : null]);
+  if (key !== eqCommitted) { eqCommitted = key; eqDraft = valid ? eq.gains_db.slice() : null; }
+  const draftValid = validEQGains(eqDraft);
+  const changed = valid && draftValid && eqDraft.some((value, index) => value !== eq.gains_db[index]);
+  const pending = !!active || queue.length > 0;
+  const canAdjust = ready && awake && eq.available === true && valid && !pending && eq.status !== 'reset_required';
+  $('eq-preset').disabled = !canAdjust;
+  $('eq-preset').value = draftValid ? Object.keys(eqPresets).find(name => eqPresets[name].every((value, index) => value === eqDraft[index])) || 'custom' : 'custom';
+  for (const [index, input] of eqSliders.entries()) {
+    input.disabled = !canAdjust;
+    input.value = draftValid ? eqDraft[index] : 0;
+    input.setAttribute('aria-valuetext', draftValid ? eqGain(eqDraft[index]) : 'Unavailable');
+    $('eq-gain-' + index).textContent = draftValid ? eqGain(eqDraft[index]) : '—';
+  }
+  $('eq-apply').disabled = !canAdjust || !changed;
+  $('eq-apply').textContent = active === 'eq_apply' ? 'Applying…' : 'Apply EQ';
+  $('eq-reset').disabled = !ready || !awake || pending || !(eq.enabled === true || eq.status === 'reset_required');
+  $('eq-reset').textContent = active === 'eq_reset' ? 'Resetting…' : 'Reset';
+  $('eq-panel').dataset.state = !ready ? 'offline' : eq.status === 'reset_required' ? 'reset-required' : !eq.available || !valid ? 'unavailable' : changed ? 'draft' : eq.enabled ? 'custom' : 'original';
+  $('eq-state').textContent = !online ? 'Offline. Reconnect to adjust EQ.' : !ready ? 'Waiting for the soundbar.' : !awake ? 'Turn on the bar to adjust EQ.' : eq.status === 'reset_required' ? 'Reset required before making further changes.' : eq.error ? eq.error : !eq.available || !valid ? 'EQ is unavailable on this firmware or audio path.' : active === 'eq_apply' ? 'Applying your settings…' : active === 'eq_reset' ? 'Restoring original processing…' : changed ? 'Unapplied changes. Select Apply EQ to listen.' : eq.enabled ? 'Custom EQ active. Reset restores original processing.' : 'Original tuning. Adjust a band, then apply.';
+  $('eq-graph').hidden = !draftValid;
+  if (draftValid) {
+    const frequencies = Array.isArray(eq.frequencies_hz) && eq.frequencies_hz.length === 5 && eq.frequencies_hz.every(value => Number.isFinite(value) && value > 0) ? eq.frequencies_hz : [125,500,2000,4000,8000];
+    const points = eqDraft.map((gain, index) => [10 + Math.log2(frequencies[index] / 125) / 6 * 280, 8 - gain * 8]);
+    const line = 'M' + points.map(point => point.join(',')).join('L');
+    $('eq-gain-line').setAttribute('d', line);
+    $('eq-gain-area').setAttribute('d', line + 'L290,8L10,8Z');
+    $('eq-graph').querySelector('svg').setAttribute('aria-label', (changed ? 'Unapplied' : eq.enabled ? 'Applied' : 'Original') + ' EQ gain settings: ' + eqDraft.map(eqGain).join(', '));
+  }
+}
+for (const [index, input] of eqSliders.entries()) input.addEventListener('input', () => {
+  if (input.disabled || !validEQGains(eqDraft)) return;
+  const next = eqDraft.slice(); next[index] = Number(input.value);
+  if (!validEQGains(next)) return;
+  eqDraft = next;
+  renderEQ(current, online && current.available, current.power === 'On');
+});
+
+$('eq-preset').addEventListener('change', () => {
+  const preset = $('eq-preset').value;
+  if ($('eq-preset').disabled || !Object.hasOwn(eqPresets, preset)) return;
+  eqDraft = eqPresets[preset].slice();
+  renderEQ(current, online && current.available, current.power === 'On');
+});

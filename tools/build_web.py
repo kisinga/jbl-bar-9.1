@@ -13,7 +13,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(output, allowed_cidr, bluetooth_helper=None):
+def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None):
     network = ipaddress.ip_network(allowed_cidr, strict=False)
     if network.version != 4 or not network.is_private or network.prefixlen < 16:
         raise ValueError("Choose your private IPv4 LAN subnet, /16 or narrower")
@@ -26,6 +26,11 @@ def build(output, allowed_cidr, bluetooth_helper=None):
         if not 52 <= len(helper) <= 65536 or helper[:7] != b"\x7fELF\x01\x01\x01" or helper[18:20] != b"\x28\x00":
             raise ValueError("Bluetooth helper must be the owner-built 32-bit ARM ELF")
         ldflags += " -X main.bluetoothPayload=" + base64.b64encode(helper).decode("ascii")
+    if eq_parser:
+        helper = Path(eq_parser).read_bytes()
+        if not 52 <= len(helper) <= 65536 or helper[:7] != b"\x7fELF\x01\x01\x01" or helper[18:20] != b"\x28\x00":
+            raise ValueError("EQ parser must be the owner-built 32-bit ARM ELF")
+        ldflags += " -X main.eqParserPayload=" + base64.b64encode(helper).decode("ascii")
     subprocess.run(["go", "build", "-buildvcs=false", "-trimpath", "-ldflags=" + ldflags, "-o", str(output / "remote"), "."],
                    cwd=ROOT / "webremote", env=env, check=True)
     (output / "config.json").write_text(json.dumps({
@@ -47,5 +52,6 @@ if __name__ == "__main__":
     parser.add_argument("--allowed-cidr", required=True, help="Your trusted IPv4 LAN, e.g. 192.168.1.0/24")
     parser.add_argument("--output", type=Path, default=ROOT / "dist/webremote-private")
     parser.add_argument("--bluetooth-helper", type=Path, help="Optional native AVRCP helper built with tools/build_bt.py")
+    parser.add_argument("--eq-parser", type=Path, help="Optional native EQ parser built with tools/build_eq.py")
     args = parser.parse_args()
-    print("Private device files:", build(args.output, args.allowed_cidr, args.bluetooth_helper))
+    print("Private device files:", build(args.output, args.allowed_cidr, args.bluetooth_helper, args.eq_parser))

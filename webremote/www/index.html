@@ -76,17 +76,48 @@
         </div>
         <p class="sound-note">Change cycles through levels. Atmos height applies to Atmos audio.</p>
       </section>
-      <section id="eq-panel" class="eq-panel panel" aria-labelledby="eq-heading">
-        <div class="section-heading"><div><p class="section-kicker">A CLOSER LISTEN</p><h2 id="eq-heading">Equalizer</h2></div><span class="development-tag">In development</span></div>
-        <div class="eq-illustration" aria-hidden="true"><div class="eq-grid"></div><svg viewBox="0 0 400 74" preserveAspectRatio="none"><path class="eq-area" d="M0 43C45 43 48 19 100 23S159 58 207 46S269 23 314 34S365 45 400 30V74H0Z"/><path class="eq-curve" d="M0 43C45 43 48 19 100 23S159 58 207 46S269 23 314 34S365 45 400 30"/></svg><span>LOW</span><span>HIGH</span></div>
-        <h3>Fine tuning, next.</h3><p>Custom EQ is being explored. The bar’s original tuning stays in place until changes can be tested and reliably restored.</p><span class="eq-status"><span></span>No custom EQ applied</span>
+      <section id="eq-panel" class="eq-panel panel" aria-labelledby="eq-heading" data-state="unavailable">
+        <div class="section-heading"><div><p class="section-kicker">SHAPE YOUR SOUND</p><h2 id="eq-heading">Front EQ</h2></div><span class="development-tag">Experimental</span></div>
+        <p id="eq-scope" class="eq-scope">Front channels · cuts only · resets on restart</p>
+        <div id="eq-graph" class="eq-gain-graph" hidden><span>0 dB</span><svg viewBox="0 0 300 64" preserveAspectRatio="none" role="img" aria-label="EQ gain settings"><path class="eq-gain-grid" d="M0 8H300M0 32H300M0 56H300"/><path id="eq-gain-area"/><path id="eq-gain-line"/></svg><span>−6 dB</span></div>
+        <div class="eq-preset-row"><label for="eq-preset">Preset</label><select id="eq-preset" disabled aria-describedby="eq-scope"><option value="original">Original</option><option value="less_bass">Less bass</option><option value="clear_dialogue">Clear dialogue</option><option value="softer_treble">Softer treble</option><option value="warm">Warm</option><option value="bright">Bright</option><option value="vocal_focus">Vocal focus</option><option value="custom">Custom</option></select></div>
+        <div class="eq-bands" aria-describedby="eq-scope eq-processing">
+          <div class="eq-band"><label for="eq-slider-0">125 Hz</label><input id="eq-slider-0" type="range" aria-describedby="eq-scope eq-processing" min="-6" max="0" step="0.5" value="0" disabled aria-label="125 Hz gain, relative to original tuning"><output id="eq-gain-0" for="eq-slider-0">—</output></div>
+          <div class="eq-band"><label for="eq-slider-1">500 Hz</label><input id="eq-slider-1" type="range" aria-describedby="eq-scope eq-processing" min="-6" max="0" step="0.5" value="0" disabled aria-label="500 Hz gain, relative to original tuning"><output id="eq-gain-1" for="eq-slider-1">—</output></div>
+          <div class="eq-band"><label for="eq-slider-2">2 kHz</label><input id="eq-slider-2" type="range" aria-describedby="eq-scope eq-processing" min="-6" max="0" step="0.5" value="0" disabled aria-label="2 kHz gain, relative to original tuning"><output id="eq-gain-2" for="eq-slider-2">—</output></div>
+          <div class="eq-band"><label for="eq-slider-3">4 kHz</label><input id="eq-slider-3" type="range" aria-describedby="eq-scope eq-processing" min="-6" max="0" step="0.5" value="0" disabled aria-label="4 kHz gain, relative to original tuning"><output id="eq-gain-3" for="eq-slider-3">—</output></div>
+          <div class="eq-band"><label for="eq-slider-4">8 kHz</label><input id="eq-slider-4" type="range" aria-describedby="eq-scope eq-processing" min="-6" max="0" step="0.5" value="0" disabled aria-label="8 kHz gain, relative to original tuning"><output id="eq-gain-4" for="eq-slider-4">—</output></div>
+        </div>
+        <div class="eq-actions"><button id="eq-apply" data-action="eq_apply" disabled>Apply EQ</button><button id="eq-reset" data-action="eq_reset" disabled>Reset</button></div>
+        <p id="eq-state" class="eq-state">EQ is not available.</p><p id="eq-processing" class="eq-processing">Uses the bar’s custom DSP mode.</p>
       </section>
     </div>
   </div>
   <div id="message" class="feedback" role="status" aria-live="polite" aria-atomic="true"><span class="feedback-dot"></span><span id="message-text">Connecting to the soundbar.</span><button id="cancel-volume" hidden>Clear queued taps</button></div>
-  <section id="wifi-panel" class="wifi-panel panel" aria-labelledby="wifi-heading">
-    <div class="network-heading"><span class="network-icon"><svg><use href="#i-wifi"/></svg></span><div><h2 id="wifi-heading">Connection</h2><h3 id="wifi-name">Checking Wi-Fi</h3><p id="wifi-status">Reading network status…</p></div></div>
+  <section id="system-panel" class="system-panel panel" aria-labelledby="system-heading" data-state="waiting">
+    <div class="section-heading"><div><p class="section-kicker">UNDER THE HOOD</p><h2 id="system-heading">System monitor</h2></div><span id="system-status" class="monitor-status">Waiting for data</span></div>
+    <div class="monitor-charts">
+      <section class="monitor-metric cpu-metric" aria-labelledby="cpu-heading">
+        <div class="metric-heading"><h3 id="cpu-heading">CPU</h3><span id="cpu-detail">—</span></div><div class="metric-value"><strong id="cpu-value">—</strong><span>utilization</span></div>
+        <svg id="cpu-chart" class="metric-chart" viewBox="0 0 300 72" preserveAspectRatio="none" role="img" aria-label="CPU history: waiting for samples"><path class="chart-grid" d="M0 18H300M0 36H300M0 54H300"/><path id="cpu-area" class="chart-area"/><path id="cpu-line" class="chart-line"/><circle id="cpu-point" class="chart-point" r="2.5" hidden/></svg>
+        <div class="chart-caption"><span>Recent history</span><span>0–100%</span></div>
+      </section>
+      <section class="monitor-metric memory-metric" aria-labelledby="memory-heading">
+        <div class="metric-heading"><h3 id="memory-heading">RAM</h3><span id="memory-detail">—</span></div><div class="metric-value"><strong id="memory-value">—</strong><span>in use</span></div>
+        <svg id="memory-chart" class="metric-chart" viewBox="0 0 300 72" preserveAspectRatio="none" role="img" aria-label="RAM history: waiting for samples"><path class="chart-grid" d="M0 18H300M0 36H300M0 54H300"/><path id="memory-area" class="chart-area"/><path id="memory-line" class="chart-line"/><circle id="memory-point" class="chart-point" r="2.5" hidden/></svg>
+        <div class="chart-caption"><span id="memory-available">Available memory not reported</span><span id="history-count">No samples yet</span></div>
+      </section>
+    </div>
+    <div class="monitor-secondary">
+      <div class="storage-metric"><div class="metric-heading"><h3>Storage</h3><span id="storage-detail">—</span></div><progress id="storage-progress" max="100" value="0" aria-label="Storage used" hidden></progress><p id="storage-value">Usage not reported</p></div>
+      <div class="network-metric"><h3>Wi-Fi traffic</h3><div class="traffic-rates"><span><i aria-hidden="true">↓</i><strong id="network-receive">—</strong><small>received</small></span><span><i aria-hidden="true">↑</i><strong id="network-transmit">—</strong><small>sent</small></span></div></div>
+    </div>
+    <dl class="system-vitals"><div><dt>Uptime</dt><dd id="system-uptime">—</dd></div><div><dt>Load <span>1 / 5 / 15 min</span></dt><dd id="system-load">—</dd></div><div id="system-processes-row" hidden><dt>Processes</dt><dd id="system-processes">—</dd></div><div id="system-temperature-row" hidden><dt>Temperature</dt><dd id="system-temperature">—</dd></div></dl>
+    <p id="system-note" class="system-note">Live vitals appear when the soundbar reports them.</p>
+  <section id="wifi-panel" class="wifi-panel" aria-labelledby="wifi-heading">
+    <div class="network-heading"><span class="network-icon"><svg><use href="#i-wifi"/></svg></span><div><h3 id="wifi-heading">Wi-Fi connection</h3><p id="wifi-name">Checking Wi-Fi</p><p id="wifi-status">Reading network status…</p></div></div>
     <div class="network-address"><a id="local-address" class="local-address" href="http://jbl.local" hidden>jbl.local <span aria-hidden="true">↗</span></a><div class="network-details"><span id="wifi-ip">—</span><span id="wifi-signal"></span></div><p id="hotspot-status" hidden></p></div>
+  </section>
   </section>
   <div class="more-details">
     <details class="device-details"><summary>Soundbar details <span aria-hidden="true">+</span></summary><dl><div><dt>Bluetooth name</dt><dd id="device-name">—</dd></div><div><dt>Uptime</dt><dd id="device-uptime">—</dd></div><div><dt>Smart Mode automation</dt><dd id="device-automation">—</dd></div><div id="cast-eq-row" hidden><dt>Cast tone settings</dt><dd id="cast-eq">—</dd></div></dl></details>

@@ -1,110 +1,82 @@
 # Development
 
-Keep the foundation small: readable scripts, reproducible packages and working recovery. Smart Mode, SSH and the browser remote are separate features. Preserve the working behavior and firmware identity guards. Do not add support for a build by merely changing its hash: its fields, event ABI and restoration behavior need validation.
+Keep scripts readable, packages reproducible and recovery working. Preserve firmware identities, native guards and existing startup hooks. Supporting another build requires field, event ABI and restoration validation; changing a hash is insufficient.
 
 ## Build and test
 
-On Linux, install Python 3.10+ and BusyBox (`/usr/bin/busybox`). On Debian/Ubuntu the packages are `python3` and `busybox`. These are developer requirements; users only need the ZIP.
+Install Python 3.10+ and BusyBox at `/usr/bin/busybox` on Linux (`python3 busybox` on Debian/Ubuntu). These are developer requirements; Smart Mode users only need the release ZIPs.
 
 ```sh
 python3 tools/build_release.py
 python3 tools/test.py
 ```
 
-Archives and `SHA256SUMS` appear in `dist/`. Rebuilding the same inputs produces identical ZIP bytes. The build verifies payload hashes, embedded expected hashes, exact tested device files and shell syntax. It refuses stale or modified device code against the pinned baseline. No firmware image or external Python package is needed.
+Find reproducible ZIPs and `SHA256SUMS` in `dist/`. The builder checks pinned device files, payload/embedded hashes and shell syntax; modified or stale payloads fail the baseline check. No firmware image or external Python package is required.
 
-The 141 host checks include the existing 121 core fixtures and 20 CLI checks. They use temporary fake process/CLI files or an isolated local HTTP server, never a soundbar or real USB. Synthetic identity replacement stays confined to fixtures. Results go in ignored `build/test-results/`. The 102 checks recorded for the original Smart Mode release remain its historical result.
+The current **141 host checks** comprise 121 core fixtures and 20 CLI checks. They use temporary fake process/CLI files and an isolated local HTTP server, without a soundbar or USB. Results stay in `build/test-results/`. The original Smart Mode release’s historical result is 102 checks.
 
-Optional descriptor validation against a legally obtained extracted ARM BusyBox uses `JBL_ARM_BUSYBOX=/absolute/path/to/busybox python3 tests/check_descriptors.py`, with `qemu-arm` and registered ARM binfmt available for direct applet execution. That binary is not bundled.
+For optional extracted ARM BusyBox descriptor checks, install `qemu-arm` and registered ARM binfmt, then run:
+
+```sh
+JBL_ARM_BUSYBOX=/absolute/path/to/busybox python3 tests/check_descriptors.py
+```
+
+Supply a legally obtained binary; vendor binaries are not bundled.
 
 ## Layout
 
-The three tools have separate source folders and share these root instructions:
+| Path | Contents |
+| --- | --- |
+| `webremote/` | Go server and embedded browser interface |
+| `smart-mode/` | Exact Smart Mode installable source, including CRLF launcher/hook |
+| `ssh/` | Portable SSH setup templates |
+| `tools/`, `tests/` | Builders, CLI, fixtures and integrity baselines |
+| `research/README.md` | Findings and private archive index |
 
-- [`webremote/`](webremote/): Go server and embedded browser interface.
-- [`smart-mode/`](smart-mode/): exact installable Smart Mode source, including the CRLF-preserved launcher/hook.
-- [`ssh/`](ssh/): portable SSH setup templates; generated credentials and device keys stay private.
+Keep generated credentials/packages, firmware, full captures, personal configuration and tool caches out of commits/releases. Use the issue template for hardware results. Root instructions cover use, recovery and community links; `USB-README.txt` and `ROLLBACK.txt` ship with Smart Mode.
 
-`tools/` contains builders, the optional Python CLI and the test runner; `tests/` contains fixtures and pinned device-file hashes. `README.md` covers use and recovery, `COMMUNITY.md` collects discussion links, and `USB-README.txt` / `ROLLBACK.txt` ship in the Smart Mode ZIPs. [`research/README.md`](research/README.md) indexes the public research archive; local captures and vendor artifacts remain ignored.
-
-`main` and tag `v0.1.0` preserve the revision 5 I first confirmed on my bar. Experimental latency work belongs on a separate branch and must not replace that tested download until hardware validation. A new payload requires updated checksums, installer expectations, ownership/upgrade handling, tests and a fresh hardware result. The baseline verifier must not be casually bypassed to publish an untested change.
-
-Report results with the issue template. Keep proprietary images, full device logs, credentials, personal paths and tool caches out of commits and releases.
+Preserve the confirmed revision 5 download at `v0.1.0`. New payloads require checksums, ownership/upgrade handling, fixtures and fresh hardware evidence. Keep experimental latency changes on their branch until validated.
 
 ## SSH package
 
-The hardware result on 20 October 2026 covers my device: USB-free startup, root password login, an interactive terminal and SFTP. A clean generic installation must be tested separately before I call the portable package confirmed. I reuse existing device binaries; I do not distribute the vendor loader, libraries or firmware.
+Hardware evidence covers USB-free startup, root password login, an interactive terminal and SFTP on the development bar. Independently validate a clean portable installation before calling it confirmed. Reuse native vendor binaries; do not distribute their loader/libraries.
 
-The builder needs Python 3 on Linux. It asks for a password, writes its SHA-512 crypt hash into the generated package and limits login to the computer IPv4 address supplied at build time. I keep generated packages private: even a password hash or derived Wi-Fi PSK is sensitive. I never commit an SSID, password, PSK, private host key, personal address or full device capture.
+Build on Linux with Python 3:
 
 ```sh
 python3 tools/build_ssh.py --allowed-pc <computer-ipv4-address>
 ```
 
-Enter a new root password twice when prompted (at least eight characters). By default I reuse Wi-Fi already configured on the bar and enable automatic SSH startup. Add `--wifi` to supply an SSID and WPA2 passphrase interactively, or `--usb-only` to require USB insertion after each reboot. `--interface wlan0` is the default.
+Enter a new root password twice, at least eight characters. The builder embeds its SHA-512 crypt hash and limits login to the supplied computer address. Keep generated packages private, including password hashes and derived Wi-Fi PSKs.
 
-The output is **`dist/jbl-bar9-ssh-private.zip`** plus **`dist/jbl-bar9-ssh-rollback-private.zip`**. These are personal installation artifacts, never public release assets. Extract the setup ZIP's contents directly to a FAT32 USB root, with `AutoScript/AutoScript` and `JBLLocalSSH/` at the top level. Keep the matching rollback ZIP on the computer. Use one AutoScript package at a time.
+Default behavior reuses configured Wi-Fi and enables SSH autostart. Add `--wifi` for interactive SSID/WPA2 credentials or `--usb-only` to require USB insertion after each reboot. The default interface is `wlan0`.
 
-With the bar fully on and playing normally, insert USB, leave controls alone for three minutes, then return it to the computer and inspect `JBLLocalSSH/STATUS.txt` and `setup.log`. Success is `SSH_READY`, or `ALREADY_RUNNING_PASSWORD_UNCHANGED` when an existing daemon is preserved and automatic startup is updated. Reinsertion does not rotate an already-running installation's password.
+1. Keep `dist/jbl-bar9-ssh-rollback-private.zip` on the computer.
+2. Extract `dist/jbl-bar9-ssh-private.zip` directly to FAT32 USB, with `AutoScript/AutoScript` and `JBLLocalSSH/` at its root. Use one AutoScript package at a time.
+3. Insert into the fully on, normally playing bar. Leave controls alone for three minutes, then return USB to the computer.
+4. Require `JBLLocalSSH/STATUS.txt` to report `SSH_READY` or `ALREADY_RUNNING_PASSWORD_UNCHANGED`; inspect `setup.log`. Reinsertion preserves an already-running daemon’s password.
+5. Verify the fingerprint in `connection.txt` against `host_ed25519.pub` before accepting the SSH host key.
+6. Test `ssh -p 2222 root@<bar-ip-address>`, a normal command, an interactive terminal and SFTP. A listener or `sshd -t` alone is insufficient.
+7. With recovery available, restart **without USB**. Verify SSH returns and LOAD, power, volume and standby remain normal.
 
-`JBLLocalSSH/connection.txt` contains connection details and the host-key fingerprint; `host_ed25519.pub` is the public host key. Do not infer success from elapsed time. Verify that fingerprint before accepting the host key and logging in with `ssh -p 2222 root@<bar-ip-address>`.
+Remove browser remote first. To disable SSH autostart, run `/bin/sh /var/JBLLocalSSH/rollback-boot.sh` over SSH, or use the matching rollback ZIP on clean FAT32 USB. Rollback restores the recorded pre-SSH hook only when recognized; active sessions, stored files and unknown later hook edits are preserved.
 
-For the default automatic-start package, test a restart with **USB removed**. Confirm SSH returns, normal LOAD completes and power/volume/standby still work. A listener alone is insufficient: verify a password login, a normal shell command, an interactive terminal and SFTP. Do not replace or overwrite unrelated AutoScript hooks.
-
-To disable automatic SSH, use `/bin/sh /var/JBLLocalSSH/rollback-boot.sh` over SSH, or extract the matching rollback ZIP to a clean FAT32 USB root and run it on the bar. This restores the pre-SSH startup hook when it still matches the expected version; it keeps the active session and stored files. It preserves unrecognized later hook changes rather than overwriting them. Keep the USB recovery option available before the reboot test.
-
-The boot hook must close inherited service sockets, run in the background, wait a bounded time for Wi-Fi and preserve the existing Smart Mode hook. Rollback disables automatic SSH while preserving an active session and unrelated later changes. The native daemon depends on a compatible private loader/NSS/account view; passing a host shell-syntax check alone does not establish device compatibility.
-
-## Faster wake candidate — revision 6
-
-**Working branch `work/faster-wake`; hardware untested.** The public v0.1.0 download remains the confirmed revision 5. Do not describe the faster candidate as device-validated.
-
-The confirmed trace took 34.55 seconds from first awake observation to `STANDARD_THIS_WAKE`. Around ten seconds were spent accumulating awake samples at five-second intervals; `once.sh` then included a fixed ten-second delay and repeated readiness checks before invoking the controller.
-
-| Setting | Confirmed revision 5 | Candidate revision 6 |
-| --- | --- | --- |
-| Watcher poll interval | 5 seconds | 1 second |
-| Required identical awake samples | 3 | 3 |
-| Bounded runner's initial settling delay | 10 seconds | 1 second |
-| Runner readiness sample interval/count | 2 seconds / 3 samples | Unchanged |
-| Mute hold, key-release/completion checks | Confirmed sequence | Byte-for-byte unchanged controller/helper |
-| Standby deadline | None | None |
-
-The candidate removes approximately 17 seconds of scheduled waiting, suggesting **about 18 seconds** from first awake detection on a similar run. That is an estimate, not a measurement. Initial detection also polls sooner. Read-only state sampling now occurs more frequently; hardware CPU/load and wake behavior must be observed. The change does not shorten mute duration, skip mode checks or weaken restoration.
-
-Revision 6 has distinct ownership and checksums. Its dispatcher only upgrades the exact revision 5 package, backing it up first. It retains refusal for unknown payloads, conflicting hooks or unsupported executables. Use its **matching uninstall ZIP**; the original v0.1.0 uninstaller does not recognize revision 6 ownership.
-
-### Build and hardware test
-
-On this branch run `python3 tools/build_release.py` and `python3 tools/test.py`. The generated candidate archives are:
-
-- `dist/jbl-bar9-standard-mode-v0.2.0-dev.1-install.zip`
-- `dist/jbl-bar9-standard-mode-v0.2.0-dev.1-uninstall.zip`
-
-These local archives are deliberately separate from the public confirmed release. Use the same install/test procedure, recording actual seconds after power-on. Confirm normal LOAD, delayed power-on, Smart-to-Standard readback, key release, console restoration and repeated standby/wake. Test standby of at least 20 seconds first. Return the USB logs. No hardware result for revision 6 exists yet.
-
-The pinned revision 6 manifest is an integrity record for this candidate, not a claim of hardware qualification. `tests/fixtures/revision5-sha256.json` retains the confirmed baseline for comparison.
+Preserve inherited-socket cleanup, background startup, bounded Wi-Fi wait and the Smart Mode hook. Native OpenSSH requires the compatible private loader/NSS/account view, including host-key generation and session commands.
 
 ## Browser remote
 
-I need working SSH, Python 3 and Go 1.22+ on the build computer (tested with
-Go 1.25.5). The bar runs the resulting static ARM Go binary; no Go runtime or
-third-party Go modules are needed on it. The normal Go-only build leaves
-Bluetooth playback controls disabled; the optional helper below enables them.
+Requirements: working root SSH, Python 3 and Go 1.22+ on the computer (tested Go 1.25.5). The bar needs no Go runtime, external Go modules, database or ongoing computer service.
 
 ```sh
 python3 tools/build_web.py --allowed-cidr <trusted-lan-subnet>
-(cd webremote && go test ./...)
+(cd webremote && go test -race ./... && go vet ./...)
 ```
 
-Use the actual trusted IPv4 subnet, for example `192.168.1.0/24`. The output
-directory is `dist/webremote-private/`; its config contains the listener and
-local subnet. The browser remote requires no login. SSH keeps its own password.
-The builder strips local source paths and VCS metadata. Identical sources
-and Go toolchain produce the same server binary; owner settings differ.
+Use the actual trusted IPv4 subnet, such as `192.168.1.0/24`. Output goes to `dist/webremote-private/`. The builder strips local source paths and VCS metadata; identical inputs/toolchains produce identical binaries. Configuration varies by owner. The normal Go-only build disables Bluetooth transport controls and Front EQ.
 
-For Bluetooth playback, I build the small fixed-command C helper with an ARM
-hard-float GNU/Linux GCC toolchain and my own extracted supported firmware:
+### Optional Bluetooth helper
+
+Use an ARM hard-float GNU/Linux GCC toolchain and an extracted copy of the supported firmware:
 
 ```sh
 python3 tools/build_bt.py --cc /path/arm-none-linux-gnueabihf-gcc \
@@ -113,21 +85,32 @@ python3 tools/build_web.py --allowed-cidr <trusted-lan-subnet> \
   --bluetooth-helper build/bt-remote
 ```
 
-Only my helper is embedded. Vendor libraries are used locally for linking and
-reused from the bar at runtime; I do not distribute them. The builder checks
-pinned libraries; the server also checks the current input and connected peer.
-The helper exposes five fixed playback commands and registers no Bluetooth
-event subscriptions.
-I confirmed audible Pause and subsequent playback resumption; Next, Previous
-and Stop remain unconfirmed. Each button reports a request, not proof the
-source app changed state. One Play/Pause button follows the last successful
-Bluetooth request because A2DP can remain active while the source app is paused. It resets on native
-stream, peer or source changes; failed commands never flip it. Normal Cast
-controls require a nonmirrored session and advertised capabilities; their
-hardware behavior remains unverified.
+Only the project’s fixed-command helper is embedded. Matching vendor libraries are checked locally and reused from the bar; do not redistribute them. The helper registers no event subscribers. The server checks firmware, current input and connected peer before sending playback requests.
 
-Copy that directory over SFTP to `/var/JBLRemote` (first check that no unrelated
-installation owns that path), then run its installer:
+Audible Pause and playback resumption are confirmed; Next/Previous/Stop remain unconfirmed. One Play/Pause button follows successful Bluetooth requests because A2DP activity cannot establish app playback. Native stream, source or peer changes reset intent; errors never flip it. Normal Cast controls require a nonmirrored session and advertised capabilities, with hardware validation still outstanding.
+
+### Optional Front EQ helper
+
+Use the same ARM hard-float GNU/Linux GCC toolchain and supported extracted firmware as the Bluetooth helper:
+
+```sh
+python3 tools/build_eq.py --cc /path/arm-none-linux-gnueabihf-gcc \
+  --rootfs /path/extracted/rootfs --output build/eq-parser
+python3 tools/build_web.py --allowed-cidr <trusted-lan-subnet> \
+  --bluetooth-helper build/bt-remote --eq-parser build/eq-parser
+```
+
+Omit `--bluetooth-helper` if playback controls are not needed. Only project helper code is embedded; vendor libraries stay on the bar. Both build-time and runtime hash checks reject unsupported libraries.
+
+Turn on Standard Mode and start audio. Select a preset or adjust the five sliders, then **Apply EQ**; **Reset** returns to original tuning. Presets are starting points rather than measured corrections: Original, Less bass, Clear dialogue, Softer treble, Warm, Bright and Vocal focus. They contain relative cuts only, not another device’s calibration. Front LR adjustment covers 125/500/2,000 Hz bells and overlapping 4,000/8,000 Hz high shelves, −6 to 0 dB in 0.5 dB steps. It does not tune the subwoofer, rears or height channels.
+
+Application uses native custom DSP mode 5. It is not proven equivalent to stock processing plus EQ. Each request validates a complete 3,840-byte tuning reconstruction with the native parser before applying it; unknown calibration differences fail closed. Reset uses the native 1 → 0 preset transition and checks exact original bytes. Keep the bar’s normal mute state across both operations.
+
+EQ is temporary: restart returns to original tuning, and web power/source/sound changes reset it first. The monitor also attempts a reset when the native route changes. Other native controls, standby/CEC and HDMI/eARC/Cast layouts still need qualification; Bluetooth has audible confirmation. Recovery files belong in `/var/JBLRemote`; preserve them after an error and try **Reset**. Do not edit another program’s `/mnt/ubi_boot/temp.json` or remove recovery files to force an unsupported route.
+
+### Install and remove
+
+Check that no unrelated installation owns `/var/JBLRemote`. Copy the output directory over SFTP, then install:
 
 ```text
 sftp -P 2222 root@<bar-ip-address>
@@ -139,34 +122,25 @@ bye
 ssh -p 2222 root@<bar-ip-address> '/bin/sh /var/JBLRemote/install.sh'
 ```
 
-Open `http://jbl.local` (`:8080` remains available); there is no web login.
-I register the alias through the existing Bonjour daemon, which handles name
-probing and conflicts. Local multicast and mDNS support are required. If the
-name conflicts or does not resolve, I use `http://<bar-ip-address>`; I do not
-silently rename the alias. Registration follows Wi-Fi address changes and is
-withdrawn when the remote stops. Anyone on the configured trusted subnet can
-use these controls. Only this hostname and accepted local addresses pass the
-Host checks; the HTTP destination must also match an allowed interface.
-The server accepts requests from the configured subnet, plus clients of the
-active native `ap0` hotspot when their HTTP destination matches that interface. Fixed control
-names, JSON-only POSTs, CSRF tokens and same-origin checks protect mutations;
-it does not accept arbitrary commands or serve filesystem paths.
+Open `http://jbl.local`, or the bar’s local IP if mDNS is blocked/conflicting. Port `8080` remains available. Existing Bonjour handles probing/conflicts; registration follows Wi-Fi address changes and withdraws on exit. No silent alias renaming occurs.
 
-The installer preserves the exact existing startup hook and adds one
-background command. Remove features in reverse installation order: web remote,
-SSH, then Smart Mode. To remove only the remote, run:
+Anyone on the configured trusted subnet can use the remote without a web login. Requests must match accepted Host/local interface addresses. Active native `ap0` hotspot clients are also allowed only for that interface’s HTTP destination. Fixed commands, JSON-only POSTs, same-origin checks and CSRF tokens guard mutations; no arbitrary command/filesystem endpoint is exposed.
+
+Installation preserves the exact startup hook and adds one background command. Remove **browser remote → SSH → Smart Mode**. To remove only the remote:
 
 ```sh
 ssh -p 2222 root@<bar-ip-address> '/bin/sh /var/JBLRemote/uninstall.sh'
 ```
 
-It restores its recorded hook if still recognized, stops its own process and
-retains files for inspection. Later unknown hook edits are preserved. Keep
-SSH usable while experimenting. Volume/mute and readback are hardware-tested;
-Night Mode Off → On → Off and bass/Atmos cycles are hardware-tested too.
-Rear changes need an undocked hardware test; power, input transitions and manual Standard remain experimental.
+Removal stops its own process and restores the recorded hook only when recognized; files and unknown later hook changes remain. Keep SSH usable during development.
 
-The UI test uses Node and Playwright on the development computer:
+### State and interface
+
+Prioritize listening and sound controls. Use the optional Front EQ helper for supported native routes; [EQ findings](research/README.md#eq-exploration--20-october-2026) record parser, application and restoration evidence.
+
+One native reader samples each second only while subscribed through `EventSource`; changed state is coalesced and slow clients retain only the newest update. Wi-Fi status is cached for five seconds, Cast status for two seconds while requested. The auxiliary system monitor caches two-second CPU/RAM/storage/network samples, with bounded two-minute browser history and no database. Missing sensors/readings remain unavailable. Monotonic revisions prevent older replies from overwriting newer observations. Both listeners share controls and access checks; an occupied port 80 leaves 8080 usable.
+
+Run UI fixtures with Node and Playwright:
 
 ```sh
 # First time only:
@@ -175,40 +149,15 @@ npx playwright install chromium
 node tests/webremote-ui.mjs
 ```
 
-`PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` can reuse an
-existing installation. Tests serve the real assets with delayed/failed mock
-responses, cover queued/cancelled controls, holds, keyboard input, reconnects,
-stale replies, standby, Bluetooth/Wi-Fi/streaming feedback, the single playback
-toggle, EQ preview, reduced motion and 320/390/1024px layouts. The current
-suite passes 104 browser checks. Go tests
-cover LAN/hotspot/Host/CSRF boundaries, event streams, native Wi-Fi datagrams,
-state confirmation, peer-name filtering, sound decoding, native Bonjour
-registration and bounded read-only Cast framing/status queries.
-UI fixtures do not substitute for hardware pairing or audible tests.
+Set `PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` to reuse an installation. The current **156 browser checks** cover queues/cancellation, held and keyboard controls, failures/reconnects, stale replies, standby, Bluetooth/streaming, single Play/Pause, EQ presets/manual drafts/application gating, system sample history/gaps/availability, reduced motion and 320/390/1024px layouts. Public screenshots use fixtures, never live personal data.
 
-Live updates use Go’s standard HTTP server and the browser’s `EventSource`.
-A single reader samples native state once per second only while subscribed;
-unchanged state is suppressed and slow clients keep only the newest update.
-Wi-Fi is sampled separately every five seconds; Cast metadata uses a bounded
-loopback status query at most every two seconds while requested. Monotonic revisions prevent
-an older stream/HTTP reply from undoing a newer observation. No third-party
-Go module or database is needed. Both HTTP listeners share the same controls
-and access checks; an occupied port 80 leaves 8080 usable.
+Go tests cover access boundaries, event streams, native Wi-Fi datagrams, readback, peer filtering, sound decoding, Bonjour, Cast framing/status system parsing/cache behavior, native EQ route guards and full-block recipe preservation. Run race tests and vet after backend changes. Fixtures do not establish audible behavior.
 
-On 20 October 2026 I confirmed live AirPlay and Wi-Fi readback, both HTTP
-ports, a 22-second single browser event connection with zero state-poll requests,
-Night Mode Off → On → Off and complete bass/Atmos cycles restored to their
-original levels. The connected Bluetooth name and Playing → Paused updates were subsequently confirmed on my bar.
-The observed YouTube session uses Chrome Audio Mirroring (`85CDB22F`): its receiver
-keeps reporting PLAYING when playback pauses at the sender. I label this Audio
-mirroring and do not claim sender pause detection. Normal receiver media-state
-decoding has fixtures but no live validation. The deployed UI correctly identified that live mirroring session, with one
-event connection and no automatic state requests over 22 seconds. Native hotspot
-activation/access still needs an outage test. No Wi-Fi loss, reboot or factory reset was induced.
+Hardware confirmation includes volume/mute, pairing/name/native stream states, AirPlay/Wi-Fi readback, Night Mode Off → On → Off and bass/Atmos cycles restored to initial settings. Rear changes require an undocked test; power/source/manual Standard remain experimental. Chrome Audio Mirroring (`85CDB22F`) keeps receiver PLAYING when sender playback pauses; label mirroring without claiming sender pause detection. Automatic hotspot activation/access needs a separate outage test.
 
 ### Optional CLI
 
-I use the standard-library Python 3 CLI with the same deployed Go API:
+Use Python’s standard library against the same deployed API:
 
 ```sh
 python3 tools/jbl.py status
@@ -219,15 +168,25 @@ python3 tools/jbl.py --host <private-ipv4[:port]> status --json
 python3 tests/check_cli.py
 ```
 
-`volume down`, `mute`, `power`, `source tv|hdmi|bluetooth` and available
-`play`, `pause`, `next`, `previous`, `stop` commands are also supported.
-`--timeout` accepts 1–30 seconds; JSON omits CSRF tokens. Night on/off and
-Smart Mode off read the current state first and skip an unnecessary toggle.
-Unknown state stays unknown, unsupported playback is refused, and failures
-are never retried automatically. Manual Smart Mode off does not replace the
-persistent wake watcher.
+Also supported: `volume down`, `mute`, `power`, `source tv|hdmi|bluetooth`, and available `play`, `pause`, `next`, `previous`, `stop`. `--timeout` accepts 1–30 seconds. JSON excludes CSRF tokens. Night/Smart Mode commands check known state before changing it; unsupported playback is refused and failures are never retried automatically. Manual Smart Mode off preserves the persistent watcher.
 
-I took CLI/control ideas from [k1rnt/JBL Soundbar CLI at the reviewed commit](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309).
-Its newer Linkplay/JBL One transport is separate; this CLI calls only my
-fixed Bar 9.1 Go endpoints. [EQ exploration](research/README.md#eq-exploration--20-october-2026)
-remains read-only research, without unverified sliders.
+[k1rnt/JBL Soundbar CLI](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309) supplied CLI/control inspiration. Its newer Linkplay/JBL One transport is separate; this CLI uses the fixed Bar 9.1 Go endpoints.
+
+## Faster wake candidate — revision 6
+
+Keep **`work/faster-wake` hardware-untested** and separate from confirmed v0.1.0/revision 5.
+
+| Setting | Revision 5 | Candidate revision 6 |
+| --- | --- | --- |
+| Watcher polling | 5 seconds | 1 second |
+| Identical awake samples | 3 | 3 |
+| Runner initial delay | 10 seconds | 1 second |
+| Readiness sampling | 2 seconds / 3 samples | Unchanged |
+| Mute hold, release/completion guards | Confirmed controller | Unchanged |
+| Standby deadline | None | None |
+
+The confirmed 34.55-second wake trace included about ten seconds of sample accumulation and a fixed ten-second runner delay. Revision 6 removes approximately 17 seconds of scheduled waiting; an estimated 18-second result is **not a hardware measurement**. Observe native load and wake behavior before qualification.
+
+On that branch, build/test with the normal tools. Candidate outputs are `dist/jbl-bar9-standard-mode-v0.2.0-dev.1-install.zip` and its matching `-uninstall.zip`. Distinct ownership/checksums permit only the exact revision 5 upgrade, with backup; unknown payloads/hooks remain protected. The v0.1.0 uninstaller does not recognize revision 6.
+
+Record actual power-on timing, normal LOAD, delayed power-on, mode readback, key release, console restoration and repeated standby/wake. Begin with standby lasting at least 20 seconds and export logs. Keep `tests/fixtures/revision5-sha256.json` as the confirmed baseline. Candidate integrity manifests do not establish hardware qualification.
