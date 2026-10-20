@@ -153,9 +153,9 @@ found explicit hotspot-start dispatch and restart/retry paths, but did not
 establish automatic Wi-Fi-loss fallback for a provisioned bar. That needs an
 outage test or further vendor Cast-policy analysis; no outage was induced.
 
-I confirmed the connected Bluetooth phone name on 20 October 2026. The page now
-shows the native Bluetooth streaming/suspended state as Playing/Paused and keeps
-the connected-device card visible while paused. These states describe A2DP audio,
+I confirmed the connected Bluetooth phone name on 20 October 2026. The page
+shows native Bluetooth Streaming audio / Stream suspended and keeps the
+connected-device card visible while suspended. These states describe A2DP audio,
 not an individual phone app. On 20 October 2026 I confirmed both Playing and
 Paused updated correctly when I played and paused audio from my connected phone.
 
@@ -190,44 +190,62 @@ example data rather than personal network or device details.
 
 ## EQ exploration — 20 October 2026
 
-I found a credible route to real EQ inside the existing JBL HPP/HDSP processor.
-Its tuning parser supports five-band groups named `LR EQ`, `LRs EQ`, `LFE EQ`
-and `C Mode EQ`, plus per-channel PEQ and other speaker processing. The packaged
-pipeline includes HPP/HPP_BM, and the running process maps the matching HDSP
-library. I preserved a read-only snapshot of its full 3,840-byte tuning block.
+The existing JBL HPP/HDSP processor has a real custom-tuning path. The packaged
+speaker pipeline includes HPP/HPP_BM, and I verified the matching libraries in
+the running process. A fresh read-only capture of the 3,840-byte tuning block
+matched the earlier capture exactly. The native registry contains **22 EQ
+groups / 164 bands**; the four initially identified five-band groups are only
+a subset. Frequency is Hz, gain is dB, and filter types 11/16/17 are
+bell/high-shelf/low-shelf. The decoder does not enforce safe bounds.
 
-The processor watches `/mnt/ubi_boot/temp.json` and consumes updates from its
-audio callback. That file was absent and I did not create it. Parsing starts
-from compiled defaults: a partial JSON file resets omitted tuning instead of
-preserving the current block. The same configuration includes crossover and
-limiter settings. Filter types, units, limits, calibration preservation and exact
-restoration need validation before any changes or UI sliders. HDMI/eARC,
-Bluetooth and Cast coverage remains an inference from the shared processor,
-not an audible test across inputs.
+I ran the firmware's own JSON parser under isolated QEMU on my computer,
+with read-only vendor libraries and no soundbar connection. It established:
 
-Cast provides another, narrower route: its matching `cast_audio.json` loads
-`libcast_equalizer_1.0.so` on default output streams, and the running Cast process
-maps that library. Receiver status reports low/high shelves at 150/4,500 Hz,
-both 0 dB, with zero peaking bands advertised. The community
+| Offline case | Result |
+| --- | --- |
+| Captured tuning reconstructed as JSON | All 3,840 bytes match exactly |
+| One LR gain reduced by 0.5 dB | Only its four-byte gain word changes |
+| Original JSON parsed again | Exact original block hash restored |
+| Frequency key `f` instead of `fc` | Frequencies silently fall back to 300 Hz |
+
+The correct frequency key is **`fc`**. This is a snapshot-specific preservation
+recipe: all EQ tuples are explicit, three captured gain corrections are kept,
+and every remaining byte must match the pinned compiled defaults. It is not
+a serializer for arbitrary calibration or another bar's tuning.
+
+**The remaining blocker is application, not JSON parsing.** The processor
+watches `/mnt/ubi_boot/temp.json`, but its full-block setter forces internal
+DSP mode 5, rebuilds filters and clears histories. I independently read the
+running instance in mode 0 at 44.1 kHz. Applying the file would therefore
+change routing beyond EQ, even with identical parameter bytes. Returning to
+mode 0 reloads a preset and can discard custom parameters. This internal mode
+is separate from the user-facing Smart/Standard setting. I have not created
+the watched file, changed DSP memory, applied EQ or restarted audio services.
+
+A bounded isolated audio probe produced no valid frames. Loading the matching
+thread library allowed full native initialization, but processing still faulted
+before emitting audio. It provides no acoustic comparison. The next step is to
+complete the isolated processing setup and verify application/restoration
+without unintended processing changes.
+Per-source HDMI/eARC, Bluetooth and Cast coverage still needs audible tests.
+The UI's Equalizer section remains a noninteractive development preview.
+
+Cast offers a narrower candidate: its native output pipeline maps
+`libcast_equalizer_1.0.so`, and status reports low/high shelves at 150/4,500 Hz,
+both 0 dB. The community
 [Google Home local API specification](https://github.com/rithvikvibhu/GHLocalApi/blob/master/GoogleHome.openapi3.json)
-documents a shelf setter, but I have not called it or established its effect on
-this bar. The legacy setup response does not expose the newer EQ capability
-fields. This is a candidate for Cast audio, not proof of EQ on TV/eARC.
+documents a setter, but I have not called it or established its effect on this
+bar. It is not evidence of EQ on TV/eARC. I also reviewed
+[JBL Soundbar CLI](https://github.com/k1rnt/jbl-soundbar-cli) and
+[JBL_Soundbar](https://github.com/MrBearPresident/JBL_Soundbar); their newer
+protocols are not established on the Bar 9.1. I found no demonstrated Bar 9.1
+custom-EQ implementation in the bounded public search.
 
-I also reviewed [JBL Soundbar CLI](https://github.com/k1rnt/jbl-soundbar-cli)
-and [JBL_Soundbar](https://github.com/MrBearPresident/JBL_Soundbar).
-They provide useful CLI/EQ control ideas for newer Linkplay/JBL One devices;
-their protocols are not established on the Bar 9.1. I found no demonstrated
-Bar 9.1 custom-EQ implementation in the bounded public search. The next useful
-step is an offline round-trip of the full current tuning and filter enum mapping,
-with exact restoration, before considering a small measured hardware change.
-No EQ setting, DSP memory, tuning file or audio service was modified.
-
-The ignored `private/firmware-workspace/analysis/eq-native/` retains source
-identities, REA evidence, decoded records and the future test plan. The earlier
-sound-handler disassembly provenance was corrected: all relied-on regions are
-byte-identical between the two archived builds; runtime identity guards remain
-pinned to the tested build.
+The ignored `private/firmware-workspace/analysis/eq-native/` retains native
+identities, REA exports, isolated parser helpers, exact diffs and read-only
+instance captures. Its `phase2/`, `offline-roundtrip/` and `phase2-state/`
+folders contain this follow-up evidence. Vendor libraries, raw tuning and
+unverified hardware presets remain private.
 
 ## Track metadata limits
 
@@ -248,8 +266,8 @@ I replaced that route with a small client for the native MediaTek AVRCP RPC
 service. It connects without registering callbacks, sends one key-down/key-up
 pair and closes. I confirmed by listening that the direct Pause test interrupted playback;
 I sent Play to restore it. The connected computer kept its A2DP stream
-open, so Streaming cannot confirm whether its app is playing. Separate Play
-and Pause buttons report requests; next/previous/stop still need audible tests.
+open, so Streaming cannot confirm whether its app is playing. The single Play/Pause button follows successful requests; stream/source/peer
+changes reset its intent. Next/previous/stop still need audible tests.
 The optional helper is my own source, linked against an owner's matching vendor
 libraries; the public repository includes no vendor binaries. Native callback
 subscribers, pairing state, service startup and audio processing are preserved.
@@ -283,3 +301,18 @@ overflow. The server used about 10.7 MiB resident memory. All 141 host fixtures,
 87 browser checks, Go race tests and vet passed; repeated Go builds with the
 owner-built helper were byte-identical. The original Smart Mode ZIP hashes
 remain unchanged.
+
+
+The UI follow-up puts listening/source controls first, sound/EQ alongside them,
+and connection/details below. The single Bluetooth Play/Pause button follows
+successful requests without inventing an app playback state; Stop offers Play,
+while errors leave the prior intent intact. The fixture suite passes 104
+browser checks, including mobile touch targets and reduced-motion behavior.
+Public screenshots use example data. EQ remains disabled pending the native
+mode/application work described above.
+
+
+The polished UI was also checked live: one Play/Pause control changed to Play
+after the Pause request and back to Pause after Play. Original sound settings
+were preserved. Over 22 seconds it retained one event connection, made no
+automatic state requests and had no browser errors or mobile overflow.

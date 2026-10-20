@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101113"><title>JBL Bar 9.1 · Remote</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111215"><title>JBL Bar 9.1 · Remote</title>
+  <link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
 <body>
 <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
 <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9M7 5.5a8 8 0 1 0 10 0"/></symbol>
@@ -15,23 +19,80 @@
 <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></symbol>
 <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8V4Z"/></symbol><symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 4v16M16 4v16"/></symbol><symbol id="i-next" viewBox="0 0 24 24"><path d="m5 5 10 7-10 7V5Zm13 0v14"/></symbol><symbol id="i-previous" viewBox="0 0 24 24"><path d="m19 5-10 7 10 7V5ZM6 5v14"/></symbol><symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></symbol>
 </defs></svg>
+<a class="skip-link" href="#volume-panel">Skip to controls</a>
 <main>
-<header><a href="/" aria-label="JBL Bar 9.1 home"><span class="brand">JBL</span><span class="wordmark">BAR 9.1<small>LOCAL CONTROL</small></span></a><div class="header-status"><span id="connection" class="connection" data-state="connecting"><span id="connection-label">Connecting</span></span><button id="refresh" class="icon-button" aria-label="Refresh soundbar state" title="Refresh"><svg><use href="#i-refresh"/></svg></button></div></header>
-<section class="intro"><div><p class="eyebrow">THE LISTENING ROOM</p><h1>Sound, on your terms.</h1><p id="summary">Connecting to your soundbar…</p></div><button id="power" class="power" data-action="power" disabled aria-label="Turn soundbar on"><svg><use href="#i-power"/></svg><span id="power-label">Power</span></button></section>
-<div class="dashboard">
-<section id="volume-panel" class="volume-panel panel" aria-labelledby="volume-label"><div class="panel-top"><h2 id="volume-label">VOLUME</h2><span id="power-state" class="tag">—</span></div><section id="playback" class="now-playing" aria-label="Playback" hidden><div class="playback-heading"><svg><use id="playback-icon" href="#i-cast"/></svg><div><span id="playback-service">Streaming</span><strong id="playback-status">—</strong></div><span class="playing-bars" aria-hidden="true"><i></i><i></i><i></i></span></div><p id="playback-title" hidden></p><p id="playback-meta" hidden></p><span id="playback-app" hidden></span><div id="playback-timeline" hidden><progress id="playback-progress" max="1" value="0" aria-label="Track progress"></progress><span id="playback-time"></span></div><div class="transport" aria-label="Playback controls"><button id="media-previous" data-action="media_previous" aria-label="Previous track" title="Previous track" disabled><svg><use href="#i-previous"/></svg></button><button id="media-toggle" data-action="media_play" aria-label="Play" title="Play" disabled><svg><use id="media-toggle-icon" href="#i-play"/></svg><span id="media-toggle-label" class="transport-label">Play</span></button><button id="media-pause" data-action="media_pause" aria-label="Pause" title="Pause" disabled><svg><use href="#i-pause"/></svg><span class="transport-label">Pause</span></button><button id="media-next" data-action="media_next" aria-label="Next track" title="Next track" disabled><svg><use href="#i-next"/></svg></button><button id="media-stop" data-action="media_stop" aria-label="Stop playback" title="Stop playback" disabled><svg><use href="#i-stop"/></svg></button></div><p id="media-help" class="media-help"></p><p id="playback-detail" hidden></p></section><div class="volume-controls"><button data-action="volume_down" class="step" disabled aria-label="Volume down">−</button><div class="dial"><div class="dial-ticks"></div><div class="dial-rim"></div><div class="volume-readout"><span id="volume">—</span><span id="volume-caption">LISTENING LEVEL</span><span id="volume-pending">&nbsp;</span></div></div><button data-action="volume_up" class="step" disabled aria-label="Volume up">+</button></div><button id="mute" data-action="mute" class="mute" disabled aria-pressed="false"><svg><use id="mute-icon" href="#i-volume"/></svg><span id="mute-label">Mute sound</span><span class="shortcut">M</span></button><p id="volume-hint" class="hint">Tap for one step. Hold to keep going.</p><div class="soundbar-art" aria-hidden="true"><div class="speaker satellite"></div><div class="speaker bar"><span>JBL</span></div><div class="speaker satellite"></div></div></section>
-<div class="secondary">
-<section class="inputs panel" aria-labelledby="inputs-label"><div class="section-heading"><h2 id="inputs-label">SOURCE</h2><span id="input-name">—</span></div><div class="input-buttons">
-<button data-action="input_tv" data-input="TV / ARC" class="input-button" disabled aria-pressed="false"><svg><use href="#i-tv"/></svg><span class="source-copy">TV / ARC<small>Your television</small></span><svg class="source-check"><use href="#i-check"/></svg></button>
-<button data-action="input_hdmi" data-input="HDMI" class="input-button" disabled aria-pressed="false"><svg><use href="#i-hdmi"/></svg><span class="source-copy">HDMI<small>Connected device</small></span><svg class="source-check"><use href="#i-check"/></svg></button>
-<button data-action="input_bluetooth" data-input="Bluetooth" class="input-button" disabled aria-pressed="false"><svg><use href="#i-bluetooth"/></svg><span class="source-copy">Bluetooth<small>Wireless audio</small></span><svg class="source-check"><use href="#i-check"/></svg></button>
-</div><div id="bluetooth-panel" class="bluetooth-panel" hidden><div class="bt-heading"><span class="bt-dot"></span><h3 id="bt-status">Bluetooth source selected</h3></div><p id="bt-help">Open Bluetooth settings on your phone and choose JBL Bar 9.1.</p><button id="bt-pair" data-action="bluetooth_pair" disabled><svg><use href="#i-bluetooth"/></svg><span id="bt-pair-label">Pair a device</span></button><small id="bt-note">Pairing may disconnect the current Bluetooth device.</small></div></section>
-<section class="mode-panel panel"><div class="section-heading"><h2>SOUND</h2><span class="mode-mark" aria-hidden="true">≋</span></div><h3 id="mode">Checking sound mode</h3><p id="mode-description">Reading your current settings.</p><button id="standard" data-action="standard" disabled><svg><use href="#i-check"/></svg><span id="standard-label">Use Standard</span></button><div class="sound-settings"><div class="sound-row"><div><span>Bass</span><small id="bass-value">—</small></div><button data-action="bass_next" id="bass-next" disabled aria-label="Change bass level">Change <span aria-hidden="true">↗</span></button></div><div class="sound-row"><div><span>Atmos height</span><small id="atmos-value">—</small></div><button data-action="atmos_next" id="atmos-next" disabled aria-label="Change Atmos height level">Change <span aria-hidden="true">↗</span></button></div><div class="sound-row"><div><span>Rear speakers</span><small id="rear-value">—</small></div><button data-action="rear_next" id="rear-next" disabled aria-label="Change rear speaker level">Change <span aria-hidden="true">↗</span></button></div><div class="sound-row night-row"><div><span>Night mode</span><small id="night-value">—</small></div><button data-action="night_toggle" id="night" disabled aria-pressed="false"><span id="night-label">Turn on</span></button></div><p class="sound-note">Each tap cycles to the next level. Atmos height applies to Atmos content.</p></div></section>
-<section id="wifi-panel" class="wifi-panel panel"><div class="section-heading"><h2>WI-FI</h2><svg><use href="#i-wifi"/></svg></div><h3 id="wifi-name">Checking connection</h3><p id="wifi-status">Reading network status…</p><a id="local-address" class="local-address" href="http://jbl.local" hidden>jbl.local <span aria-hidden="true">↗</span></a><div class="network-details"><span id="wifi-ip">—</span><span id="wifi-signal"></span></div><p id="hotspot-status" hidden></p></section>
-</div></div>
-<div id="message" class="feedback" role="status" aria-live="polite" aria-atomic="true"><span class="feedback-dot"></span><span id="message-text">Waiting for the soundbar.</span><button id="cancel-volume" hidden>Clear queued taps</button></div>
-<footer><span>Direct to your soundbar<span class="footer-separator"> · </span>No cloud</span><span id="last-seen">Not synced yet</span></footer>
-<details class="device-details"><summary>Soundbar details <span>+</span></summary><dl><div><dt>Bluetooth name</dt><dd id="device-name">—</dd></div><div><dt>Uptime</dt><dd id="device-uptime">—</dd></div><div><dt>Smart Mode automation</dt><dd id="device-automation">—</dd></div><div id="cast-eq-row" hidden><dt>Cast tone settings</dt><dd id="cast-eq">—</dd></div></dl></details>
-<details class="help"><summary>Good to know <span>+</span></summary><p>Hold + or − for repeated steps, or use your keyboard’s ↑ and ↓ keys. Press M to mute. Pending volume changes appear immediately and are confirmed by the bar; releasing a hold stops adding steps.</p><p>Power, source switching and manual Standard selection are experimental. When the bar is in standby, turn it on before adjusting sound. This page receives live updates while it’s visible. Bluetooth device names come from the bar’s pairing cache and may lag a device rename. Bluetooth status describes the audio stream; it can stay active while an app is paused. Play, pause and track controls send requests to the connected device; apps may handle them differently. Track details are not currently being reported by the tested Bluetooth connection. Night mode uses a brief mute-hold sequence, like the original remote. Cast track details appear when the receiver shares them; mirrored audio cannot report the sending app’s play/pause state. AirPlay reports an active session only.</p></details>
+  <header>
+    <a href="/" aria-label="JBL Bar 9.1 home"><span class="brand">JBL</span><span class="wordmark">BAR 9.1<small>YOUR LOCAL REMOTE</small></span></a>
+    <div class="header-status"><span id="connection" class="connection" data-state="connecting"><span id="connection-label">Connecting</span></span><button id="refresh" class="icon-button" aria-label="Refresh soundbar state" title="Refresh"><svg><use href="#i-refresh"/></svg></button></div>
+  </header>
+  <section class="intro" aria-labelledby="page-title">
+    <div><p class="eyebrow">SETTLE IN. PRESS PLAY.</p><h1 id="page-title">Your listening room.</h1><p id="summary">Connecting to your soundbar…</p></div>
+    <button id="power" class="power" data-action="power" disabled aria-label="Turn soundbar on"><svg><use href="#i-power"/></svg><span id="power-label">Power</span></button>
+  </section>
+  <div class="dashboard">
+    <div class="primary">
+      <section id="volume-panel" class="volume-panel panel" aria-labelledby="volume-label" tabindex="-1">
+        <div class="panel-top"><h2 id="volume-label">Volume</h2></div>
+        <div class="volume-controls">
+          <button data-action="volume_down" class="step" disabled aria-label="Volume down">−</button>
+          <div class="dial"><div class="dial-ticks"></div><div class="dial-rim"></div><div class="volume-readout"><span id="volume">—</span><span id="volume-caption"></span><span id="volume-pending">&nbsp;</span></div></div>
+          <button data-action="volume_up" class="step" disabled aria-label="Volume up">+</button>
+        </div>
+        <button id="mute" data-action="mute" class="mute" disabled aria-pressed="false"><svg><use id="mute-icon" href="#i-volume"/></svg><span id="mute-label">Mute sound</span><kbd class="shortcut">M</kbd></button>
+        <p id="volume-hint" class="hint">Tap to adjust. Hold to keep going.</p>
+        <section id="playback" class="now-playing" aria-label="Playback" hidden>
+          <div class="playback-heading"><svg><use id="playback-icon" href="#i-cast"/></svg><div><span id="playback-service">Streaming</span><strong id="playback-status">—</strong></div><span class="playing-bars" aria-hidden="true"><i></i><i></i><i></i></span></div>
+          <p id="playback-title" hidden></p><p id="playback-meta" hidden></p><span id="playback-app" hidden></span>
+          <div id="playback-timeline" hidden><progress id="playback-progress" max="1" value="0" aria-label="Track progress"></progress><span id="playback-time"></span></div>
+          <div class="transport" aria-label="Playback controls">
+            <button id="media-previous" data-action="media_previous" aria-label="Previous track" title="Previous track" disabled><svg><use href="#i-previous"/></svg></button>
+            <button id="media-toggle" data-action="media_play" aria-label="Play" title="Play" disabled><svg><use id="media-toggle-icon" href="#i-play"/></svg><span id="media-toggle-label" class="transport-label">Play</span></button>
+            <button id="media-next" data-action="media_next" aria-label="Next track" title="Next track" disabled><svg><use href="#i-next"/></svg></button>
+            <button id="media-stop" data-action="media_stop" aria-label="Stop playback" title="Stop playback" disabled><svg><use href="#i-stop"/></svg></button>
+          </div>
+          <p id="media-help" class="media-help"></p><p id="playback-detail" hidden></p>
+        </section>
+        <div class="soundbar-art" aria-hidden="true"><div class="speaker satellite"></div><div class="speaker bar"><span>JBL</span></div><div class="speaker satellite"></div></div>
+      </section>
+      <section class="inputs panel" aria-labelledby="inputs-label">
+        <div class="section-heading"><div><p class="section-kicker">WHAT'S PLAYING</p><h2 id="inputs-label">Source</h2></div><span id="input-name" class="current-source">—</span></div>
+        <div class="input-buttons">
+          <button data-action="input_tv" data-input="TV / ARC" class="input-button" disabled aria-pressed="false"><svg><use href="#i-tv"/></svg><span class="source-copy">TV / ARC<small>Television</small></span><svg class="source-check"><use href="#i-check"/></svg></button>
+          <button data-action="input_hdmi" data-input="HDMI" class="input-button" disabled aria-pressed="false"><svg><use href="#i-hdmi"/></svg><span class="source-copy">HDMI<small>Connected device</small></span><svg class="source-check"><use href="#i-check"/></svg></button>
+          <button data-action="input_bluetooth" data-input="Bluetooth" class="input-button" disabled aria-pressed="false"><svg><use href="#i-bluetooth"/></svg><span class="source-copy">Bluetooth<small>Wireless audio</small></span><svg class="source-check"><use href="#i-check"/></svg></button>
+        </div>
+        <div id="bluetooth-panel" class="bluetooth-panel" hidden><div class="bt-heading"><span class="bt-dot"></span><h3 id="bt-status">Bluetooth selected</h3></div><p id="bt-help">Choose JBL Bar 9.1 in your device's Bluetooth settings.</p><button id="bt-pair" data-action="bluetooth_pair" disabled><svg><use href="#i-bluetooth"/></svg><span id="bt-pair-label">Pair a device</span></button><small id="bt-note">Pairing may disconnect the current device.</small></div>
+      </section>
+    </div>
+    <div class="secondary">
+      <section class="mode-panel panel" aria-labelledby="sound-heading">
+        <div class="section-heading"><div><p class="section-kicker">MAKE IT YOURS</p><h2 id="sound-heading">Sound</h2></div><span class="mode-mark" aria-hidden="true">≋</span></div>
+        <div class="sound-mode"><div><h3 id="mode">Checking mode</h3><p id="mode-description">Reading your sound settings.</p></div><button id="standard" data-action="standard" disabled><svg><use href="#i-check"/></svg><span id="standard-label">Use Standard</span></button></div>
+        <div class="sound-settings">
+          <div class="sound-row"><div><span>Bass</span><small id="bass-value">—</small></div><button data-action="bass_next" id="bass-next" disabled aria-label="Change bass level">Change <span aria-hidden="true">↗</span></button></div>
+          <div class="sound-row"><div><span>Atmos height</span><small id="atmos-value">—</small></div><button data-action="atmos_next" id="atmos-next" disabled aria-label="Change Atmos height level">Change <span aria-hidden="true">↗</span></button></div>
+          <div class="sound-row"><div><span>Rear speakers</span><small id="rear-value">—</small></div><button data-action="rear_next" id="rear-next" disabled aria-label="Change rear speaker level">Change <span aria-hidden="true">↗</span></button></div>
+          <div class="sound-row night-row"><div><span>Night mode</span><small id="night-value">—</small></div><button data-action="night_toggle" id="night" disabled aria-pressed="false"><span id="night-label">Turn on</span></button></div>
+        </div>
+        <p class="sound-note">Change cycles through levels. Atmos height applies to Atmos audio.</p>
+      </section>
+      <section id="eq-panel" class="eq-panel panel" aria-labelledby="eq-heading">
+        <div class="section-heading"><div><p class="section-kicker">A CLOSER LISTEN</p><h2 id="eq-heading">Equalizer</h2></div><span class="development-tag">In development</span></div>
+        <div class="eq-illustration" aria-hidden="true"><div class="eq-grid"></div><svg viewBox="0 0 400 74" preserveAspectRatio="none"><path class="eq-area" d="M0 43C45 43 48 19 100 23S159 58 207 46S269 23 314 34S365 45 400 30V74H0Z"/><path class="eq-curve" d="M0 43C45 43 48 19 100 23S159 58 207 46S269 23 314 34S365 45 400 30"/></svg><span>LOW</span><span>HIGH</span></div>
+        <h3>Fine tuning, next.</h3><p>Custom EQ is being explored. The bar’s original tuning stays in place until changes can be tested and reliably restored.</p><span class="eq-status"><span></span>No custom EQ applied</span>
+      </section>
+    </div>
+  </div>
+  <div id="message" class="feedback" role="status" aria-live="polite" aria-atomic="true"><span class="feedback-dot"></span><span id="message-text">Connecting to the soundbar.</span><button id="cancel-volume" hidden>Clear queued taps</button></div>
+  <section id="wifi-panel" class="wifi-panel panel" aria-labelledby="wifi-heading">
+    <div class="network-heading"><span class="network-icon"><svg><use href="#i-wifi"/></svg></span><div><h2 id="wifi-heading">Connection</h2><h3 id="wifi-name">Checking Wi-Fi</h3><p id="wifi-status">Reading network status…</p></div></div>
+    <div class="network-address"><a id="local-address" class="local-address" href="http://jbl.local" hidden>jbl.local <span aria-hidden="true">↗</span></a><div class="network-details"><span id="wifi-ip">—</span><span id="wifi-signal"></span></div><p id="hotspot-status" hidden></p></div>
+  </section>
+  <div class="more-details">
+    <details class="device-details"><summary>Soundbar details <span aria-hidden="true">+</span></summary><dl><div><dt>Bluetooth name</dt><dd id="device-name">—</dd></div><div><dt>Uptime</dt><dd id="device-uptime">—</dd></div><div><dt>Smart Mode automation</dt><dd id="device-automation">—</dd></div><div id="cast-eq-row" hidden><dt>Cast tone settings</dt><dd id="cast-eq">—</dd></div></dl></details>
+    <details class="help"><summary>Controls &amp; tips <span aria-hidden="true">+</span></summary><div class="help-content"><p><strong>Volume.</strong> Tap + or − for one step; hold for more. Keyboard: ↑ / ↓ for volume, M to mute. Clear queued taps to cancel unsent changes.</p><p><strong>Sound.</strong> Standard turns Smart Mode off. Standard and Night Mode use a brief mute-hold sequence. Rear levels are available when the rear speakers are detached.</p><p><strong>Playback.</strong> Bluetooth buttons request changes on the connected device. Its audio stream may stay active while an app is paused. Track details appear when a receiver shares them; mirrored Cast audio and AirPlay have more limited status.</p><p><strong>Local control.</strong> Updates arrive live while this page is visible. Power and source changes are experimental. If the connection drops, pending controls are cleared and never replayed.</p></div></details>
+  </div>
+  <footer><span>Made for your soundbar.<span class="footer-separator"> · </span>Local. No cloud.</span><span id="last-seen">Not synced yet</span></footer>
 </main>
-</body></html>
+</body>
+</html>

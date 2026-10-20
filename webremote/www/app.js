@@ -5,6 +5,17 @@ const isVolume = action => action === 'volume_up' || action === 'volume_down';
 const delta = action => action === 'volume_up' ? 1 : action === 'volume_down' ? -1 : 0;
 let current, csrf = '', online = false, active = null, queue = [], epoch = 0;
 let refreshing = false, stream = null, latestState = null, lastSync = 0, holdTimer, repeatTimer, heldButton;
+// A successful AVRCP request changes the next button action, not the reported stream state.
+let mediaIntent = null, mediaPeer = '', mediaAudio = '';
+function mediaIdentity(s) {
+  const bt = s?.bluetooth;
+  return s?.input === 'Bluetooth' && bt?.connected ? JSON.stringify([bt.peer_name || '', bt.name || '']) : '';
+}
+function syncMediaIntent(s) {
+  const peer = mediaIdentity(s), audio = s?.bluetooth?.audio || '';
+  if (!peer || peer !== mediaPeer || audio !== mediaAudio) mediaIntent = null;
+  mediaPeer = peer; mediaAudio = audio;
+}
 function feedback(text, kind = '') {
   $('message-text').textContent = text;
   $('message').dataset.kind = kind;
@@ -23,10 +34,9 @@ function render() {
   $('summary').textContent = !online ? 'Connection lost. Showing the last known settings.' : !s.available ? (s.error || 'Waiting for your soundbar…') : awake ? sourceName(s) + ' · ' + s.mode + ' mode' : s.power === 'Standby' ? 'In standby. Ready when you are.' : 'Your soundbar is starting…';
   const offset = pendingVolume();
   $('volume').textContent = s.volume == null ? '—' : Math.max(0, s.volume + offset);
-  $('volume-caption').textContent = !awake ? 'IN STANDBY' : s.muted ? 'SOUND MUTED' : 'LISTENING LEVEL';
+  $('volume-caption').textContent = !awake ? 'IN STANDBY' : s.muted ? 'SOUND MUTED' : '';
   $('volume-pending').textContent = pending && isVolume(active) ? 'Adjusting…' : '\u00a0';
   $('volume-panel').classList.toggle('pending', pending && isVolume(active));
-  $('power-state').textContent = ready ? s.power : 'Last known';
   $('power').classList.toggle('on', awake);
   $('power').setAttribute('aria-label', awake ? 'Put soundbar in standby' : 'Turn soundbar on');
   $('power-label').textContent = active === 'power' ? 'Working…' : awake ? 'Standby' : 'Turn on';
@@ -41,10 +51,10 @@ function render() {
     b.setAttribute('aria-pressed', String(selected));
   });
   $('mode').textContent = s.mode === 'Standard' ? 'Standard' : s.mode === 'Smart' ? 'Smart Mode' : 'Checking mode';
-  $('mode-description').textContent = !awake ? 'Turn on to adjust your sound.' : s.mode === 'Standard' ? 'Smart Mode is off. Enjoy the original mix.' : 'Use Standard to turn Smart Mode off.';
+  $('mode-description').textContent = !awake ? 'Turn on to adjust your sound.' : s.mode === 'Standard' ? 'Smart Mode is off.' : 'Use Standard to turn Smart Mode off.';
   $('standard-label').textContent = active === 'standard' ? 'Selecting…' : s.mode === 'Standard' ? 'Selected' : 'Use Standard';
   $('standard').classList.toggle('confirmed', s.mode === 'Standard');
-  $('volume-hint').textContent = !awake ? 'Turn the bar on to adjust volume.' : s.muted ? 'Sound is muted. Tap above to unmute.' : 'Tap for one step. Hold to keep going.';
+  $('volume-hint').textContent = !awake ? 'Turn the bar on to adjust volume.' : s.muted ? 'Sound is muted. Tap above to unmute.' : 'Tap to adjust. Hold to keep going.';
   buttons.forEach(b => {
     const action = b.dataset.action;
     b.disabled = !ready || !['On', 'Standby'].includes(s.power) || (action !== 'power' && !awake) || (pending && !(isVolume(action) && isVolume(active))) || (action === 'standard' && s.mode === 'Standard');
@@ -78,7 +88,7 @@ function receiveState(s) {
   const changed = settingsChanged(s);
   if (!adopt(s)) return;
   if (!s.available) feedback(s.error || 'Waiting for your soundbar…', 'error');
-  else if (reconnecting) feedback('Ready to listen. Settings update live.');
+  else if (reconnecting) feedback('Ready. Your settings update live.');
   else if (changed && $('message').dataset.kind === 'success') feedback('Settings updated from the soundbar.');
   render();
 }
@@ -113,7 +123,7 @@ async function refresh() {
     adopt(s);
     if (changed && $('message').dataset.kind === 'success') feedback('Settings updated from the soundbar.');
     if (!s.available) feedback(s.error || 'Waiting for your soundbar…', 'error');
-    else if (reconnecting) feedback('Ready to listen. All settings are live.');
+    else if (reconnecting) feedback('Ready. Your settings update live.');
   } catch {
     if (version !== epoch || active) return;
     online = false;
@@ -175,6 +185,7 @@ async function pump() {
   render();
   feedback(pendingMessage(), 'pending');
   const action = active;
+  const requestPeer = mediaIdentity(current);
   try {
     const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify({action}), signal: AbortSignal.timeout(20000)});
     const text = await response.text();
@@ -186,6 +197,8 @@ async function pump() {
     }
     adopt(data);
     if (!data.available) throw new Error(data.error || 'Soundbar unavailable.');
+    syncMediaIntent(data);
+    if (requestPeer && requestPeer === mediaIdentity(data) && ['media_play','media_pause','media_stop'].includes(action)) mediaIntent = action;
     feedback(success(action, data), 'success');
   } catch (error) {
     queue = [];
@@ -310,11 +323,21 @@ function renderPlayback(s, ready, awake) {
   $('playback-time').textContent = timed ? mediaTime(cast.current_time) + ' / ' + mediaTime(cast.duration) : '';
   $('playback').classList.toggle('active', ready && awake && !!playback?.active);
   $('playback').classList.toggle('mirroring', !!cast?.mirroring);
+  syncMediaIntent(s);
   const controls = s.media_controls || [];
-  for (const id of ['media-previous','media-toggle','media-pause','media-next','media-stop']) {
+  const wantsPause = bluetooth ? (mediaIntent ? mediaIntent === 'media_play' : bt?.audio === 'Streaming') : cast?.player_state === 'PLAYING';
+  let toggle = wantsPause ? 'media_pause' : 'media_play';
+  if (!controls.includes(toggle) && controls.includes(wantsPause ? 'media_play' : 'media_pause')) toggle = wantsPause ? 'media_play' : 'media_pause';
+  const label = toggle === 'media_pause' ? 'Pause' : 'Play';
+  $('media-toggle').dataset.action = toggle;
+  $('media-toggle').setAttribute('aria-label', label);
+  $('media-toggle').title = label;
+  $('media-toggle-label').textContent = label;
+  $('media-toggle-icon').setAttribute('href', toggle === 'media_pause' ? '#i-pause' : '#i-play');
+  for (const id of ['media-previous','media-toggle','media-next','media-stop']) {
     $(id).disabled = !ready || !awake || !!active || !controls.includes($(id).dataset.action);
   }
-  $('media-help').textContent = controls.length ? (bluetooth ? 'Controls request changes on your device. Audio streaming can continue while an app is paused.' : 'Controls request changes from the receiver.') : cast?.mirroring ? 'Use playback controls in the sending app.' : bluetooth && bt?.connected ? 'Playback controls are unavailable for this connection.' : 'Playback controls aren’t available on this source.';
+  $('media-help').textContent = controls.length ? (bluetooth ? 'Sent to your device. Audio streaming may continue while an app is paused.' : 'Controls request changes from the receiver.') : cast?.mirroring ? 'Use playback controls in the sending app.' : bluetooth && bt?.connected ? 'Playback controls are unavailable for this connection.' : 'Playback controls aren’t available on this source.';
 }
 function renderExtras(s, ready, awake) {
   const sound=s.sound || {};

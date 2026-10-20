@@ -81,6 +81,13 @@ try {
   await page.goto(url);
   await page.waitForFunction(()=>document.querySelector('#connection').dataset.state==='online');
   check(stateGets===0 && streamGets===1,'initial state uses one push connection');
+  check(await page.locator('h1').count()===1,'one clear page heading');
+  check(await page.locator('#eq-panel h2').textContent()==='Equalizer','dedicated equalizer section');
+  check((await page.locator('#eq-panel').textContent()).includes('In development') && (await page.locator('#eq-panel').textContent()).includes('No custom EQ applied'),'EQ preview honestly describes development status');
+  check(await page.locator('#eq-panel button,#eq-panel input,[role=slider]').count()===0,'EQ preview exposes no pretend controls');
+  check(await page.locator('.panel').first().evaluate(e=>getComputedStyle(e).animationName)==='none','reduced-motion preference removes entry animation');
+  check(await page.locator('#volume').evaluate(e=>Number.parseFloat(getComputedStyle(e).fontSize))>await page.locator('#sound-heading').evaluate(e=>Number.parseFloat(getComputedStyle(e).fontSize)),'volume remains the primary visual control');
+
   const stale={...snapshot(),revision:revision-1,volume:200};
   for(const res of streams)res.write('data: '+JSON.stringify(stale)+'\n\n');
   await pause(100);
@@ -147,7 +154,7 @@ try {
   await pause(600);
   check(calls.length===atLoss,'reconnect never replays controls');
   state.power='Standby'; await page.locator('#refresh').click();
-  await page.waitForFunction(()=>document.querySelector('#power-state').textContent==='Standby');
+  await page.waitForFunction(()=>document.querySelector('#power').getAttribute('aria-label')==='Turn soundbar on');
   check(await plus.isDisabled() && await page.locator('#power').isEnabled(),'standby only permits power');
   check((await page.locator('#summary').textContent()).includes('standby'),'standby copy');
   state.available=false;state.power='Starting';state.error='Soundbar is starting';
@@ -155,7 +162,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('#connection-label').textContent==='Starting');
   check(await page.locator('#power').isDisabled(),'starting firmware disables power');
   state=initial(); await page.locator('#refresh').click();
-  await page.waitForFunction(()=>document.querySelector('#power-state').textContent==='On');
+  await page.waitForFunction(()=>document.querySelector('#power').getAttribute('aria-label')==='Put soundbar in standby');
   await page.locator('[data-action=input_bluetooth]').click();
   check((await page.locator('#message-text').textContent()).includes('Bluetooth'),'Bluetooth progress');
   await page.waitForFunction(()=>document.querySelector('#message').dataset.kind==='success');
@@ -172,41 +179,64 @@ try {
   check((await page.locator('#bt-help').textContent()).includes('Example phone'),'connected peer name shown separately from bar name');
   check((await page.locator('#playback-status').textContent())==='Streaming audio','Bluetooth status describes the audio stream');
   check((await page.locator('#playback-title').textContent())==='Example phone','Bluetooth playback identifies peer');
-  check(await page.locator('#media-toggle').getAttribute('data-action')==='media_play' && await page.locator('#media-pause').getAttribute('data-action')==='media_pause','Play and Pause are separate fixed commands');
-  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isEnabled(),'connected Bluetooth offers both Play and Pause');
-  await page.locator('#media-pause').click();
+  check(await page.locator('#media-toggle').getAttribute('data-action')==='media_pause','streaming Bluetooth initially offers Pause');
+  check(await page.locator('[data-action=media_play],[data-action=media_pause]').count()===1,'one shared Play/Pause button');
+  await page.locator('#media-toggle').click();
   await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Pause requested.');
   check(calls.at(-1)==='media_pause' && state.bluetooth.audio==='Streaming','Pause is requested without inventing an app or stream state');
   check((await page.locator('#playback-status').textContent())==='Streaming audio','A2DP can stay active after Pause');
   check((await page.locator('#media-help').textContent()).includes('while an app is paused'),'stream activity limitation is explained');
-  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isEnabled(),'Play remains available even when A2DP stays Streaming');
+  check(await page.locator('#media-toggle').getAttribute('aria-label')==='Play','successful Pause changes the next requested action to Play');
   await page.locator('#media-toggle').click();
   await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Play requested.');
   check(calls.at(-1)==='media_play' && state.bluetooth.audio==='Streaming','Play reports a request without claiming app confirmation');
+  check(await page.locator('#media-toggle').getAttribute('aria-label')==='Pause','successful Play restores Pause');
+  failure='playback request failed';
+  await page.locator('#media-toggle').click();
+  await page.waitForFunction(()=>document.querySelector('#message').dataset.kind==='error');
+  check(await page.locator('#media-toggle').getAttribute('aria-label')==='Pause','failed Pause never flips intent');
+  failure='';
   state.bluetooth.audio='Paused';
   await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Stream suspended');
   check(await page.locator('#playback').isVisible() && (await page.locator('#bt-status').textContent())==='Stream suspended','suspended Bluetooth stream stays visible');
   check(!await page.locator('#playback').evaluate(e=>e.classList.contains('active')),'suspended stream stops the activity indicator');
-  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isEnabled(),'suspended stream does not infer or hide transport commands');
+  check(await page.locator('#media-toggle').getAttribute('aria-label')==='Play','actual stream transition resets pending playback intent');
   advertisedControls=['media_pause'];
-  await page.waitForFunction(()=>document.querySelector('#media-toggle').disabled);
-  check(await page.locator('#media-pause').isEnabled(),'availability follows server flags rather than Bluetooth stream state');
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').dataset.action==='media_pause');
+  check(await page.locator('#media-toggle').isEnabled(),'single transport follows server capabilities');
   advertisedControls=null;
-  await page.waitForFunction(()=>!document.querySelector('#media-toggle').disabled);
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').dataset.action==='media_play');
+  await page.locator('#media-toggle').click();
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Play requested.');
+  check(await page.locator('#media-toggle').getAttribute('aria-label')==='Pause','request intent works while stream remains suspended');
+  state.bluetooth.peer_name='Another example phone';
+  await page.waitForFunction(()=>document.querySelector('#playback-title').textContent==='Another example phone');
+  check(await page.locator('#media-toggle').getAttribute('aria-label')==='Play','changing peers clears previous playback intent');
+  await page.locator('#media-toggle').click();
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Play requested.');
+  state.input='TV / ARC';
+  await page.waitForFunction(()=>document.querySelector('#playback').hidden);
+  state.input='Bluetooth';
+  await page.waitForFunction(()=>!document.querySelector('#playback').hidden);
+  check(await page.locator('#media-toggle').getAttribute('aria-label')==='Play','leaving and returning to Bluetooth clears previous playback intent');
+
   await page.locator('#media-next').click();
   await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Next track requested.');
   check(calls.at(-1)==='media_next','next reports requested rather than confirmed track');
   await page.locator('#media-previous').click();
   await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Previous track requested.');
   check(calls.at(-1)==='media_previous','previous uses explicit command');
+  state.bluetooth.audio='Streaming';
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').dataset.action==='media_pause');
   await page.locator('#media-stop').click();
   await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Stop requested.');
   check(calls.at(-1)==='media_stop','stop request acknowledged');
+  check(state.bluetooth.audio==='Streaming' && await page.locator('#media-toggle').getAttribute('aria-label')==='Play','successful Stop offers Play without inventing a stream transition');
   state.bluetooth.media_ready=false;
   await page.waitForFunction(()=>document.querySelector('#media-toggle').disabled);
-  check((await page.locator('.transport button:disabled').count())===5,'missing AVRCP readiness disables every transport control');
+  check((await page.locator('.transport button:disabled').count())===4,'missing AVRCP readiness disables every transport control');
   const beforeUnavailable=calls.length;
-  await page.locator('#media-pause').evaluate(button=>button.click());
+  await page.locator('#media-toggle').evaluate(button=>button.click());
   await pause(100);
   check(calls.length===beforeUnavailable,'unavailable AVRCP cannot enqueue a command');
   state.bluetooth.media_ready=true;
@@ -216,7 +246,7 @@ try {
   state.bluetooth.connected=false;state.bluetooth.audio='Disconnected';
   await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Waiting for a device');
   check(await page.locator('#playback-title').isHidden(),'disconnected peer name clears');
-  check((await page.locator('.transport button:disabled').count())===5,'disconnected device cannot receive any controls');
+  check((await page.locator('.transport button:disabled').count())===4,'disconnected device cannot receive any controls');
   state.bluetooth.connected=null;
   await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Status unavailable');
   check(await page.locator('#playback').isVisible(),'unknown Bluetooth state is explicit');
@@ -256,19 +286,19 @@ try {
   check((await page.locator('#playback-detail').textContent()).includes('isn’t reported'),'mirroring limitation explained');
   check((await page.locator('#playback-app').textContent())==='Chrome Audio Mirroring','receiver application shown');
   check(await page.locator('#playback-timeline').isHidden(),'mirroring never invents a track timeline');
-  check((await page.locator('.transport button:disabled').count())===5,'mirrored sender controls stay disabled');
+  check((await page.locator('.transport button:disabled').count())===4,'mirrored sender controls stay disabled');
   state.streaming={service:'Chromecast',status:'Paused',active:false,cast:{available:true,application:'Music app',mirroring:false,has_media:true,supported_commands:129,player_state:'PAUSED',title:'<img src=x onerror=alert(1)> '+ 'Long title '.repeat(30),artist:'Example artist',album:'Example album',current_time:75,duration:240,low_shelf_gain:0,high_shelf_gain:-2}};
   await page.waitForFunction(()=>document.querySelector('#playback-time').textContent==='1:15 / 4:00');
   check((await page.locator('#playback-meta').textContent())==='Example artist · Example album','Cast artist and album shown');
-  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isDisabled() && await page.locator('#media-previous').isEnabled() && await page.locator('#media-next').isDisabled(),'paused Cast enables only server-advertised Play and Previous');
+  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-toggle').getAttribute('aria-label')==='Play' && await page.locator('#media-previous').isEnabled() && await page.locator('#media-next').isDisabled(),'paused Cast enables only server-advertised Play and Previous');
   state.streaming.cast.player_state='PLAYING';state.streaming.cast.supported_commands=65;
-  await page.waitForFunction(()=>!document.querySelector('#media-pause').disabled);
-  check(await page.locator('#media-toggle').isDisabled() && await page.locator('#media-previous').isDisabled() && await page.locator('#media-next').isEnabled(),'playing Cast enables only server-advertised Pause and Next');
-  await page.locator('#media-pause').click();
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').dataset.action==='media_pause');
+  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-previous').isDisabled() && await page.locator('#media-next').isEnabled(),'playing Cast enables only server-advertised Pause and Next');
+  await page.locator('#media-toggle').click();
   await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Pause requested.');
-  check(calls.at(-1)==='media_pause' && await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isDisabled(),'Cast pause request follows refreshed receiver capabilities');
+  check(calls.at(-1)==='media_pause' && await page.locator('#media-toggle').isEnabled() && await page.locator('#media-toggle').getAttribute('aria-label')==='Play','Cast pause request follows refreshed receiver capabilities');
   state.streaming.cast.player_state='PLAYING';state.streaming.cast.supported_commands=0;
-  await page.waitForFunction(()=>document.querySelector('#media-toggle').disabled && document.querySelector('#media-pause').disabled && document.querySelector('#media-next').disabled);
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').disabled && document.querySelector('#media-next').disabled);
   check(await page.locator('#media-toggle').isDisabled() && await page.locator('#media-next').isDisabled(),'Cast without pause or skip capabilities keeps those commands disabled');
   check((await page.locator('#playback-title img').count())===0,'remote metadata is rendered as text');
   check(await page.locator('#playback-progress').getAttribute('value')==='75','timeline uses receiver position');
@@ -277,7 +307,7 @@ try {
   for (const width of [320,390,1024]) {
     await page.setViewportSize({width,height:900});
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'long media metadata fits at '+width);
-    check(await page.locator('.transport button').evaluateAll(buttons=>buttons.every(button=>{const r=button.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.left>=0 && r.right<=innerWidth;})),'five 44px transport targets fit at '+width);
+    check(await page.locator('.transport button').evaluateAll(buttons=>buttons.every(button=>{const r=button.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.left>=0 && r.right<=innerWidth;})),'four 44px transport targets fit at '+width);
   }
   await page.locator('.device-details summary').click();
   const beforeIdle=stateGets;await pause(1200);
@@ -286,6 +316,9 @@ try {
   for (const width of [320,390,1024]) {
     await page.setViewportSize({width,height:900});
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow at '+width);
+    check(await page.locator('button,summary').evaluateAll(elements=>elements.filter(e=>e.getBoundingClientRect().height>0).every(e=>e.getBoundingClientRect().height>=44)),'44px touch height for all visible controls at '+width);
+    if(width>=1000) check(await page.locator('.primary').evaluate(e=>e.getBoundingClientRect().right)<=await page.locator('.secondary').evaluate(e=>e.getBoundingClientRect().left),'listening and sound controls form separate desktop columns');
+
   }
   await page.setViewportSize({width:320,height:920});
   state=initial();state.input='Bluetooth';state.bluetooth={...state.bluetooth,selected:true,connected:true,audio:'Streaming',peer_name:'Example phone'}; await page.locator('#refresh').click();
@@ -297,6 +330,8 @@ try {
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-new.png',root)),fullPage:true});
   await page.setViewportSize({width:1200,height:900});
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-desktop-new.png',root)),fullPage:true});
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  check(await page.locator('.panel').first().evaluate(e=>getComputedStyle(e).animationName)==='arrive','motion enabled only when preference permits');
   check(errors.length===0,'no browser exceptions: '+errors.join(', '));
   console.log(checks+' browser UX checks passed');
 } finally {await browser.close();clearInterval(pushTimer);for(const res of streams)res.destroy();server.close();}

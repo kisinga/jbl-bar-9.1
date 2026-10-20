@@ -120,8 +120,9 @@ The helper exposes five fixed playback commands and registers no Bluetooth
 event subscriptions.
 I confirmed audible Pause and subsequent playback resumption; Next, Previous
 and Stop remain unconfirmed. Each button reports a request, not proof the
-source app changed state. Separate Play/Pause buttons avoid guessing from an
-A2DP stream that can remain active while the source app is paused. Normal Cast
+source app changed state. One Play/Pause button follows the last successful
+Bluetooth request because A2DP can remain active while the source app is paused. It resets on native
+stream, peer or source changes; failed commands never flip it. Normal Cast
 controls require a nonmirrored session and advertised capabilities; their
 hardware behavior remains unverified.
 
@@ -177,7 +178,9 @@ node tests/webremote-ui.mjs
 `PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` can reuse an
 existing installation. Tests serve the real assets with delayed/failed mock
 responses, cover queued/cancelled controls, holds, keyboard input, reconnects,
-stale replies, standby, Bluetooth/Wi-Fi/streaming feedback and 320/390/1024px layouts. Go tests
+stale replies, standby, Bluetooth/Wi-Fi/streaming feedback, the single playback
+toggle, EQ preview, reduced motion and 320/390/1024px layouts. The current
+suite passes 104 browser checks. Go tests
 cover LAN/hotspot/Host/CSRF boundaries, event streams, native Wi-Fi datagrams,
 state confirmation, peer-name filtering, sound decoding, native Bonjour
 registration and bounded read-only Cast framing/status queries.
