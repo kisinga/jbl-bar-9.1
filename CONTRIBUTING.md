@@ -166,7 +166,7 @@ and access checks; an occupied port 80 leaves 8080 usable.
 On 20 October 2026 I confirmed live AirPlay and Wi-Fi readback, both HTTP
 ports, a 22-second single browser event connection with zero state-poll requests,
 and complete bass/Atmos cycles restored to their original levels. The connected
-Bluetooth name was subsequently confirmed; native streaming/suspended status is now shown.
+Bluetooth name and Playing → Paused updates were subsequently confirmed on my bar.
 The observed YouTube session uses Chrome Audio Mirroring (`85CDB22F`): its receiver
 keeps reporting PLAYING when playback pauses at the sender. I label this Audio
 mirroring and do not claim sender pause detection. Normal receiver media-state

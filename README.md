@@ -27,7 +27,7 @@ I open **`http://<bar-ip-address>`** from a phone or computer on my configured L
 
 Go sends changed state over one event connection while the page is visible. Feedback is immediate, but the bar still takes roughly **1–2 seconds per volume step** to confirm a change. Unsent actions are discarded after an error or connection loss; controls are never replayed automatically.
 
-I confirmed volume/mute, Bluetooth pairing and the connected phone’s name, Wi-Fi readback and complete bass/height cycles, restoring my starting settings. The page and SSH returned after a USB-free reboot. Power/input transitions and manual Standard selection remain experimental; rear adjustment still needs an undocked hardware test. The server used about 10 MiB resident memory with Cast status enabled in my latest check.
+I confirmed volume/mute, Bluetooth pairing, the connected phone’s name and Playing → Paused updates, Wi-Fi readback and complete bass/height cycles, restoring my starting settings. The page and SSH returned after a USB-free reboot. Power/input transitions and manual Standard selection remain experimental; rear adjustment still needs an undocked hardware test. The server used about 10 MiB resident memory with Cast status enabled in my latest check.
 
 Access is restricted to my configured LAN, with fixed control names, firmware identity checks and same-origin/CSRF protection. When the bar’s native setup hotspot is already active, clients can also open **`http://192.168.255.249`** on that interface. Automatic hotspot activation after Wi-Fi loss and captive-portal opening remain unconfirmed; I have not changed Wi-Fi setup policy.
 

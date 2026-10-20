@@ -156,7 +156,8 @@ outage test or further vendor Cast-policy analysis; no outage was induced.
 I confirmed the connected Bluetooth phone name on 20 October 2026. The page now
 shows the native Bluetooth streaming/suspended state as Playing/Paused and keeps
 the connected-device card visible while paused. These states describe A2DP audio,
-not an individual phone app; the pause transition still needs a fresh live check.
+not an individual phone app. On 20 October 2026 I confirmed both Playing and
+Paused updated correctly when I played and paused audio from my connected phone.
 
 The reported Chromecast mismatch reproduced with YouTube through **Chrome Audio
 Mirroring**, app ID `85CDB22F`. The receiver exposes a generic LIVE media session
