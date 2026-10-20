@@ -8,7 +8,7 @@ I started by stopping Smart Mode from coming back whenever I power on my JBL Bar
 | --- | --- |
 | [Automatic Smart Mode off](#smart-mode-off) | Revision 5 / v0.1.0 confirmed on hardware; about 35 seconds after detecting power-on. |
 | [Root SSH](#root-ssh) | Password login, interactive shell, SFTP and USB-free startup confirmed on 20 October 2026; the generic installer is a separate reproducibility step. |
-| [Local browser remote](#local-browser-remote) | Live state, volume and mute confirmed on hardware and through a phone-sized browser; other mapped buttons remain experimental. |
+| [Local browser remote](#local-browser-remote) | Live state, volume/mute and USB-free startup confirmed on hardware; phone-sized browser tested. Other mapped buttons remain experimental. |
 | [Faster Smart Mode wake](CONTRIBUTING.md#faster-wake-candidate--revision-6) | Revision 6 on `work/faster-wake` remains hardware untested. It requires its matching uninstall ZIP. |
 
 The foundation is **[touch MAX's 8 January 2024 AutoScript article](https://touch-max.ru/vzlom/zapusk-ssh-na-proshivke-jbl-9-1)** and its linked **[almirus/jbl9.1 project](https://github.com/almirus/jbl9.1)**. They published the USB entry point and invited work on keeping Smart Mode off. I built on that work; I did not discover AutoScript.
@@ -124,7 +124,7 @@ This is a **32-bit ARM Linux** system with Android-derived services and Chromeca
 
 I run a lightweight [browser remote](webremote/) directly on the bar, port **8080**, with live volume, mute, input and sound-mode readback. It uses password authentication, same-origin/CSRF checks, a fixed set of permitted controls and exact firmware checks. [Build and install instructions](CONTRIBUTING.md#browser-remote) use a static ARM executable; no Android runtime or ongoing computer service is needed.
 
-On 20 October 2026 I verified volume `10 → 9 → 10` and mute `off → on → off` through the HTTP API and a phone-sized browser, restoring my original settings. Power, input switching and manual Standard selection are mapped from this firmware but remain experimental in this interface. It temporarily opens and restores the same console fields as the Smart Mode helper, with parser acknowledgments and state readback. I refuse known active Smart Mode transitions; simultaneous physical wake/control races need further testing.
+On 20 October 2026 I verified volume `10 → 9 → 10` and mute `off → on → off` through the HTTP API and a phone-sized browser, restoring my original settings. After a reboot without USB, both the page and SSH returned automatically; the remote used about 3–6 MiB resident memory in these checks. Power, input switching and manual Standard selection are mapped from this firmware but remain experimental in this interface. It temporarily opens and restores the same console fields as the Smart Mode helper, with parser acknowledgments and state readback. I refuse known active Smart Mode transitions; simultaneous physical wake/control races need further testing.
 
 ![Local JBL Bar 9.1 browser remote](docs/web-remote.png)
 

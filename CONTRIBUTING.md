@@ -27,7 +27,7 @@ Optional descriptor validation against a legally obtained extracted ARM BusyBox 
 - `USB-README.txt` / `ROLLBACK.txt`: short guides included in the ZIPs.
 - `tools/`: package builders and test runner.
 - `ssh/`: portable SSH setup templates; generated passwords, Wi-Fi configuration and device keys stay out of Git.
-- `webremote/`: experimental Go server and embedded browser UI; do not treat it as hardware-qualified until the result is recorded.
+- `webremote/`: small Go server and embedded browser UI; root README records which controls have hardware evidence.
 - `tests/`: portable fixture suite and pinned revision 5 file hashes.
 - `research/`: public index plus ignored local-only artifacts; see its README.
 
