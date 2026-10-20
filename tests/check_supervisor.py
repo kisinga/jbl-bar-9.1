@@ -23,12 +23,12 @@ if args[0]=='pidof':print(4242);raise SystemExit()
 if args[0]=='sync':raise SystemExit()
 if args[0]=='sleep':
  n=int((r/'ticks').read_text())+1 if (r/'ticks').exists() else 1
- (r/'ticks').write_text(str(n));(r/'proc/uptime').write_text(f'{n*5} 0\\n')
+ (r/'ticks').write_text(str(n));(r/'proc/uptime').write_text(f'{n} 0\\n')
  def state(system=None,mode=None):
   with (r/'proc/4242/mem').open('r+b') as f:
    if system is not None:f.seek(12962676);f.write(struct.pack('<I',system))
    if mode is not None:f.seek(13378532);f.write(struct.pack('<I',mode))
- if case=='late_power_on' and n==18:state(0,3)
+ if case=='late_power_on' and n==90:state(0,3)
  if case=='two_wakes':
   if n==8:state(2,3)
   if n==15:state(0,3)
@@ -37,7 +37,7 @@ if args[0]=='sleep':
   state(0,3);(r/'proc/4242/stat').write_text('4242 (bdpprog) S '+'0 '*18+'99999\\n')
  if case=='bounded_logs':state(2 if n%2 else 4,3)
  if case=='rollback_idle' and n==4:(r/'usb/ROLLBACK').touch()
- if n >= (150 if case=='bounded_logs' else 30):(r/'store/DISABLED').write_text('fixture end')
+ if n >= (150 if case=='bounded_logs' else 120 if case=='late_power_on' else 30):(r/'store/DISABLED').write_text('fixture end')
  if case=='disabled_idle' and n==4:(r/'store/DISABLED').write_text('fixture cancel')
  time.sleep(.002);raise SystemExit()
 os.execv('/usr/bin/busybox',['busybox']+args)

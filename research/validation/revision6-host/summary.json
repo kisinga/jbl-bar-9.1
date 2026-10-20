@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-19",
+  "status": "host checks passed; revision6 hardware pending",
+  "cases": {
+    "once-tests.json": 10,
+    "drain-tests.json": 4,
+    "controller-tests.json": 31,
+    "descriptor-tests.json": 16,
+    "update-tests.json": 9,
+    "setup-tests.json": 16,
+    "supervisor-tests.json": 16
+  },
+  "total": 102,
+  "device_source_hashes": {
+    "AutoScript/AutoScript": "a98a4673cf9cbe9b08757873de2da974274dd22f8cdb028b87b347f72fa0f7ec",
+    "JBLInstall/install.sh": "77c1ee9b48085a7165ffccc6ce64701e0e33959a696367cb6c260a0a4c9ba7e0",
+    "JBLInstall/uninstall.sh": "060034cd62a0b9d11f822e3331c77c0a3d1874bcca5ff3c9d976aedcfeaa3833",
+    "JBLInstall/collect-storage.sh": "a5ae39e4c0a1134531d80d91b1e4cb1a93f31cb3e05b693c7b8abd469a88f5bd",
+    "JBLInstall/setup.sh": "09c7ed505e4489abbc3a125cb7b0d15bdf1d6ae1c86261fba3a94685a505cf1c",
+    "JBLInstall/payload/helper.sh": "ca1d2dd6d7b8ccc1590946432d04334d5a8f88c2320acbae447967d0a43a8644",
+    "JBLInstall/payload/controller.sh": "3a166012981c6ab5bac8372e7a34e2df4a10ba6b8dc7a61ba6a68a9c07c79176",
+    "JBLInstall/payload/hook.expected": "87cf62cefa6b584547f2769662295c3e84d97b30b06e8ee871e50cfceeb92581",
+    "JBLInstall/payload/OWNER.txt": "f291c5f3ee3a586ca05ff33e4d6cfe315e4b45c5361260b84eb0662990089b64",
+    "JBLInstall/payload/run.sh": "aaa5af3e5457b715a8aad018a258fe4841f2a35076a4952b8b3993299d035b00",
+    "JBLInstall/payload/checksums.txt": "6c6119de762336efdaadb76202eb38085f0ff6c89393461e983ed33f20ebb91e",
+    "JBLInstall/payload/once.sh": "cde5aaf6f67a7c52cc237476b141c59e8e0286405ae977f481162c145be5bace"
+  },
+  "limits": "Synthetic executable/CLI/procfs fixtures and host BusyBox; not hardware timing proof."
+}

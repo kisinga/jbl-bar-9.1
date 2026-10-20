@@ -132,6 +132,12 @@ Keep the system monitor auxiliary to sound controls. Two-second cached samples p
 
 Use the current fixture suite rather than historical intermediate check totals: **141 host checks, 156 browser checks**, plus Go race tests and vet. Screenshots contain example values. Original Smart Mode ZIP bytes remain unchanged. CLI/discovery/capability ideas came from [the reviewed k1rnt revision](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309); its newer Linkplay transport and one-shot Smart Mode setter do not supply this bar’s native implementation or wake watcher.
 
+## Direct Smart Mode control
+
+The pinned native audio table exposes `app.audio.eq_set VALUE`. Its handler reaches the same HPP parameter `0x840001` setter used by Smart Mode’s audio task: Standard maps to 0, Smart to 1 or 2 according to source. This establishes a direct DSP candidate, not a complete replacement. No live validation of this CLI entry was performed in this pass.
+
+The normal full toggle also temporarily mutes, resets playback, updates the display/runtime word and saved config200, then queues audio command0x12. That queue uses in-process handles; no Bluetooth-style external bridge or dedicated single SoundMode key was found in the inspected paths. Do not replace the action with a mode-flag write or raw EEPROM edit. Keep future Go consolidation separate from direct native control: shared polling/locks/readback can remove duplicate scheduling, while key emulation still needs its native hold interval until a complete direct action is validated.
+
 ## Further validation
 
-Prioritize repeated application/reset and per-source audio behavior. Keep faster wake hardware qualification, short standby/CEC detection, sampling overhead, the transient installation long-press failure and additional firmware identities separate. Never substitute a passing host fixture, model suggestion or parser success for a hardware result.
+Prioritize repeated application/reset and per-source audio behavior. Revision 6 measured 18.26 seconds from observed awake to Standard versus a 34.64-second revision 5 control; one-second polling alone measured 27.00 seconds. Preserve the [device record](validation/revision6-device.json), including the unexplained pre-action power-off/reboot. Keep CEC/cold-boot qualification, sampling overhead, the transient installation long-press failure and additional firmware identities separate. Never substitute a passing host fixture, model suggestion or parser success for a hardware result.

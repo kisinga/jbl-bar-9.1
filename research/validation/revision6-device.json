@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-20",
+  "scope": "One owned JBL Bar 9.1, controlled SSH payload updates and native readback; no firmware flash. Seconds run from first observed awake sample to confirmed Standard with released keys. Sampling introduces approximately one second of uncertainty.",
+  "firmware_sha256": "86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441c90b63",
+  "revision6_manifest_sha256": "6c6119de762336efdaadb76202eb38085f0ff6c89393461e983ed33f20ebb91e",
+  "cases": [
+    {
+      "case": "revision5-baseline",
+      "poll_seconds": 5,
+      "runner_initial_delay_seconds": 10,
+      "observed_awake_to_standard_seconds": 36.29,
+      "standby_seconds": 23,
+      "wake_trigger": "test_power_command",
+      "standard_confirmed": true,
+      "normal_settings_restored": true,
+      "keys_released": true,
+      "console_restored": true
+    },
+    {
+      "case": "revision5-control-after-reboot",
+      "poll_seconds": 5,
+      "runner_initial_delay_seconds": 10,
+      "observed_awake_to_standard_seconds": 34.64,
+      "standby_seconds": 23,
+      "wake_trigger": "test_power_command",
+      "standard_confirmed": true,
+      "normal_settings_restored": true,
+      "keys_released": true,
+      "console_restored": true
+    },
+    {
+      "case": "poll1-delay10-wake",
+      "poll_seconds": 1,
+      "runner_initial_delay_seconds": 10,
+      "observed_awake_to_standard_seconds": 27.0,
+      "standby_seconds": 23,
+      "wake_trigger": "test_power_command",
+      "standard_confirmed": true,
+      "normal_settings_restored": true,
+      "keys_released": true,
+      "console_restored": true
+    },
+    {
+      "case": "revision6-wake-1-success",
+      "poll_seconds": 1,
+      "runner_initial_delay_seconds": 1,
+      "observed_awake_to_standard_seconds": 18.26,
+      "standby_seconds": 23,
+      "wake_trigger": "test_power_command",
+      "standard_confirmed": true,
+      "normal_settings_restored": true,
+      "keys_released": true,
+      "console_restored": true
+    },
+    {
+      "case": "revision6-wake-short",
+      "poll_seconds": 1,
+      "runner_initial_delay_seconds": 1,
+      "observed_awake_to_standard_seconds": 18.01,
+      "standby_seconds": 9.56,
+      "wake_trigger": "test_power_command",
+      "standard_confirmed": true,
+      "normal_settings_restored": true,
+      "keys_released": true,
+      "console_restored": true
+    },
+    {
+      "case": "revision6-wake-delayed-robust",
+      "poll_seconds": 1,
+      "runner_initial_delay_seconds": 1,
+      "observed_awake_to_standard_seconds": 17.16,
+      "standby_seconds": 76.14,
+      "wake_trigger": "test_power_command",
+      "standard_confirmed": true,
+      "normal_settings_restored": true,
+      "keys_released": true,
+      "console_restored": true
+    }
+  ],
+  "initial_interruption": {
+    "kind": "unexpected OS reboot during standby test",
+    "before_standard_action": true,
+    "previous_native_state": {
+      "power": 0,
+      "system": 1,
+      "mode": 0
+    },
+    "ssh_web_recovered": true,
+    "cause": "Unresolved. Static native power code selects standby/power-off paths by configuration and suspend count; no causal attribution to timing changes.",
+    "response": "Preserved logs, restored revision5 control, then qualified poll-only and complete revision6 separately."
+  },
+  "external_wake_observation": "A separate long-standby attempt woke externally before the test driver sent power; native logs confirm Standard and console restoration. Trigger was not established and this is not counted as a full controlled test.",
+  "preserved": "Combined SSH/web/Smart Mode startup hook byte-for-byte; prior revision5 helper retained for recovery.",
+  "remaining": "CEC, mains cold boot, additional devices, new USB install/upgrade/uninstall hardware tests; direct input-free Smart Mode control not validated."
+}

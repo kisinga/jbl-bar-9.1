@@ -6,7 +6,7 @@ USB=/mnt/sda1/JBLInstall
 DEST=/var/JBLStandard
 HOOK=/var/AutoScript.TSS
 RAM=/tmp/jbl-standard-mutation-active
-EXPECTED_MANIFEST=214c8b621d92f5d528bf6a256f3e058bcda23438fdc05677ca242ba50ee95c80
+EXPECTED_MANIFEST=6c6119de762336efdaadb76202eb38085f0ff6c89393461e983ed33f20ebb91e
 [ -x "$BB" ] && [ -d "$USB" ] || exit 1
 if [ -f "$USB/ROLLBACK" ]; then exec /bin/sh "$USB/uninstall.sh"; fi
 "$BB" awk '$2=="/tmp" && $3=="tmpfs" {ok=1} END {exit !ok}' /proc/mounts || exit 1
@@ -40,7 +40,7 @@ finish() {
     exit "$code"
 }
 trap 'finish INTERRUPTED 1' HUP INT TERM
-printf '\nINSTALL_REV5 BOOT_ID='; "$BB" cat /proc/sys/kernel/random/boot_id
+printf '\nINSTALL_REV6 BOOT_ID='; "$BB" cat /proc/sys/kernel/random/boot_id
 printf 'UPTIME='; "$BB" cat /proc/uptime
 [ ! -e /tmp/jbl-standard-keeper ] || finish OLD_KEEPER_PRESENT_REBOOT_WITHOUT_USB 1
 applets=$("$BB" --list) || finish BUSYBOX_UNAVAILABLE 1
@@ -103,7 +103,7 @@ for f in run.sh once.sh controller.sh helper.sh hook.expected OWNER.txt checksum
     "$BB" cp "$USB/payload/$f" "$DEST/$f" || finish PAYLOAD_COPY_FAILED 1
 done
 (cd "$DEST" && "$BB" sha256sum -c checksums.txt) || finish INSTALLED_READBACK_FAILED 1
-printf 'PREINSTALL_HOOK=ABSENT\nVERSION=5\nVAR=%s\n' "$resolved" > "$DEST/INSTALL.txt" || finish INSTALL_RECORD_FAILED 1
+printf 'PREINSTALL_HOOK=ABSENT\nVERSION=6\nVAR=%s\n' "$resolved" > "$DEST/INSTALL.txt" || finish INSTALL_RECORD_FAILED 1
 "$BB" cp "$DEST/INSTALL.txt" "$USB/INSTALL.txt" || finish BACKUP_RECORD_FAILED 1
 "$BB" sync
 # Same-filesystem hard link activates a complete hook atomically without clobbering.

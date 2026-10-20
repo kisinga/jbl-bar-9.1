@@ -70,7 +70,7 @@ finish() {
 trap 'finish INTERRUPTED 1' HUP INT TERM
 boot=$("$BB" cat "$PROC/sys/kernel/random/boot_id")
 [ ! -f "$STORE/watch.log" ] || "$BB" cp "$STORE/watch.log" "$STORE/watch-previous.log"
-record START_REV5
+record START_REV6
 (cd "$SOURCE" && "$BB" sha256sum -c checksums.txt) > "$RAM/integrity.log" 2>&1 || finish PAYLOAD_MISMATCH 1
 PID=
 START=
@@ -88,12 +88,12 @@ while :; do
     if [ "$#" -ne 1 ]; then
         stable=0; handled=0; PID=; START=
         record WAITING_FOR_PROCESS
-        "$BB" sleep 5
+        "$BB" sleep 1
         continue
     fi
     candidate=$1
     start=$("$BB" awk '{print $22}' "$PROC/$candidate/stat" 2>/dev/null)
-    if [ -z "$start" ]; then stable=0; "$BB" sleep 5; continue; fi
+    if [ -z "$start" ]; then stable=0; "$BB" sleep 1; continue; fi
     if [ "$candidate:$start" != "$PID:$START" ]; then
         hash=$("$BB" sha256sum "$PROC/$candidate/exe") || finish FIRMWARE_UNREADABLE 1
         set -- $hash
@@ -106,7 +106,7 @@ while :; do
     mode=$(read_value 13378532 4) || finish MODE_UNREADABLE 1
     # Never combine samples from different process instances.
     now=$("$BB" awk '{print $22}' "$PROC/$PID/stat" 2>/dev/null)
-    if [ "$now" != "$START" ]; then stable=0; "$BB" sleep 5; continue; fi
+    if [ "$now" != "$START" ]; then stable=0; "$BB" sleep 1; continue; fi
     state="$power:$system:$mode"
     [ "$state" = "$last_state" ] || stable=0
     last_state=$state
@@ -148,5 +148,5 @@ while :; do
             stable=0; handled=0
             record "WAITING_POWER_${power}_SYSTEM_${system}_MODE_${mode}";;
     esac
-    "$BB" sleep 5
+    "$BB" sleep 1
 done

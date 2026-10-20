@@ -1,0 +1,122 @@
+{
+  "scope": "Actual supervisor on host with temp proc and clock fixtures; stubbed bounded action. Does not prove device wake coverage.",
+  "supervisor_sha256": "aaa5af3e5457b715a8aad018a258fe4841f2a35076a4952b8b3993299d035b00",
+  "cases": [
+    {
+      "case": "late_power_on",
+      "attempts": [
+        "92"
+      ],
+      "status": "CANCELLED",
+      "exit": 0
+    },
+    {
+      "case": "two_wakes",
+      "attempts": [
+        "2",
+        "17"
+      ],
+      "status": "CANCELLED",
+      "exit": 0
+    },
+    {
+      "case": "already_standard",
+      "attempts": [],
+      "status": "CANCELLED",
+      "exit": 0
+    },
+    {
+      "case": "manual_smart_latched",
+      "attempts": [
+        "2"
+      ],
+      "status": "CANCELLED",
+      "exit": 0
+    },
+    {
+      "case": "process_restart",
+      "attempts": [
+        "2",
+        "10"
+      ],
+      "status": "CANCELLED",
+      "exit": 0
+    },
+    {
+      "case": "bad_firmware",
+      "attempts": [],
+      "status": "FIRMWARE_MISMATCH",
+      "exit": 1
+    },
+    {
+      "case": "payload_changed",
+      "attempts": [],
+      "status": "PAYLOAD_MISMATCH",
+      "exit": 1
+    },
+    {
+      "case": "failed_once",
+      "attempts": [
+        "2"
+      ],
+      "status": "ONCE_FAILED_INPUT_RELEASE_NOT_CONFIRMED",
+      "exit": 1
+    },
+    {
+      "case": "stale_once_status",
+      "attempts": [
+        "2"
+      ],
+      "status": "UNEXPECTED_ONCE_RESULT_",
+      "exit": 1
+    },
+    {
+      "case": "duplicate",
+      "attempts": [],
+      "status": "NO_STATUS",
+      "exit": 0
+    },
+    {
+      "case": "rollback_idle",
+      "attempts": [],
+      "status": "CANCELLED",
+      "exit": 0
+    },
+    {
+      "case": "disabled_idle",
+      "attempts": [],
+      "status": "CANCELLED",
+      "exit": 0
+    },
+    {
+      "case": "disable_during_once",
+      "attempts": [
+        "2"
+      ],
+      "status": "CANCELLED",
+      "exit": 0
+    },
+    {
+      "case": "rollback_during_once",
+      "attempts": [
+        "2"
+      ],
+      "status": "CANCELLED",
+      "exit": 0
+    },
+    {
+      "case": "signal_during_once",
+      "attempts": [
+        "2"
+      ],
+      "status": "INTERRUPTED",
+      "exit": 1
+    },
+    {
+      "case": "bounded_logs",
+      "attempts": [],
+      "status": "CANCELLED",
+      "exit": 0
+    }
+  ]
+}

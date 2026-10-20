@@ -1,0 +1,87 @@
+{
+  "scope": "Host filesystem transaction fixtures; mocked hardware trial and mount metadata. Actual installer/rollback scripts adapted to temp paths; no device install proven.",
+  "installer_sha256": "09c7ed505e4489abbc3a125cb7b0d15bdf1d6ae1c86261fba3a94685a505cf1c",
+  "uninstaller_sha256": "060034cd62a0b9d11f822e3331c77c0a3d1874bcca5ff3c9d976aedcfeaa3833",
+  "cases": [
+    {
+      "case": "install_uninstall",
+      "install_status": "INSTALLED_PENDING_REBOOT_TEST",
+      "exit": 0
+    },
+    {
+      "case": "already_installed",
+      "install_status": "INSTALLED_PENDING_REBOOT_TEST",
+      "exit": 0
+    },
+    {
+      "case": "existing_hook",
+      "install_status": "EXISTING_AUTOSCRIPT_PRESERVED_NO_INSTALL",
+      "exit": 1
+    },
+    {
+      "case": "hook_symlink",
+      "install_status": "EXISTING_AUTOSCRIPT_PRESERVED_NO_INSTALL",
+      "exit": 1
+    },
+    {
+      "case": "wrong_var",
+      "install_status": "VAR_NOT_VERIFIED_PERSISTENT",
+      "exit": 1
+    },
+    {
+      "case": "readonly",
+      "install_status": "VAR_MOUNT_NOT_VERIFIED_WRITABLE_UBIFS",
+      "exit": 1
+    },
+    {
+      "case": "nested_tmpfs",
+      "install_status": "VAR_MOUNT_NOT_VERIFIED_WRITABLE_UBIFS",
+      "exit": 1
+    },
+    {
+      "case": "bad_payload",
+      "install_status": "PAYLOAD_MISMATCH",
+      "exit": 1
+    },
+    {
+      "case": "failed_trial",
+      "install_status": "TRIAL_NOT_SUCCESSFUL_NO_INSTALL",
+      "exit": 1
+    },
+    {
+      "case": "stale_trial",
+      "install_status": "TRIAL_NOT_SUCCESSFUL_NO_INSTALL",
+      "exit": 1
+    },
+    {
+      "case": "copy_failure",
+      "install_status": "PAYLOAD_COPY_FAILED",
+      "exit": 1
+    },
+    {
+      "case": "link_failure",
+      "install_status": "HOOK_ACTIVATION_FAILED",
+      "exit": 1
+    },
+    {
+      "case": "directory_race",
+      "install_status": "HOOK_ACTIVATION_FAILED",
+      "exit": 1
+    },
+    {
+      "case": "mutation_busy",
+      "install_status": "NO_STATUS",
+      "exit": 0
+    },
+    {
+      "case": "changed_hook",
+      "install_status": "INSTALLED_PENDING_REBOOT_TEST",
+      "exit": 0
+    },
+    {
+      "case": "unowned_destination",
+      "install_status": "INSTALLED_VERSION_CONFLICT",
+      "exit": 1
+    }
+  ]
+}

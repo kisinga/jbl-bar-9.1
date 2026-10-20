@@ -1,0 +1,224 @@
+{
+  "scope": "Host fixtures, not firmware emulation. Verifies identity/state guards, temporary field writes, restoration on controlled exits/signals, refusal to restore into replaced process, key sequencing and one-shot behavior. Does not prove hardware proc-mem writes, transport, timing or audio.",
+  "controller_sha256": "3a166012981c6ab5bac8372e7a34e2df4a10ba6b8dc7a61ba6a68a9c07c79176",
+  "helper_sha256": "ca1d2dd6d7b8ccc1590946432d04334d5a8f88c2320acbae447967d0a43a8644",
+  "cases": [
+    {
+      "case": "bad_adapter",
+      "status": "INPUT_BUSY_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "input_busy",
+      "status": "INPUT_BUSY_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "no_completion",
+      "status": "COMMAND_COMPLETION_NOT_CONFIRMED",
+      "key_commands": 2,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "stuck_down",
+      "status": "INPUT_RELEASE_NOT_CONFIRMED",
+      "key_commands": 2,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "stuck_combo",
+      "status": "INPUT_RELEASE_NOT_CONFIRMED",
+      "key_commands": 2,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "mode_changed_after_release",
+      "status": "FINAL_MODE_CHANGED",
+      "key_commands": 2,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "asleep",
+      "status": "NOT_AWAKE_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "str_standby",
+      "status": "NOT_AWAKE_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "power_off_during_mute",
+      "status": "POWER_CHANGED_DURING_TEST",
+      "key_commands": 1,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "success",
+      "status": "STANDARD_SELECTED",
+      "key_commands": 2,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "input_enabled",
+      "status": "STANDARD_SELECTED",
+      "key_commands": 2,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "console_open",
+      "status": "STANDARD_SELECTED",
+      "key_commands": 2,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "already_standard",
+      "status": "ALREADY_STANDARD_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "unknown_mode",
+      "status": "UNEXPECTED_MODE_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "bad_firmware",
+      "status": "FIRMWARE_MISMATCH_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "bad_cli",
+      "status": "CLI_MISMATCH_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "bad_helper",
+      "status": "HELPER_MISMATCH_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "missing_memory",
+      "status": "MODE_UNREADABLE_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": null,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "missing_socket",
+      "status": "CLI_SOCKET_ABSENT_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "login_active",
+      "status": "UNEXPECTED_CONSOLE_STATE_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "inconsistent_console",
+      "status": "UNEXPECTED_CONSOLE_STATE_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "input_write_fail",
+      "status": "CONSOLE_INPUT_WRITE_FAILED",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "gate_write_fail",
+      "status": "CONSOLE_GATE_WRITE_FAILED",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "wake_failure",
+      "status": "CLI_WAKE_FAILED",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "no_ack",
+      "status": "CLI_MARKER_NOT_CONFIRMED",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "remote_busy",
+      "status": "REMOTE_BUSY_NO_CHANGE",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "no_repeat",
+      "status": "LONG_PRESS_NOT_CONFIRMED",
+      "key_commands": 1,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "no_mode_change",
+      "status": "STANDARD_NOT_CONFIRMED",
+      "key_commands": 2,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "interrupt",
+      "status": "INTERRUPTED",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": true,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "process_changed",
+      "status": "CONSOLE_RESTORE_FAILED",
+      "key_commands": 0,
+      "console_original_values_retained_or_restored": false,
+      "second_invocation_did_nothing": true
+    },
+    {
+      "case": "restore_failure",
+      "status": "CONSOLE_RESTORE_FAILED",
+      "key_commands": 2,
+      "console_original_values_retained_or_restored": false,
+      "second_invocation_did_nothing": true
+    }
+  ]
+}

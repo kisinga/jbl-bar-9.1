@@ -52,7 +52,7 @@ Install once, then remove USB. The helper waits indefinitely in standby and sele
 - **[Uninstall ZIP](https://github.com/kisinga/jbl-bar-9.1/releases/download/v0.1.0/jbl-bar9-standard-mode-v0.1.0-uninstall.zip)** — keep a copy.
 - [Release notes and SHA-256 checksums](https://github.com/kisinga/jbl-bar-9.1/releases/tag/v0.1.0)
 
-Use the release ZIPs, rather than GitHub’s source archive. No configuration is needed. [`work/faster-wake`](https://github.com/kisinga/jbl-bar-9.1/tree/work/faster-wake) is a separate, **hardware-untested candidate**.
+Use the release ZIPs, rather than GitHub’s source archive. No configuration is needed. Source builds now contain revision 6: faster timing measured at about **18 seconds** on the test bar, versus about 35 seconds for revision 5. The linked v0.1.0 ZIPs remain unchanged. [Build and qualification details](CONTRIBUTING.md#faster-wake--revision-6).
 
 ### Requirements
 

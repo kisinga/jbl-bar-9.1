@@ -1,12 +1,12 @@
 #!/bin/sh
-# USB entry: upgrade only exact known rev4; otherwise let setup validate rev5.
+# USB entry: upgrade only exact known rev5; otherwise let setup validate rev6.
 BB=/bin/busybox
 USB=/mnt/sda1/JBLInstall
 DEST=/var/JBLStandard
 HOOK=/var/AutoScript.TSS
 RAM=/tmp/jbl-standard-usb-operation
-OLD_MANIFEST=4a203e0d24af805d1e11e14bbf9bc69b362bcde2c2beb017c3799d390c1906cf
-EXPECTED_MANIFEST=214c8b621d92f5d528bf6a256f3e058bcda23438fdc05677ca242ba50ee95c80
+OLD_MANIFEST=214c8b621d92f5d528bf6a256f3e058bcda23438fdc05677ca242ba50ee95c80
+EXPECTED_MANIFEST=6c6119de762336efdaadb76202eb38085f0ff6c89393461e983ed33f20ebb91e
 EXPECTED_HOOK=87cf62cefa6b584547f2769662295c3e84d97b30b06e8ee871e50cfceeb92581
 [ -x "$BB" ] && [ -d "$USB" ] || exit 1
 "$BB" mkdir "$RAM" 2>/dev/null || exit 0
@@ -43,11 +43,11 @@ set -- $hash
 if [ -e "$DEST" ] || [ -L "$DEST" ]; then
     [ -d "$DEST" ] && [ ! -L "$DEST" ] || finish DESTINATION_CONFLICT 1
     owner=$("$BB" cat "$DEST/OWNER.txt" 2>/dev/null)
-    if [ "$owner" = JBL_STANDARD_HOOK_REV4 ]; then
+    if [ "$owner" = JBL_STANDARD_HOOK_REV5 ]; then
         hash=$("$BB" sha256sum "$DEST/checksums.txt") || finish OLD_MANIFEST_UNREADABLE 1
         set -- $hash
-        [ "$1" = "$OLD_MANIFEST" ] || finish UNKNOWN_REV4_PRESERVED 1
-        (cd "$DEST" && "$BB" sha256sum -c checksums.txt) || finish CHANGED_REV4_PRESERVED 1
+        [ "$1" = "$OLD_MANIFEST" ] || finish UNKNOWN_REV5_PRESERVED 1
+        (cd "$DEST" && "$BB" sha256sum -c checksums.txt) || finish CHANGED_REV5_PRESERVED 1
         [ -f "$HOOK" ] && [ ! -L "$HOOK" ] || finish OLD_HOOK_CONFLICT 1
         hash=$("$BB" sha256sum "$HOOK") || finish OLD_HOOK_UNREADABLE 1
         set -- $hash

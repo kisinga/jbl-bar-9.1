@@ -8,7 +8,7 @@ import subprocess
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '0.1.0'
+VERSION = '0.2.0-dev.1'
 
 
 def sha(data):
@@ -19,8 +19,8 @@ def validate():
     source = ROOT / 'smart-mode'
     files = {str(p.relative_to(source)): p.read_bytes()
              for p in sorted(source.rglob('*')) if p.is_file()}
-    baseline = json.loads((ROOT / 'tests/fixtures/revision5-sha256.json').read_text())
-    assert {n: sha(v) for n, v in files.items()} == baseline, 'Tested device bytes changed'
+    baseline = json.loads((ROOT / 'tests/fixtures/revision6-sha256.json').read_text())
+    assert {n: sha(v) for n, v in files.items()} == baseline, 'Pinned candidate device bytes changed'
     payload = source / 'JBLInstall/payload'
     checks = (payload / 'checksums.txt').read_bytes()
     for line in checks.decode().splitlines():
@@ -36,6 +36,12 @@ def validate():
         assert re.search(r'^EXPECTED_HOOK=(\w+)$', text, re.M).group(1) == sha(hook)
     controller = (payload / 'controller.sh').read_text()
     assert sha((payload / 'helper.sh').read_bytes()) in controller
+    confirmed = json.loads((ROOT / 'tests/fixtures/revision5-sha256.json').read_text())
+    dispatcher = (source / 'JBLInstall/install.sh').read_text()
+    assert re.search(r'^OLD_MANIFEST=(\w+)$', dispatcher, re.M).group(1) == confirmed['JBLInstall/payload/checksums.txt']
+    for name in ('JBLInstall/payload/controller.sh', 'JBLInstall/payload/helper.sh',
+                 'JBLInstall/payload/hook.expected', 'AutoScript/AutoScript'):
+        assert sha(files[name]) == confirmed[name], 'Key/action or hook changed: ' + name
     for name in ('AutoScript/AutoScript', 'JBLInstall/payload/hook.expected'):
         assert files[name].endswith(b'\r\n') and files[name].count(b'\n') == 1
     for p in source.rglob('*.sh'):
@@ -57,8 +63,8 @@ def build():
         if kind == 'uninstall':
             content['JBLInstall/ROLLBACK'] = b'ROLLBACK\n'
         manifest = {'project': 'jbl-bar9-standard-mode', 'version': VERSION,
-                    'device_revision': 5, 'kind': kind,
-                    'status': 'experimental; one owner-confirmed cold boot',
+                    'device_revision': 6, 'kind': kind,
+                    'status': 'experimental; one-bar SSH wake timing validated',
                     'files': {n: sha(v) for n, v in sorted(content.items())}}
         content['manifest.json'] = (json.dumps(manifest, indent=2) + '\n').encode()
         path = out / f'jbl-bar9-standard-mode-v{VERSION}-{kind}.zip'

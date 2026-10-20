@@ -1,6 +1,6 @@
 REMOVE THE PERSISTENT HELPER
 
-Extract the matching v0.1.0 UNINSTALL ZIP to a clean FAT32 USB root.
+Extract the matching v0.2.0-dev.1 UNINSTALL ZIP to a clean FAT32 USB root.
 Alternatively create an empty file named ROLLBACK (no extension) inside
 JBLInstall on the installation USB. Make sure it is not ROLLBACK.txt.
 
@@ -17,4 +17,4 @@ Do not interrupt power during a normal installation/removal. If recovery fails,
 stop experiments and seek device-specific help. Removing USB alone cannot undo
 installation. Keep the ROLLBACK flag on a recovery USB.
 
-Guide: https://github.com/kisinga/jbl-bar9-standard-mode/blob/main/docs/TROUBLESHOOTING.md
+Guide: https://github.com/kisinga/jbl-bar-9.1#troubleshooting

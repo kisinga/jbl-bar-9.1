@@ -52,15 +52,16 @@ finish() {
     exit "$code"
 }
 trap 'finish INTERRUPTED 1' HUP INT TERM
-printf 'JBL_STANDARD_ONCE_REV3 START\n'
+printf 'JBL_STANDARD_ONCE_REV6 START\n'
 printf 'BOOT_ID='; "$BB" cat "$PROC/sys/kernel/random/boot_id"
 printf 'UPTIME='; "$BB" cat "$PROC/uptime"
 (cd "$SOURCE" && "$BB" sha256sum -c checksums.txt) || finish PAYLOAD_MISMATCH 1
 hash=$("$BB" sha256sum "$CLI") || finish CLI_UNREADABLE 1
 set -- $hash
 [ "$1" = "$EXPECTED_CLI" ] || finish CLI_MISMATCH 1
-# Give early boot/audio initialization time to finish before sampling readiness.
-"$BB" sleep 10
+# The watcher has already stabilized awake state; retain a short settling delay.
+# Direct installation trials still perform the full identity/readiness checks below.
+"$BB" sleep 1
 PID=
 START=
 stable=0

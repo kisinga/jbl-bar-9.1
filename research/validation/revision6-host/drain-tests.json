@@ -1,0 +1,27 @@
+{
+  "scope": "Host filesystem transaction fixtures; mocked hardware trial and mount metadata. Actual installer/rollback scripts adapted to temp paths; no device install proven.",
+  "installer_sha256": "09c7ed505e4489abbc3a125cb7b0d15bdf1d6ae1c86261fba3a94685a505cf1c",
+  "uninstaller_sha256": "060034cd62a0b9d11f822e3331c77c0a3d1874bcca5ff3c9d976aedcfeaa3833",
+  "cases": [
+    {
+      "case": "watch_drain",
+      "install_status": "INSTALLED_PENDING_REBOOT_TEST",
+      "exit": 0
+    },
+    {
+      "case": "once_drain",
+      "install_status": "INSTALLED_PENDING_REBOOT_TEST",
+      "exit": 0
+    },
+    {
+      "case": "both_drain",
+      "install_status": "INSTALLED_PENDING_REBOOT_TEST",
+      "exit": 0
+    },
+    {
+      "case": "watch_stuck",
+      "install_status": "INSTALLED_PENDING_REBOOT_TEST",
+      "exit": 0
+    }
+  ]
+}

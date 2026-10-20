@@ -151,7 +151,7 @@ node tests/webremote-ui.mjs
 
 Set `PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` to reuse an installation. The current **156 browser checks** cover queues/cancellation, held and keyboard controls, failures/reconnects, stale replies, standby, Bluetooth/streaming, single Play/Pause, EQ presets/manual drafts/application gating, system sample history/gaps/availability, reduced motion and 320/390/1024px layouts. Public screenshots use fixtures, never live personal data.
 
-Go tests cover access boundaries, event streams, native Wi-Fi datagrams, readback, peer filtering, sound decoding, Bonjour, Cast framing/status system parsing/cache behavior, native EQ route guards and full-block recipe preservation. Run race tests and vet after backend changes. Fixtures do not establish audible behavior.
+Go tests cover access boundaries, event streams, native Wi-Fi datagrams, readback, peer filtering, sound decoding, Bonjour, Cast framing/status, system parsing/cache behavior, native EQ route guards and full-block recipe preservation. Run race tests and vet after backend changes. Fixtures do not establish audible behavior.
 
 Hardware confirmation includes volume/mute, pairing/name/native stream states, AirPlay/Wi-Fi readback, Night Mode Off → On → Off and bass/Atmos cycles restored to initial settings. Rear changes require an undocked test; power/source/manual Standard remain experimental. Chrome Audio Mirroring (`85CDB22F`) keeps receiver PLAYING when sender playback pauses; label mirroring without claiming sender pause detection. Automatic hotspot activation/access needs a separate outage test.
 
@@ -172,21 +172,38 @@ Also supported: `volume down`, `mute`, `power`, `source tv|hdmi|bluetooth`, and 
 
 [k1rnt/JBL Soundbar CLI](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309) supplied CLI/control inspiration. Its newer Linkplay/JBL One transport is separate; this CLI uses the fixed Bar 9.1 Go endpoints.
 
-## Faster wake candidate — revision 6
+## Faster wake — revision 6
 
-Keep **`work/faster-wake` hardware-untested** and separate from confirmed v0.1.0/revision 5.
+Build revision 6 from `main`; the former `work/faster-wake` branch is merged. Keep the original v0.1.0/revision 5 release and checksums as the recovery baseline.
 
-| Setting | Revision 5 | Candidate revision 6 |
+| Setting | Revision 5 | Revision 6 |
 | --- | --- | --- |
 | Watcher polling | 5 seconds | 1 second |
 | Identical awake samples | 3 | 3 |
 | Runner initial delay | 10 seconds | 1 second |
 | Readiness sampling | 2 seconds / 3 samples | Unchanged |
-| Mute hold, release/completion guards | Confirmed controller | Unchanged |
+| Mute hold, release/completion guards | Original controller | Unchanged |
 | Standby deadline | None | None |
 
-The confirmed 34.55-second wake trace included about ten seconds of sample accumulation and a fixed ten-second runner delay. Revision 6 removes approximately 17 seconds of scheduled waiting; an estimated 18-second result is **not a hardware measurement**. Observe native load and wake behavior before qualification.
+Measured on the same owned bar on 20 October 2026, from first observed awake state to confirmed Standard Mode:
 
-On that branch, build/test with the normal tools. Candidate outputs are `dist/jbl-bar9-standard-mode-v0.2.0-dev.1-install.zip` and its matching `-uninstall.zip`. Distinct ownership/checksums permit only the exact revision 5 upgrade, with backup; unknown payloads/hooks remain protected. The v0.1.0 uninstaller does not recognize revision 6.
+| Test | Seconds |
+| --- | --- |
+| Revision 5 control | 34.64 |
+| One-second polling, original initial delay | 27.00 |
+| Revision 6, 23-second standby | 18.26 |
+| Revision 6, 9.6-second standby | 18.01 |
+| Revision 6, 76.1-second standby | 17.16 |
 
-Record actual power-on timing, normal LOAD, delayed power-on, mode readback, key release, console restoration and repeated standby/wake. Begin with standby lasting at least 20 seconds and export logs. Keep `tests/fixtures/revision5-sha256.json` as the confirmed baseline. Candidate integrity manifests do not establish hardware qualification.
+Require released keys, exact console restoration and unchanged volume/mute/source/sound settings; a display message alone is insufficient. Raw logs remain private; [device validation](research/validation/revision6-device.json) records sanitized results. CEC wakes, mains cold boots and additional bars still need qualification.
+
+One unexpected reboot occurred during an initial standby test before any Standard Mode sequence ran. The previous log ended in native power-off state `power=0/system=1`; subsequent revision 5 control and faster-wake tests completed normally. The cause remains unresolved; do not attribute it to the timing change or claim it fixed.
+
+```sh
+python3 tools/test.py
+# ZIPs: dist/jbl-bar9-standard-mode-v0.2.0-dev.1-{install,uninstall}.zip
+```
+
+Use the matching revision 6 uninstall package, not the published v0.1.0 uninstaller. Exact revision 5 payloads/hooks may upgrade through the USB installer; unknown files and modified hooks remain protected. With SSH/web startup hooks already added, the USB upgrader intentionally refuses that modified hook. Preserve the entire helper and hook before a controlled SSH payload update; do not overwrite the combined startup hook with `hook.expected`.
+
+The tested SSH update replaced only the owned Smart Mode payload, preserved the combined startup hook byte for byte, and retained the prior helper for rollback. Installation from USB and removal of the new version still need independent hardware tests. The v0.1.0 downloads are unchanged.

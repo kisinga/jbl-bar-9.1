@@ -6,7 +6,7 @@ arm=os.environ.get('JBL_ARM_BUSYBOX')
 bb=Path(arm) if arm else Path('/usr/bin/busybox')
 launch=['/usr/bin/qemu-arm',str(bb)] if arm else [str(bb)]
 rows=[]
-for revision in [4,5]:
+for revision in [4,6]:
  source=(b/'smart-mode/JBLInstall/payload/run.sh').read_text();prefix=source.split('\nPROC=/proc',1)[0]
  if revision==4:
   start=prefix.index('    # Glob enumeration')
@@ -30,7 +30,7 @@ for revision in [4,5]:
      except FileNotFoundError:pass
    p.wait(timeout=4)
    reached=marker.exists();preserved=(t/'regular').read_text()=='preserved'
-   if revision==5:assert p.returncode==0 and reached and preserved and not any(s.startswith('socket:') for s in targets),(count,p.returncode,targets)
+   if revision==6:assert p.returncode==0 and reached and preserved and not any(s.startswith('socket:') for s in targets),(count,p.returncode,targets)
    elif count>=1:assert p.returncode==1 and not reached,(count,p.returncode)
    rows.append({'revision':revision,'inherited_socket_count':count,'inherited_fds':inherited,'exit':p.returncode,'reached_worker':reached,'regular_file_preserved':preserved,'remaining_sockets':sum(s.startswith('socket:') for s in targets) if reached else None})
    print('PASS',rows[-1],flush=True)
@@ -43,4 +43,4 @@ for case in ['readlink_failure_present','busybox_missing']:
   p=subprocess.run(launch+['ash',str(script)],pass_fds=(dup,),capture_output=True,timeout=5);os.close(dup)
   assert p.returncode!=0 and not marker.exists(),case
   rows.append({'case':case,'exit':p.returncode,'reached_worker':False});print('PASS',rows[-1],flush=True)
-(w/'test-results/descriptor-tests.json').write_text(json.dumps({'scope':('Extracted ARM via QEMU/binfmt; ' if arm else 'Host BusyBox; ')+'host procfs. Actual package startup prefix. Revision4 negative controls reproduce early exit; revision5 must continue with sockets closed and regular file preserved. No soundbar boot proof.','busybox_sha256':hashlib.sha256(bb.read_bytes()).hexdigest(),'run_sha256':hashlib.sha256((b/'smart-mode/JBLInstall/payload/run.sh').read_bytes()).hexdigest(),'cases':rows},indent=2)+'\n')
+(w/'test-results/descriptor-tests.json').write_text(json.dumps({'scope':('Extracted ARM via QEMU/binfmt; ' if arm else 'Host BusyBox; ')+'host procfs. Actual package startup prefix. Revision4 negative controls reproduce early exit; revision6 must continue with sockets closed and regular file preserved. No soundbar boot proof.','busybox_sha256':hashlib.sha256(bb.read_bytes()).hexdigest(),'run_sha256':hashlib.sha256((b/'smart-mode/JBLInstall/payload/run.sh').read_bytes()).hexdigest(),'cases':rows},indent=2)+'\n')
