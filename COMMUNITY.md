@@ -19,20 +19,22 @@ I could not verify Reddit's current subreddit rules or the posts' locked/archive
 
 ## My draft for a community that permits this kind of post
 
-**Title: JBL Bar 9.1: I made a USB workaround that turns Smart Mode off after startup**
+**Title: JBL Bar 9.1 tinkering: automatic Smart Mode off and USB-free root SSH**
 
 I got tired of manually disabling Smart Mode whenever I turned on my JBL Bar 9.1, so I made a reversible USB-installed workaround.
 
 Install once, remove USB, and the helper waits indefinitely in standby before selecting Standard Mode after wake. I confirmed a mains restart followed by delayed power-on on my bar; it took about 35 seconds after detecting power-on.
 
+I have also confirmed root SSH, an interactive shell, SFTP and automatic SSH startup after a USB-free reboot. I am turning the repository into a reproducible tinkering foundation, with a local browser remote as the next experiment. The ready-made v0.1.0 ZIPs install only the Smart Mode helper; SSH has its own setup and recovery path.
+
 I built on [touch MAX's AutoScript article](https://touch-max.ru/vzlom/zapusk-ssh-na-proshivke-jbl-9-1) and [almirus/jbl9.1](https://github.com/almirus/jbl9.1). Credit for the USB entry point belongs to that earlier work.
 
-Source, install/uninstall ZIPs and instructions: https://github.com/kisinga/jbl-bar9-standard-mode
+Source, install/uninstall ZIPs and instructions: https://github.com/kisinga/jbl-bar-9.1
 
 This is experimental and checks one exact Bar 9.1 firmware build. It installs a persistent helper and temporarily changes console fields in RAM; it does not flash firmware. My first install needed a retry, and an earlier development version stalled startup, so keep the uninstall ZIP. Repeated standby/CEC wakes remain unverified. USB removal alone does not uninstall it.
 
-If you try it, I would appreciate your firmware label and cold-boot/standby results.
+If you try it, I would appreciate your firmware label, the exact package/commit and cold-boot/standby results. For SSH, a fresh-install report with a successful login and normal controls is especially useful. Please review logs before sharing them; leave credentials and device keys out.
 
 ## What I would link
 
-I would link the repository or [confirmed v0.1.0 release](https://github.com/kisinga/jbl-bar9-standard-mode/releases/tag/v0.1.0), not the untested working branch as a finished fix. I would describe it as automatic Standard Mode after startup, not a universal firmware patch or instant permanent change to JBL's own setting.
+I would link the repository or [confirmed v0.1.0 release](https://github.com/kisinga/jbl-bar-9.1/releases/tag/v0.1.0), not the untested working branch as a finished fix. I would distinguish my confirmed SSH installation from an independently reproduced generic installation. I would describe it as automatic Standard Mode after startup, not a universal firmware patch or instant permanent change to JBL's own setting.

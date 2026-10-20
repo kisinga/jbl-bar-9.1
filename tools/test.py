@@ -27,5 +27,6 @@ if __name__ == '__main__':
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(run, sorted((ROOT / 'tests').glob('check_*.py'))))
     counts = {p.name: len(json.loads(p.read_text())['cases']) for p in sorted(out.glob('*-tests.json'))}
-    assert sum(counts.values()) == 102, counts
+    assert counts.get('ssh-tests.json') == 19, counts
+    assert sum(counts.values()) == 121, counts
     print(json.dumps({'cases': counts, 'total': sum(counts.values())}, indent=2))
