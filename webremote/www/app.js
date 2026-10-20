@@ -133,6 +133,12 @@ async function refresh() {
   }
 }
 function success(action, s) {
+	if (action === 'night_toggle') return 'Night mode ' + (s.sound?.night ? 'on.' : 'off.');
+	if (action === 'media_play') return 'Play requested.';
+	if (action === 'media_pause') return 'Pause requested.';
+	if (action === 'media_next') return 'Next track requested.';
+	if (action === 'media_previous') return 'Previous track requested.';
+	if (action === 'media_stop') return 'Stop requested.';
   if (isVolume(action)) return 'Volume ' + s.volume + (s.muted ? ' · sound muted' : '');
   if (action === 'mute') return s.muted ? 'Sound muted.' : 'Sound unmuted.';
   if (action === 'power') return s.power === 'On' ? 'Your soundbar is on.' : 'Soundbar is in standby.';
@@ -145,6 +151,8 @@ function success(action, s) {
   return sourceName(s) + ' selected.';
 }
 function pendingMessage() {
+	if (active === 'night_toggle') return 'Changing night mode… audio may briefly mute.';
+	if (active?.startsWith('media_')) return 'Sending playback control…';
   if (isVolume(active)) return 'Adjusting volume' + (queue.length ? ' · ' + queue.length + ' queued' : '') + '…';
   if (active === 'standard') return 'Selecting Standard… audio may briefly mute.';
   if (active === 'input_bluetooth') return 'Switching to Bluetooth…';
@@ -249,7 +257,7 @@ function renderBluetooth(s, ready, awake) {
   const pairing = active === 'bluetooth_pair';
   const discoverable = !!bt?.discoverable && !!bt?.connectable;
   $('bluetooth-panel').classList.toggle('discoverable', discoverable && ready && awake);
-  $('bt-status').textContent = active === 'input_bluetooth' ? 'Switching to Bluetooth…' : pairing ? 'Starting pairing…' : !ready ? 'Connection unavailable' : !awake ? 'Soundbar in standby' : discoverable ? 'Ready to pair' : bt?.connected ? (selected && bt.audio === 'Streaming' ? 'Streaming audio' : selected && bt.audio === 'Paused' ? 'Audio paused' : 'Device connected') : 'Bluetooth source selected';
+  $('bt-status').textContent = active === 'input_bluetooth' ? 'Switching to Bluetooth…' : pairing ? 'Starting pairing…' : !ready ? 'Connection unavailable' : !awake ? 'Soundbar in standby' : discoverable ? 'Ready to pair' : bt?.connected ? (selected && bt.audio === 'Streaming' ? 'Streaming audio' : selected && bt.audio === 'Paused' ? 'Stream suspended' : 'Device connected') : 'Bluetooth source selected';
   const peer = bt?.peer_name || 'A Bluetooth device';
   $('bt-help').textContent = !awake ? 'Turn on the bar to connect a device.' : !selected ? peer + ' is connected. Select Bluetooth above to listen.' : discoverable ? 'Choose ' + name + ' in your phone’s Bluetooth settings. The bar is discoverable now.' : bt?.connected ? peer + ' is connected. To use a different device, start pairing below.' : 'Open Bluetooth settings on your phone and choose ' + name + '. If it’s missing, start pairing below.';
   $('bt-pair-label').textContent = pairing ? 'Starting…' : discoverable ? 'Pairing is open' : bt?.connected ? 'Pair another device' : 'Pair a device';
@@ -277,7 +285,7 @@ function renderPlayback(s, ready, awake) {
   const bluetooth = s.input === 'Bluetooth';
   const playback = bluetooth ? {
     service: 'Bluetooth',
-    status: bt?.connected == null ? 'Status unavailable' : !bt.connected ? 'Waiting for a device' : bt.audio === 'Streaming' ? 'Playing' : bt.audio === 'Paused' ? 'Paused' : 'Connected',
+    status: bt?.connected == null ? 'Status unavailable' : !bt.connected ? 'Waiting for a device' : bt.audio === 'Streaming' ? 'Streaming audio' : bt.audio === 'Paused' ? 'Stream suspended' : 'Connected',
     active: bt?.connected && bt.audio === 'Streaming',
   } : s.streaming;
   const cast = playback?.cast;
@@ -302,9 +310,18 @@ function renderPlayback(s, ready, awake) {
   $('playback-time').textContent = timed ? mediaTime(cast.current_time) + ' / ' + mediaTime(cast.duration) : '';
   $('playback').classList.toggle('active', ready && awake && !!playback?.active);
   $('playback').classList.toggle('mirroring', !!cast?.mirroring);
+  const controls = s.media_controls || [];
+  for (const id of ['media-previous','media-toggle','media-pause','media-next','media-stop']) {
+    $(id).disabled = !ready || !awake || !!active || !controls.includes($(id).dataset.action);
+  }
+  $('media-help').textContent = controls.length ? (bluetooth ? 'Controls request changes on your device. Audio streaming can continue while an app is paused.' : 'Controls request changes from the receiver.') : cast?.mirroring ? 'Use playback controls in the sending app.' : bluetooth && bt?.connected ? 'Playback controls are unavailable for this connection.' : 'Playback controls aren’t available on this source.';
 }
 function renderExtras(s, ready, awake) {
   const sound=s.sound || {};
+  $('night-value').textContent = sound.night == null ? 'Unavailable' : sound.night ? 'On' : 'Off';
+  $('night-label').textContent = active === 'night_toggle' ? 'Changing…' : sound.night ? 'Turn off' : 'Turn on';
+  $('night').setAttribute('aria-pressed', String(sound.night === true));
+  $('night').disabled = !ready || !awake || !!active || sound.night == null;
   $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5';
   $('atmos-value').textContent=['Low','Mid','High'][sound.atmos] || 'Unavailable';
   const rear=['Low','Mid','High','Muted'][sound.rear] || 'Unavailable';
@@ -318,6 +335,7 @@ function renderExtras(s, ready, awake) {
   const quality = signal == null ? '' : signal >= -55 ? 'Strong signal' : signal >= -67 ? 'Good signal' : signal >= -75 ? 'Fair signal' : 'Weak signal';
   $('wifi-status').textContent=wifi.connected ? ['Connected', quality].filter(Boolean).join(' · ') : wifi.hotspot_ip ? 'Setup hotspot is active' : wifi.available ? 'Waiting for a Wi-Fi connection' : 'The Wi-Fi service has not reported its state.';
   $('wifi-ip').textContent=wifi.ip || 'No network address';
+  $('local-address').hidden = s.hostname !== 'jbl.local';
   const band=wifi.frequency_mhz ? (wifi.frequency_mhz>=5925?'6 GHz':wifi.frequency_mhz>=4900?'5 GHz':'2.4 GHz') : '';
   $('wifi-signal').textContent=[wifi.signal_dbm==null?'':wifi.signal_dbm+' dBm',band].filter(Boolean).join(' · ');
   $('hotspot-status').hidden=!wifi.hotspot_ip;

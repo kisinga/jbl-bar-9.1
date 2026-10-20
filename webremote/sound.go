@@ -1,6 +1,7 @@
 package main
 
 type soundState struct {
+	Night      *bool   `json:"night,omitempty"`
 	Bass       *uint32 `json:"bass,omitempty"`
 	Atmos      *uint32 `json:"atmos,omitempty"`
 	Rear       *uint32 `json:"rear,omitempty"`
@@ -9,6 +10,10 @@ type soundState struct {
 
 func (d *device) sound() soundState {
 	var s soundState
+	if v, e := d.read(0xe4329a, 1); e == nil && v <= 1 {
+		on := v == 1
+		s.Night = &on
+	}
 	if v, e := d.configByte(238); e == nil && v <= 4 {
 		s.Bass = &v
 	}
@@ -55,6 +60,7 @@ func soundObserved(action string, before, after *soundState) bool {
 }
 
 type streamState struct {
+	native  uint32
 	Detail  string        `json:"detail,omitempty"`
 	Cast    *CastSnapshot `json:"cast,omitempty"`
 	Service string        `json:"service"`

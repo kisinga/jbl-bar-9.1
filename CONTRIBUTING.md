@@ -13,7 +13,7 @@ python3 tools/test.py
 
 Archives and `SHA256SUMS` appear in `dist/`. Rebuilding the same inputs produces identical ZIP bytes. The build verifies payload hashes, embedded expected hashes, exact tested device files and shell syntax. It refuses stale or modified device code against the pinned baseline. No firmware image or external Python package is needed.
 
-The 121 host checks execute adapted temporary copies with fake process files and CLI behavior. They never connect to a soundbar or modify the real USB. The synthetic identity replacement is confined to those copies. Results go in ignored `build/test-results/`.
+The 141 host checks include the existing 121 core fixtures and 20 CLI checks. They use temporary fake process/CLI files or an isolated local HTTP server, never a soundbar or real USB. Synthetic identity replacement stays confined to fixtures. Results go in ignored `build/test-results/`. The 102 checks recorded for the original Smart Mode release remain its historical result.
 
 Optional descriptor validation against a legally obtained extracted ARM BusyBox uses `JBL_ARM_BUSYBOX=/absolute/path/to/busybox python3 tests/check_descriptors.py`, with `qemu-arm` and registered ARM binfmt available for direct applet execution. That binary is not bundled.
 
@@ -25,7 +25,7 @@ The three tools have separate source folders and share these root instructions:
 - [`smart-mode/`](smart-mode/): exact installable Smart Mode source, including the CRLF-preserved launcher/hook.
 - [`ssh/`](ssh/): portable SSH setup templates; generated credentials and device keys stay private.
 
-`tools/` contains builders and the test runner; `tests/` contains fixtures and pinned device-file hashes. `README.md` covers use and recovery, `COMMUNITY.md` collects discussion links, and `USB-README.txt` / `ROLLBACK.txt` ship in the Smart Mode ZIPs. [`research/README.md`](research/README.md) indexes the public research archive; local captures and vendor artifacts remain ignored.
+`tools/` contains builders, the optional Python CLI and the test runner; `tests/` contains fixtures and pinned device-file hashes. `README.md` covers use and recovery, `COMMUNITY.md` collects discussion links, and `USB-README.txt` / `ROLLBACK.txt` ship in the Smart Mode ZIPs. [`research/README.md`](research/README.md) indexes the public research archive; local captures and vendor artifacts remain ignored.
 
 `main` and tag `v0.1.0` preserve the revision 5 I first confirmed on my bar. Experimental latency work belongs on a separate branch and must not replace that tested download until hardware validation. A new payload requires updated checksums, installer expectations, ownership/upgrade handling, tests and a fresh hardware result. The baseline verifier must not be casually bypassed to publish an untested change.
 
@@ -88,12 +88,13 @@ The pinned revision 6 manifest is an integrity record for this candidate, not a 
 ## Browser remote
 
 I need working SSH, Python 3 and Go 1.22+ on the build computer (tested with
-Go 1.25.5). The bar runs the resulting static ARM binary; no Go runtime or
-third-party Go modules are needed on it.
+Go 1.25.5). The bar runs the resulting static ARM Go binary; no Go runtime or
+third-party Go modules are needed on it. The normal Go-only build leaves
+Bluetooth playback controls disabled; the optional helper below enables them.
 
 ```sh
 python3 tools/build_web.py --allowed-cidr <trusted-lan-subnet>
-cd webremote && go test ./...
+(cd webremote && go test ./...)
 ```
 
 Use the actual trusted IPv4 subnet, for example `192.168.1.0/24`. The output
@@ -101,6 +102,28 @@ directory is `dist/webremote-private/`; its config contains the listener and
 local subnet. The browser remote requires no login. SSH keeps its own password.
 The builder strips local source paths and VCS metadata. Identical sources
 and Go toolchain produce the same server binary; owner settings differ.
+
+For Bluetooth playback, I build the small fixed-command C helper with an ARM
+hard-float GNU/Linux GCC toolchain and my own extracted supported firmware:
+
+```sh
+python3 tools/build_bt.py --cc /path/arm-none-linux-gnueabihf-gcc \
+  --rootfs /path/extracted/rootfs --output build/bt-remote
+python3 tools/build_web.py --allowed-cidr <trusted-lan-subnet> \
+  --bluetooth-helper build/bt-remote
+```
+
+Only my helper is embedded. Vendor libraries are used locally for linking and
+reused from the bar at runtime; I do not distribute them. The builder checks
+pinned libraries; the server also checks the current input and connected peer.
+The helper exposes five fixed playback commands and registers no Bluetooth
+event subscriptions.
+I confirmed audible Pause and subsequent playback resumption; Next, Previous
+and Stop remain unconfirmed. Each button reports a request, not proof the
+source app changed state. Separate Play/Pause buttons avoid guessing from an
+A2DP stream that can remain active while the source app is paused. Normal Cast
+controls require a nonmirrored session and advertised capabilities; their
+hardware behavior remains unverified.
 
 Copy that directory over SFTP to `/var/JBLRemote` (first check that no unrelated
 installation owns that path), then run its installer:
@@ -115,9 +138,14 @@ bye
 ssh -p 2222 root@<bar-ip-address> '/bin/sh /var/JBLRemote/install.sh'
 ```
 
-Open `http://<bar-ip-address>` directly (`:8080` remains available); there is no web login.
-Anyone on the configured trusted subnet can use these controls. Use the bar’s
-IP address in the URL; DNS hostnames are rejected to prevent rebinding.
+Open `http://jbl.local` (`:8080` remains available); there is no web login.
+I register the alias through the existing Bonjour daemon, which handles name
+probing and conflicts. Local multicast and mDNS support are required. If the
+name conflicts or does not resolve, I use `http://<bar-ip-address>`; I do not
+silently rename the alias. Registration follows Wi-Fi address changes and is
+withdrawn when the remote stops. Anyone on the configured trusted subnet can
+use these controls. Only this hostname and accepted local addresses pass the
+Host checks; the HTTP destination must also match an allowed interface.
 The server accepts requests from the configured subnet, plus clients of the
 active native `ap0` hotspot when their HTTP destination matches that interface. Fixed control
 names, JSON-only POSTs, CSRF tokens and same-origin checks protect mutations;
@@ -134,8 +162,8 @@ ssh -p 2222 root@<bar-ip-address> '/bin/sh /var/JBLRemote/uninstall.sh'
 It restores its recorded hook if still recognized, stops its own process and
 retains files for inspection. Later unknown hook edits are preserved. Keep
 SSH usable while experimenting. Volume/mute and readback are hardware-tested;
-bass/Atmos cycles are hardware-tested too. Rear changes need an undocked
-hardware test; power, input transitions and manual Standard remain experimental.
+Night Mode Off → On → Off and bass/Atmos cycles are hardware-tested too.
+Rear changes need an undocked hardware test; power, input transitions and manual Standard remain experimental.
 
 The UI test uses Node and Playwright on the development computer:
 
@@ -151,7 +179,8 @@ existing installation. Tests serve the real assets with delayed/failed mock
 responses, cover queued/cancelled controls, holds, keyboard input, reconnects,
 stale replies, standby, Bluetooth/Wi-Fi/streaming feedback and 320/390/1024px layouts. Go tests
 cover LAN/hotspot/Host/CSRF boundaries, event streams, native Wi-Fi datagrams,
-state confirmation, peer-name filtering, sound decoding and bounded read-only Cast framing/status queries.
+state confirmation, peer-name filtering, sound decoding, native Bonjour
+registration and bounded read-only Cast framing/status queries.
 UI fixtures do not substitute for hardware pairing or audible tests.
 
 Live updates use Go’s standard HTTP server and the browser’s `EventSource`.
@@ -165,11 +194,37 @@ and access checks; an occupied port 80 leaves 8080 usable.
 
 On 20 October 2026 I confirmed live AirPlay and Wi-Fi readback, both HTTP
 ports, a 22-second single browser event connection with zero state-poll requests,
-and complete bass/Atmos cycles restored to their original levels. The connected
-Bluetooth name and Playing → Paused updates were subsequently confirmed on my bar.
+Night Mode Off → On → Off and complete bass/Atmos cycles restored to their
+original levels. The connected Bluetooth name and Playing → Paused updates were subsequently confirmed on my bar.
 The observed YouTube session uses Chrome Audio Mirroring (`85CDB22F`): its receiver
 keeps reporting PLAYING when playback pauses at the sender. I label this Audio
 mirroring and do not claim sender pause detection. Normal receiver media-state
 decoding has fixtures but no live validation. The deployed UI correctly identified that live mirroring session, with one
 event connection and no automatic state requests over 22 seconds. Native hotspot
 activation/access still needs an outage test. No Wi-Fi loss, reboot or factory reset was induced.
+
+### Optional CLI
+
+I use the standard-library Python 3 CLI with the same deployed Go API:
+
+```sh
+python3 tools/jbl.py status
+python3 tools/jbl.py volume up
+python3 tools/jbl.py night on
+python3 tools/jbl.py smart off
+python3 tools/jbl.py --host <private-ipv4[:port]> status --json
+python3 tests/check_cli.py
+```
+
+`volume down`, `mute`, `power`, `source tv|hdmi|bluetooth` and available
+`play`, `pause`, `next`, `previous`, `stop` commands are also supported.
+`--timeout` accepts 1–30 seconds; JSON omits CSRF tokens. Night on/off and
+Smart Mode off read the current state first and skip an unnecessary toggle.
+Unknown state stays unknown, unsupported playback is refused, and failures
+are never retried automatically. Manual Smart Mode off does not replace the
+persistent wake watcher.
+
+I took CLI/control ideas from [k1rnt/JBL Soundbar CLI at the reviewed commit](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309).
+Its newer Linkplay/JBL One transport is separate; this CLI calls only my
+fixed Bar 9.1 Go endpoints. [EQ exploration](research/README.md#eq-exploration--20-october-2026)
+remains read-only research, without unverified sliders.

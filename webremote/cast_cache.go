@@ -50,7 +50,7 @@ func monitorCast(ctx context.Context) {
 	}
 }
 func castStream(native uint32, metadata CastSnapshot) *streamState {
-	s := &streamState{Service: "Chromecast", Status: "Selected"}
+	s := &streamState{Service: "Chromecast", Status: "Selected", native: native}
 	// A playing Cast transport may carry silent browser mirroring. Its state
 	// alone does not prove that the sender's video or music is playing.
 	if native == 2 {

@@ -28,5 +28,6 @@ if __name__ == '__main__':
         list(pool.map(run, sorted((ROOT / 'tests').glob('check_*.py'))))
     counts = {p.name: len(json.loads(p.read_text())['cases']) for p in sorted(out.glob('*-tests.json'))}
     assert counts.get('ssh-tests.json') == 19, counts
-    assert sum(counts.values()) == 121, counts
+    assert sum(n for name, n in counts.items() if name != 'cli-tests.json') == 121, counts
+    assert counts.get('cli-tests.json') == 20, counts
     print(json.dumps({'cases': counts, 'total': sum(counts.values())}, indent=2))

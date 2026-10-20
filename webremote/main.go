@@ -41,6 +41,8 @@ type config struct {
 	AllowedCIDR string `json:"allowed_cidr"`
 }
 type bluetoothState struct {
+	peer         string // Current peer address stays inside native control code.
+	MediaReady   bool   `json:"media_ready"`
 	PeerName     string `json:"peer_name,omitempty"`
 	Selected     bool   `json:"selected"`
 	Name         string `json:"name,omitempty"`
@@ -50,23 +52,25 @@ type bluetoothState struct {
 	Audio        string `json:"audio,omitempty"`
 }
 type state struct {
-	Revision    uint64          `json:"revision"`
-	Sound       *soundState     `json:"sound,omitempty"`
-	Streaming   *streamState    `json:"streaming,omitempty"`
-	SourceState *uint32         `json:"source_state,omitempty"`
-	WiFi        wifiState       `json:"wifi"`
-	Bluetooth   *bluetoothState `json:"bluetooth,omitempty"`
-	Available   bool            `json:"available"`
-	Error       string          `json:"error,omitempty"`
-	Power       string          `json:"power"`
-	Mode        string          `json:"mode"`
-	Volume      *uint32         `json:"volume,omitempty"`
-	Muted       *bool           `json:"muted,omitempty"`
-	Source      *uint32         `json:"source,omitempty"`
-	Input       string          `json:"input"`
-	Uptime      int64           `json:"uptime"`
-	Watcher     string          `json:"watcher"`
-	CSRF        string          `json:"csrf"`
+	Hostname      string          `json:"hostname,omitempty"`
+	MediaControls []string        `json:"media_controls,omitempty"`
+	Revision      uint64          `json:"revision"`
+	Sound         *soundState     `json:"sound,omitempty"`
+	Streaming     *streamState    `json:"streaming,omitempty"`
+	SourceState   *uint32         `json:"source_state,omitempty"`
+	WiFi          wifiState       `json:"wifi"`
+	Bluetooth     *bluetoothState `json:"bluetooth,omitempty"`
+	Available     bool            `json:"available"`
+	Error         string          `json:"error,omitempty"`
+	Power         string          `json:"power"`
+	Mode          string          `json:"mode"`
+	Volume        *uint32         `json:"volume,omitempty"`
+	Muted         *bool           `json:"muted,omitempty"`
+	Source        *uint32         `json:"source,omitempty"`
+	Input         string          `json:"input"`
+	Uptime        int64           `json:"uptime"`
+	Watcher       string          `json:"watcher"`
+	CSRF          string          `json:"csrf"`
 }
 type device struct {
 	mu         sync.Mutex
@@ -304,6 +308,8 @@ func (d *device) bluetooth() *bluetoothState {
 				connected, _, valid := bluetoothAudio(value)
 				if e == nil && se == nil && valid && connected && address != "" && peerAddress(again) == address {
 					s.PeerName = name
+					s.peer = address
+					s.MediaReady = d.bluetoothMediaReady(address)
 				}
 			}
 			f.Close()
@@ -323,7 +329,7 @@ func (d *device) snapshotLocked() state {
 // console fields into a replacement firmware process.
 func (d *device) snapshotCurrent() state {
 	d.revision++
-	s := state{Revision: d.revision, Power: "Starting", Mode: "Unknown", Input: "Unknown"}
+	s := state{Revision: d.revision, Power: "Starting", Mode: "Unknown", Input: "Unknown", Hostname: discoveryHostname()}
 	if b, e := os.ReadFile("/proc/uptime"); e == nil {
 		v, _ := strconv.ParseFloat(strings.Fields(string(b))[0], 64)
 		s.Uptime = int64(v)
@@ -378,6 +384,7 @@ func (d *device) snapshotCurrent() state {
 		s.Available = false
 		s.Error = "Soundbar restarted; refreshing"
 	}
+	s.MediaControls = mediaCommands(s)
 	return s
 }
 func (d *device) snapshot() state { d.mu.Lock(); defer d.mu.Unlock(); return d.snapshotLocked() }
@@ -459,6 +466,13 @@ func actionObserved(action string, before, after state) bool {
 		return after.Bluetooth != nil && after.Bluetooth.Selected && after.Bluetooth.Discoverable && after.Bluetooth.Connectable
 	case "bass_next", "atmos_next", "rear_next":
 		return soundObserved(action, before.Sound, after.Sound)
+	case "night_toggle":
+		return before.Sound != nil && after.Sound != nil && before.Sound.Night != nil && after.Sound.Night != nil && *before.Sound.Night != *after.Sound.Night
+	case "media_play", "media_pause":
+		return mediaObserved(action, after)
+	case "media_next", "media_previous", "media_stop":
+		// These are requests: no track metadata/stop acknowledgment is guaranteed.
+		return before.Input == after.Input
 	case "standard":
 		return after.Mode == "Standard"
 	}
@@ -474,16 +488,22 @@ func controlBusy() bool {
 func (d *device) action(ctx context.Context, action string) (out state, err error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	keys := map[string]string{"volume_up": "0x6f000", "volume_down": "0x6f001", "mute": "0x6f002", "power": "0x8f000", "input_tv": "0x6f029", "input_hdmi": "0x6f01e", "input_bluetooth": "0x6f027", "bluetooth_pair": "0x6f027", "bass_next": "0x1f030", "atmos_next": "0x1f02f", "rear_next": "0x1f031"}
+	keys := map[string]string{"volume_up": "0x6f000", "volume_down": "0x6f001", "mute": "0x6f002", "power": "0x8f000", "input_tv": "0x6f029", "input_hdmi": "0x6f01e", "input_bluetooth": "0x6f027", "bluetooth_pair": "0x6f027", "bass_next": "0x1f030", "atmos_next": "0x1f02f", "rear_next": "0x1f031", "media_play": "0x9f000", "media_pause": "0x9f001", "media_stop": "0x9f002", "media_next": "0x9f005", "media_previous": "0x9f006"}
 	_, simple := keys[action]
-	if !simple && action != "standard" {
+	if !simple && action != "standard" && action != "night_toggle" {
 		return out, errors.New("unknown control")
 	}
 	before := d.snapshotLocked()
 	if !before.Available {
 		return before, errors.New(before.Error)
 	}
-	if strings.HasSuffix(action, "_next") {
+	if strings.HasPrefix(action, "media_") && !mediaAllowed(action, before) {
+		return before, errors.New("this source does not report support for that playback control")
+	}
+	if action == "night_toggle" && (before.Sound == nil || before.Sound.Night == nil) {
+		return before, errors.New("night mode status unavailable")
+	}
+	if action == "bass_next" || action == "atmos_next" || action == "rear_next" {
 		if _, _, ok := soundValue(action, before.Sound); !ok {
 			return before, errors.New("sound setting unavailable")
 		}
@@ -514,15 +534,21 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	if strings.Contains(before.Watcher, "APPLYING") || strings.Contains(before.Watcher, "STABILIZING") {
 		return before, errors.New("sound settings are settling; try again shortly")
 	}
+	if !d.idleKeys() {
+		return before, errors.New("remote control is busy; release its buttons and retry")
+	}
+	if controlBusy() {
+		return before, errors.New("Smart Mode automation is busy; retry shortly")
+	}
+	if strings.HasPrefix(action, "media_") && before.SourceState != nil && *before.SourceState == 2 {
+		return d.bluetoothAction(ctx, action, before)
+	}
 	if !d.cliChecked {
 		h, e := hashFile("/bin/cli")
 		if e != nil || h != cliHash {
 			return before, errors.New("unsupported local control client")
 		}
 		d.cliChecked = true
-	}
-	if !d.idleKeys() {
-		return before, errors.New("remote control is busy; release its buttons and retry")
 	}
 	input, e := d.read(15427780, 1)
 	if e != nil {
@@ -558,8 +584,11 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	if e = d.acknowledge(ctx, 3*time.Second); e != nil {
 		return before, fmt.Errorf("console readiness: %w", e)
 	}
-	if action == "standard" {
-		if before.Mode != "Smart" {
+	if strings.HasPrefix(action, "media_") && !mediaAllowed(action, d.snapshotCurrent()) {
+		return d.snapshotCurrent(), errors.New("playback source or capability changed; refresh before retrying")
+	}
+	if action == "standard" || action == "night_toggle" {
+		if action == "standard" && before.Mode != "Smart" {
 			return before, errors.New("unknown sound mode")
 		}
 		if e = d.cli(ctx, "mw.iom.se", "0x6f002", "3500"); e != nil {
@@ -582,7 +611,11 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 		if !ready {
 			return before, errors.New("mute hold was not confirmed")
 		}
-		if e = d.cli(ctx, "mw.iom.se", "0x6f000", "50"); e != nil {
+		comboKey := "0x6f000"
+		if action == "night_toggle" {
+			comboKey = "0x6f001"
+		}
+		if e = d.cli(ctx, "mw.iom.se", comboKey, "50"); e != nil {
 			return before, e
 		}
 	} else {
@@ -660,8 +693,12 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 	if !r.network.Contains(net.ParseIP(client)) {
 		ap = hotspotAddress()
 	}
-	if !allowedNetwork(net.ParseIP(client), net.ParseIP(target), destination, r.network, ap) {
-		http.Error(w, "Open the bar's local IP address from its trusted network", 403)
+	hostIP := net.ParseIP(target)
+	if strings.EqualFold(strings.TrimSuffix(target, "."), "jbl.local") {
+		hostIP = destination
+	}
+	if !allowedNetwork(net.ParseIP(client), hostIP, destination, r.network, ap) {
+		http.Error(w, "Open jbl.local or the bar's local IP address from its trusted network", 403)
 		return
 	}
 	if q.URL.Path == "/api/events" && q.Method == "GET" {
@@ -757,10 +794,16 @@ func main() {
 	server := &http.Server{Addr: cfg.Listen, Handler: r, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	defer func() {
+		r.device.mu.Lock()
+		defer r.device.mu.Unlock()
+		closeBluetoothBridge()
+	}()
 	r.stop = ctx.Done()
 	go r.feed.run(ctx, r.device.snapshot)
 	go monitorWiFi(ctx)
 	go monitorCast(ctx)
+	go monitorDiscovery(ctx, r.network)
 	stopped := make(chan struct{})
 	go func() {
 		<-ctx.Done()

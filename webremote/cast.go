@@ -19,19 +19,21 @@ import (
 // CastSnapshot contains display information only. Transport IDs, network
 // identifiers and arbitrary receiver payloads never leave the status client.
 type CastSnapshot struct {
-	Available     bool     `json:"available"`
-	Application   string   `json:"application,omitempty"`
-	AppID         string   `json:"app_id,omitempty"`
-	Mirroring     bool     `json:"mirroring"`
-	PlayerState   string   `json:"player_state,omitempty"`
-	StreamType    string   `json:"stream_type,omitempty"`
-	Title         string   `json:"title,omitempty"`
-	Artist        string   `json:"artist,omitempty"`
-	Album         string   `json:"album,omitempty"`
-	CurrentTime   *float64 `json:"current_time,omitempty"`
-	Duration      *float64 `json:"duration,omitempty"`
-	LowShelfGain  *float64 `json:"low_shelf_gain,omitempty"`
-	HighShelfGain *float64 `json:"high_shelf_gain,omitempty"`
+	HasMedia          bool     `json:"has_media"`
+	SupportedCommands uint64   `json:"supported_commands"`
+	Available         bool     `json:"available"`
+	Application       string   `json:"application,omitempty"`
+	AppID             string   `json:"app_id,omitempty"`
+	Mirroring         bool     `json:"mirroring"`
+	PlayerState       string   `json:"player_state,omitempty"`
+	StreamType        string   `json:"stream_type,omitempty"`
+	Title             string   `json:"title,omitempty"`
+	Artist            string   `json:"artist,omitempty"`
+	Album             string   `json:"album,omitempty"`
+	CurrentTime       *float64 `json:"current_time,omitempty"`
+	Duration          *float64 `json:"duration,omitempty"`
+	LowShelfGain      *float64 `json:"low_shelf_gain,omitempty"`
+	HighShelfGain     *float64 `json:"high_shelf_gain,omitempty"`
 }
 
 const (
@@ -212,9 +214,11 @@ type castReceiverReply struct {
 type castMediaReply struct {
 	Type   string `json:"type"`
 	Status []struct {
-		PlayerState string   `json:"playerState"`
-		CurrentTime *float64 `json:"currentTime"`
-		Media       struct {
+		MediaSessionID    *int64   `json:"mediaSessionId"`
+		SupportedCommands uint64   `json:"supportedMediaCommands"`
+		PlayerState       string   `json:"playerState"`
+		CurrentTime       *float64 `json:"currentTime"`
+		Media             struct {
 			StreamType string   `json:"streamType"`
 			Duration   *float64 `json:"duration"`
 			Metadata   struct {
@@ -286,6 +290,8 @@ func applyCastMedia(s *CastSnapshot, b []byte) error {
 		return nil
 	}
 	m := reply.Status[0]
+	s.HasMedia = m.MediaSessionID != nil && *m.MediaSessionID >= 0
+	s.SupportedCommands = m.SupportedCommands
 	switch m.PlayerState {
 	case "IDLE", "PLAYING", "PAUSED", "BUFFERING":
 		s.PlayerState = m.PlayerState

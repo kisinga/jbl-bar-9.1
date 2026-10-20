@@ -6,10 +6,22 @@ import {fileURLToPath} from 'node:url';
 const {chromium} = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = new URL('../', import.meta.url);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-const initial = () => ({available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,atmos:1,rear:2,rear_docked:true}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,audio:'Disconnected',name:'My speaker'}});
-let state = initial(), calls = [], delay = 300, failure = '', offline = false, getDelay = 0;
+const initial = () => ({available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, source_state:0, hostname:'jbl.local', csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,atmos:1,rear:2,rear_docked:true,night:false}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,media_ready:true,audio:'Disconnected',name:'My speaker'}});
+let state = initial(), calls = [], delay = 300, failure = '', offline = false, getDelay = 0, advertisedControls = null;
 const streams=new Set(); let stateGets=0, streamGets=0, revision=0, lastSnapshot='';
 function snapshot() {
+ state.media_controls=[];
+ if(state.power==='On' && state.input==='Bluetooth' && state.bluetooth?.connected && state.bluetooth.media_ready)state.media_controls=['media_previous','media_play','media_pause','media_next','media_stop'];
+ const c=state.streaming?.cast;
+ if(state.power==='On' && state.input==='Chromecast' && c?.has_media && !c.mirroring){
+  if(c.supported_commands&64)state.media_controls.push('media_next');
+  if(c.supported_commands&128)state.media_controls.push('media_previous');
+  if(c.player_state==='PAUSED')state.media_controls.push('media_play');
+  if(c.player_state==='PLAYING' && c.supported_commands&1)state.media_controls.push('media_pause');
+  state.media_controls.push('media_stop');
+ }
+
+ if(advertisedControls !== null)state.media_controls=[...advertisedControls];
  const comparable={...state};delete comparable.revision;
  const text=JSON.stringify(comparable);
  if(text!==lastSnapshot){revision++;lastSnapshot=text;}
@@ -33,6 +45,13 @@ const server = createServer(async (req, res) => {
       const {action} = JSON.parse(body); calls.push(action);
       await pause(delay);
       if (failure) { res.writeHead(409, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:failure,state})); return; }
+      if (action === 'night_toggle') state.sound.night=!state.sound.night;
+      // A2DP can remain Streaming while the app handles AVRCP Play/Pause.
+      // Only a real receiver media session has an independently reported player state.
+      if (state.input==='Chromecast' && state.streaming?.cast) {
+        if(action==='media_play')state.streaming.cast.player_state='PLAYING';
+        if(action==='media_pause')state.streaming.cast.player_state='PAUSED';
+      }
       if (action === 'volume_up') state.volume++;
       if (action === 'volume_down') state.volume--;
       if (action === 'bluetooth_pair') {state.bluetooth.discoverable=true;state.bluetooth.connectable=true;}
@@ -67,6 +86,8 @@ try {
   await pause(100);
   check((await page.locator('#volume').textContent())==='12','stale pushed states cannot rewind the UI');
   check((await page.locator('#wifi-name').textContent())==='Example Wi-Fi','Wi-Fi network shown');
+  check(await page.locator('#local-address').isVisible(),'confirmed local hostname shown');
+  check((await page.locator('#local-address').getAttribute('href'))==='http://jbl.local','local address uses advertised alias');
   check((await page.locator('#wifi-status').textContent()).includes('Strong signal'),'Wi-Fi quality label');
   await page.locator('.device-details summary').click();
   check((await page.locator('#device-uptime').textContent())==='1d 1h 5m','uptime shown in readable units');
@@ -149,19 +170,53 @@ try {
   await page.waitForFunction(()=>document.querySelector('#bt-status').textContent==='Streaming audio');
   check((await page.locator('#bt-pair-label').textContent())==='Pair another device','connected device pairing action');
   check((await page.locator('#bt-help').textContent()).includes('Example phone'),'connected peer name shown separately from bar name');
-  check((await page.locator('#playback-status').textContent())==='Playing','Bluetooth playback status shown');
+  check((await page.locator('#playback-status').textContent())==='Streaming audio','Bluetooth status describes the audio stream');
   check((await page.locator('#playback-title').textContent())==='Example phone','Bluetooth playback identifies peer');
+  check(await page.locator('#media-toggle').getAttribute('data-action')==='media_play' && await page.locator('#media-pause').getAttribute('data-action')==='media_pause','Play and Pause are separate fixed commands');
+  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isEnabled(),'connected Bluetooth offers both Play and Pause');
+  await page.locator('#media-pause').click();
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Pause requested.');
+  check(calls.at(-1)==='media_pause' && state.bluetooth.audio==='Streaming','Pause is requested without inventing an app or stream state');
+  check((await page.locator('#playback-status').textContent())==='Streaming audio','A2DP can stay active after Pause');
+  check((await page.locator('#media-help').textContent()).includes('while an app is paused'),'stream activity limitation is explained');
+  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isEnabled(),'Play remains available even when A2DP stays Streaming');
+  await page.locator('#media-toggle').click();
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Play requested.');
+  check(calls.at(-1)==='media_play' && state.bluetooth.audio==='Streaming','Play reports a request without claiming app confirmation');
   state.bluetooth.audio='Paused';
-  await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Paused');
-  check(await page.locator('#playback').isVisible(),'Bluetooth paused card stays visible');
-  check((await page.locator('#bt-status').textContent())==='Audio paused','Bluetooth panel shows pause');
-  check(!await page.locator('#playback').evaluate(e=>e.classList.contains('active')),'paused audio stops playing indicator');
+  await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Stream suspended');
+  check(await page.locator('#playback').isVisible() && (await page.locator('#bt-status').textContent())==='Stream suspended','suspended Bluetooth stream stays visible');
+  check(!await page.locator('#playback').evaluate(e=>e.classList.contains('active')),'suspended stream stops the activity indicator');
+  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isEnabled(),'suspended stream does not infer or hide transport commands');
+  advertisedControls=['media_pause'];
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').disabled);
+  check(await page.locator('#media-pause').isEnabled(),'availability follows server flags rather than Bluetooth stream state');
+  advertisedControls=null;
+  await page.waitForFunction(()=>!document.querySelector('#media-toggle').disabled);
+  await page.locator('#media-next').click();
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Next track requested.');
+  check(calls.at(-1)==='media_next','next reports requested rather than confirmed track');
+  await page.locator('#media-previous').click();
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Previous track requested.');
+  check(calls.at(-1)==='media_previous','previous uses explicit command');
+  await page.locator('#media-stop').click();
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Stop requested.');
+  check(calls.at(-1)==='media_stop','stop request acknowledged');
+  state.bluetooth.media_ready=false;
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').disabled);
+  check((await page.locator('.transport button:disabled').count())===5,'missing AVRCP readiness disables every transport control');
+  const beforeUnavailable=calls.length;
+  await page.locator('#media-pause').evaluate(button=>button.click());
+  await pause(100);
+  check(calls.length===beforeUnavailable,'unavailable AVRCP cannot enqueue a command');
+  state.bluetooth.media_ready=true;
   state.bluetooth.audio='Connected';
   await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Connected');
   check(await page.locator('#playback').isVisible(),'connected state does not imply playing');
   state.bluetooth.connected=false;state.bluetooth.audio='Disconnected';
   await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Waiting for a device');
   check(await page.locator('#playback-title').isHidden(),'disconnected peer name clears');
+  check((await page.locator('.transport button:disabled').count())===5,'disconnected device cannot receive any controls');
   state.bluetooth.connected=null;
   await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Status unavailable');
   check(await page.locator('#playback').isVisible(),'unknown Bluetooth state is explicit');
@@ -181,6 +236,15 @@ try {
   await page.locator('#atmos-next').click();
   await page.waitForFunction(()=>document.querySelector('#atmos-value').textContent==='High');
   check(state.sound.atmos===2,'Atmos height cycle confirms readback');
+  await page.locator('#night').click();
+  await page.waitForFunction(()=>document.querySelector('#night-value').textContent==='On');
+  check(await page.locator('#night').getAttribute('aria-pressed')==='true','night mode shows live on state');
+  await page.locator('#night').click();
+  await page.waitForFunction(()=>document.querySelector('#night-value').textContent==='Off');
+  check(!state.sound.night,'night mode can return off');
+  delete state.sound.night;
+  await page.waitForFunction(()=>document.querySelector('#night').disabled);
+  check((await page.locator('#night-value').textContent())==='Unavailable','missing night readback stays unavailable');
   state.input='AirPlay';state.source_state=7;state.streaming={service:'AirPlay',status:'Session active',active:true};
   await page.waitForFunction(()=>document.querySelector('#playback-service').textContent==='AirPlay');
   check((await page.locator('#playback-status').textContent())==='Session active','AirPlay updates via push without refresh');
@@ -192,9 +256,20 @@ try {
   check((await page.locator('#playback-detail').textContent()).includes('isn’t reported'),'mirroring limitation explained');
   check((await page.locator('#playback-app').textContent())==='Chrome Audio Mirroring','receiver application shown');
   check(await page.locator('#playback-timeline').isHidden(),'mirroring never invents a track timeline');
-  state.streaming={service:'Chromecast',status:'Paused',active:false,cast:{available:true,application:'Music app',mirroring:false,player_state:'PAUSED',title:'<img src=x onerror=alert(1)> '+ 'Long title '.repeat(30),artist:'Example artist',album:'Example album',current_time:75,duration:240,low_shelf_gain:0,high_shelf_gain:-2}};
+  check((await page.locator('.transport button:disabled').count())===5,'mirrored sender controls stay disabled');
+  state.streaming={service:'Chromecast',status:'Paused',active:false,cast:{available:true,application:'Music app',mirroring:false,has_media:true,supported_commands:129,player_state:'PAUSED',title:'<img src=x onerror=alert(1)> '+ 'Long title '.repeat(30),artist:'Example artist',album:'Example album',current_time:75,duration:240,low_shelf_gain:0,high_shelf_gain:-2}};
   await page.waitForFunction(()=>document.querySelector('#playback-time').textContent==='1:15 / 4:00');
   check((await page.locator('#playback-meta').textContent())==='Example artist · Example album','Cast artist and album shown');
+  check(await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isDisabled() && await page.locator('#media-previous').isEnabled() && await page.locator('#media-next').isDisabled(),'paused Cast enables only server-advertised Play and Previous');
+  state.streaming.cast.player_state='PLAYING';state.streaming.cast.supported_commands=65;
+  await page.waitForFunction(()=>!document.querySelector('#media-pause').disabled);
+  check(await page.locator('#media-toggle').isDisabled() && await page.locator('#media-previous').isDisabled() && await page.locator('#media-next').isEnabled(),'playing Cast enables only server-advertised Pause and Next');
+  await page.locator('#media-pause').click();
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Pause requested.');
+  check(calls.at(-1)==='media_pause' && await page.locator('#media-toggle').isEnabled() && await page.locator('#media-pause').isDisabled(),'Cast pause request follows refreshed receiver capabilities');
+  state.streaming.cast.player_state='PLAYING';state.streaming.cast.supported_commands=0;
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').disabled && document.querySelector('#media-pause').disabled && document.querySelector('#media-next').disabled);
+  check(await page.locator('#media-toggle').isDisabled() && await page.locator('#media-next').isDisabled(),'Cast without pause or skip capabilities keeps those commands disabled');
   check((await page.locator('#playback-title img').count())===0,'remote metadata is rendered as text');
   check(await page.locator('#playback-progress').getAttribute('value')==='75','timeline uses receiver position');
   await page.locator('.device-details summary').click();
@@ -202,6 +277,7 @@ try {
   for (const width of [320,390,1024]) {
     await page.setViewportSize({width,height:900});
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'long media metadata fits at '+width);
+    check(await page.locator('.transport button').evaluateAll(buttons=>buttons.every(button=>{const r=button.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.left>=0 && r.right<=innerWidth;})),'five 44px transport targets fit at '+width);
   }
   await page.locator('.device-details summary').click();
   const beforeIdle=stateGets;await pause(1200);
@@ -211,10 +287,13 @@ try {
     await page.setViewportSize({width,height:900});
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow at '+width);
   }
-  await page.setViewportSize({width:390,height:920});
+  await page.setViewportSize({width:320,height:920});
   state=initial();state.input='Bluetooth';state.bluetooth={...state.bluetooth,selected:true,connected:true,audio:'Streaming',peer_name:'Example phone'}; await page.locator('#refresh').click();
   await pause(200);
   await mkdir(new URL('build/',root),{recursive:true});
+  check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Bluetooth transport fits at 320px');
+  await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-320.png',root)),fullPage:true});
+  await page.setViewportSize({width:390,height:920});
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-new.png',root)),fullPage:true});
   await page.setViewportSize({width:1200,height:900});
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-desktop-new.png',root)),fullPage:true});

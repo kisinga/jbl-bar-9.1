@@ -186,3 +186,100 @@ payloads were preserved. The source reorganization leaves revision 5 install and
 uninstall ZIP bytes unchanged; all 121 host fixtures passed. The web interface
 passes 59 browser checks plus Go race tests and vet. Public screenshots use
 example data rather than personal network or device details.
+
+
+## EQ exploration — 20 October 2026
+
+I found a credible route to real EQ inside the existing JBL HPP/HDSP processor.
+Its tuning parser supports five-band groups named `LR EQ`, `LRs EQ`, `LFE EQ`
+and `C Mode EQ`, plus per-channel PEQ and other speaker processing. The packaged
+pipeline includes HPP/HPP_BM, and the running process maps the matching HDSP
+library. I preserved a read-only snapshot of its full 3,840-byte tuning block.
+
+The processor watches `/mnt/ubi_boot/temp.json` and consumes updates from its
+audio callback. That file was absent and I did not create it. Parsing starts
+from compiled defaults: a partial JSON file resets omitted tuning instead of
+preserving the current block. The same configuration includes crossover and
+limiter settings. Filter types, units, limits, calibration preservation and exact
+restoration need validation before any changes or UI sliders. HDMI/eARC,
+Bluetooth and Cast coverage remains an inference from the shared processor,
+not an audible test across inputs.
+
+Cast provides another, narrower route: its matching `cast_audio.json` loads
+`libcast_equalizer_1.0.so` on default output streams, and the running Cast process
+maps that library. Receiver status reports low/high shelves at 150/4,500 Hz,
+both 0 dB, with zero peaking bands advertised. The community
+[Google Home local API specification](https://github.com/rithvikvibhu/GHLocalApi/blob/master/GoogleHome.openapi3.json)
+documents a shelf setter, but I have not called it or established its effect on
+this bar. The legacy setup response does not expose the newer EQ capability
+fields. This is a candidate for Cast audio, not proof of EQ on TV/eARC.
+
+I also reviewed [JBL Soundbar CLI](https://github.com/k1rnt/jbl-soundbar-cli)
+and [JBL_Soundbar](https://github.com/MrBearPresident/JBL_Soundbar).
+They provide useful CLI/EQ control ideas for newer Linkplay/JBL One devices;
+their protocols are not established on the Bar 9.1. I found no demonstrated
+Bar 9.1 custom-EQ implementation in the bounded public search. The next useful
+step is an offline round-trip of the full current tuning and filter enum mapping,
+with exact restoration, before considering a small measured hardware change.
+No EQ setting, DSP memory, tuning file or audio service was modified.
+
+The ignored `private/firmware-workspace/analysis/eq-native/` retains source
+identities, REA evidence, decoded records and the future test plan. The earlier
+sound-handler disassembly provenance was corrected: all relied-on regions are
+byte-identical between the two archived builds; runtime identity guards remain
+pinned to the tested build.
+
+## Track metadata limits
+
+During the Bluetooth Streaming test, the connected per-peer middleware cache
+contained no title or artist. Its metadata records clear on disconnect, unlike
+the older `bdpprog` cache, which can retain a previous device’s track. AirPlay’s
+legacy metadata pointers were also empty; the newer SDK does not have a verified
+forwarding path into them. Cast metadata remains available when the receiver
+supplies it. I preserved the experimental reader and tests locally under
+`private/firmware-workspace/analysis/track-ui/experimental-reader/`; I did not
+deploy an unverified track-title reader or publish personal listening data.
+
+
+## Playback controls and discovery
+
+The tested Bluetooth IOM focus handler discards the normal media key events.
+I replaced that route with a small client for the native MediaTek AVRCP RPC
+service. It connects without registering callbacks, sends one key-down/key-up
+pair and closes. I confirmed by listening that the direct Pause test interrupted playback;
+I sent Play to restore it. The connected computer kept its A2DP stream
+open, so Streaming cannot confirm whether its app is playing. Separate Play
+and Pause buttons report requests; next/previous/stop still need audible tests.
+The optional helper is my own source, linked against an owner's matching vendor
+libraries; the public repository includes no vendor binaries. Native callback
+subscribers, pairing state, service startup and audio processing are preserved.
+
+I added capability-gated controls for normal Cast sessions through the native
+C4A handler. Mirroring remains excluded, and these controls need a live normal
+receiver test. Night mode uses the existing mute-hold/volume-down sequence;
+I confirmed Off → On → Off and restored the starting settings.
+
+For `jbl.local`, the Go server registers an additional record with the bar's
+existing Bonjour daemon. A native interface-specific registration stopped
+answering fresh queries despite keeping its IPC connection. DNS-SD's Any scope
+continued answering beyond the 120-second TTL; the monitor still validates
+`wlan0` against the configured LAN and withdraws its record when that address
+changes. Name conflicts leave the IP fallback available.
+
+I borrowed CLI/discovery/capability ideas from
+[k1rnt/jbl-soundbar-cli at the reviewed revision](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309).
+Its newer Linkplay protocol is separate from this bar's native implementation;
+its Smart Mode setter does not replace the persistent wake watcher here.
+The local `analysis/track-ui/rpc-helper/`, `analysis/discovery-ui/` and
+`analysis/community-cli/` folders retain private ABI evidence and test records.
+
+
+The final deployed Go API accepted Bluetooth Pause and Play in 0.124/0.225
+seconds and preserved volume, mute, power, input, sound mode and sound settings.
+This checks the integrated request path; the earlier audible confirmation is
+what establishes Pause affected playback. The live browser kept one event
+connection for 22 seconds with zero state polling, no errors and no mobile
+overflow. The server used about 10.7 MiB resident memory. All 141 host fixtures,
+87 browser checks, Go race tests and vet passed; repeated Go builds with the
+owner-built helper were byte-identical. The original Smart Mode ZIP hashes
+remain unchanged.
