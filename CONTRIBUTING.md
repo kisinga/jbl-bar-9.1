@@ -119,10 +119,11 @@ bye
 ssh -p 2222 root@<bar-ip-address> '/bin/sh /var/JBLRemote/install.sh'
 ```
 
-Open `http://<bar-ip-address>:8080` directly; there is no web login.
+Open `http://<bar-ip-address>` directly (`:8080` remains available); there is no web login.
 Anyone on the configured trusted subnet can use these controls. Use the bar’s
 IP address in the URL; DNS hostnames are rejected to prevent rebinding.
-The server accepts requests only from the configured subnet. Fixed control
+The server accepts requests from the configured subnet, plus clients of the
+active native `ap0` hotspot when their HTTP destination matches that interface. Fixed control
 names, JSON-only POSTs, CSRF tokens and same-origin checks protect mutations;
 it does not accept arbitrary commands or serve filesystem paths.
 
@@ -137,7 +138,8 @@ ssh -p 2222 root@<bar-ip-address> '/bin/sh /var/JBLRemote/uninstall.sh'
 It restores its recorded hook if still recognized, stops its own process and
 retains files for inspection. Later unknown hook edits are preserved. Keep
 SSH usable while experimenting. Volume/mute and readback are hardware-tested;
-power, input transitions and manual Standard selection remain experimental.
+bass/Atmos cycles are hardware-tested too. Rear changes need an undocked
+hardware test; power, input transitions and manual Standard remain experimental.
 
 The UI test uses Node and Playwright on the development computer:
 
@@ -151,6 +153,22 @@ node tests/webremote-ui.mjs
 `PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` can reuse an
 existing installation. Tests serve the real assets with delayed/failed mock
 responses, cover queued/cancelled controls, holds, keyboard input, reconnects,
-stale polls, standby, Bluetooth feedback and 320/390/1024px layouts. Go tests
-cover network/Host/CSRF boundaries, state confirmation and Bluetooth decoding.
+stale replies, standby, Bluetooth/Wi-Fi/streaming feedback and 320/390/1024px layouts. Go tests
+cover LAN/hotspot/Host/CSRF boundaries, event streams, native Wi-Fi datagrams,
+state confirmation, peer-name filtering and sound decoding.
 UI fixtures do not substitute for hardware pairing or audible tests.
+
+Live updates use Go’s standard HTTP server and the browser’s `EventSource`.
+A single reader samples native state once per second only while subscribed;
+unchanged state is suppressed and slow clients keep only the newest update.
+Wi-Fi is sampled separately every five seconds. Monotonic revisions prevent
+an older stream/HTTP reply from undoing a newer observation. No third-party
+Go module or database is needed. Both HTTP listeners share the same controls
+and access checks; an occupied port 80 leaves 8080 usable.
+
+On 20 October 2026 I confirmed live AirPlay and Wi-Fi readback, both HTTP
+ports, a 22-second single browser event connection with zero state-poll requests,
+and complete bass/Atmos cycles restored to their original levels. Connected
+Bluetooth-name and actual Chromecast playback checks remain pending; their
+decoders/UI have fixture coverage. Native hotspot activation/access still needs
+an outage test. No Wi-Fi loss, reboot or factory reset was induced.

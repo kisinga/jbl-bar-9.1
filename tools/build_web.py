@@ -22,7 +22,7 @@ def build(output, allowed_cidr):
     subprocess.run(["go", "build", "-buildvcs=false", "-trimpath", "-ldflags=-s -w -buildid=", "-o", str(output / "remote"), "."],
                    cwd=ROOT / "webremote", env=env, check=True)
     (output / "config.json").write_text(json.dumps({
-        "listen": ":8080", "allowed_cidr": str(network),
+        "listen": ":80", "allowed_cidr": str(network),
     }, indent=2) + "\n")
     (output / "config.json").chmod(0o600)
     (output / "OWNER.txt").write_text("JBL_WEB_REMOTE_REV1\n")

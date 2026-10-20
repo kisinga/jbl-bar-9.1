@@ -6,9 +6,26 @@ import {fileURLToPath} from 'node:url';
 const {chromium} = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = new URL('../', import.meta.url);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-const initial = () => ({available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, csrf:'fixture', watcher:'', bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,audio:'Disconnected',name:'My speaker'}});
+const initial = () => ({available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, csrf:'fixture', watcher:'', sound:{bass:0,atmos:1,rear:2,rear_docked:true}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,audio:'Disconnected',name:'My speaker'}});
 let state = initial(), calls = [], delay = 300, failure = '', offline = false, getDelay = 0;
+const streams=new Set(); let stateGets=0, streamGets=0, revision=0, lastSnapshot='';
+function snapshot() {
+ const comparable={...state};delete comparable.revision;
+ const text=JSON.stringify(comparable);
+ if(text!==lastSnapshot){revision++;lastSnapshot=text;}
+ state.revision=revision;return {...state};
+}
+const pushTimer=setInterval(()=>{
+ for(const res of streams){if(offline){res.destroy();streams.delete(res);continue;}const text=JSON.stringify(snapshot());if(text!==res.lastSnapshot){res.lastSnapshot=text;res.write('data: '+text+'\n\n');}}
+},50);
 const server = createServer(async (req, res) => {
+  if(req.url==='/api/events') {
+    streamGets++;
+    if(offline){req.socket.destroy();return;}
+    res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store'});
+    res.lastSnapshot=JSON.stringify(snapshot());res.write('data: '+res.lastSnapshot+'\n\n');
+    streams.add(res);res.on('close',()=>streams.delete(res));return;
+  }
   if (req.url.startsWith('/api/')) {
     if (offline) { req.socket.destroy(); return; }
     if (req.method === 'POST') {
@@ -19,12 +36,15 @@ const server = createServer(async (req, res) => {
       if (action === 'volume_up') state.volume++;
       if (action === 'volume_down') state.volume--;
       if (action === 'bluetooth_pair') {state.bluetooth.discoverable=true;state.bluetooth.connectable=true;}
+      if (action === 'bass_next') state.sound.bass=(state.sound.bass+1)%5;
+      if (action === 'atmos_next') state.sound.atmos=(state.sound.atmos+1)%3;
+      if (action === 'rear_next') state.sound.rear=(state.sound.rear+1)%4;
       if (action === 'mute') state.muted = !state.muted;
       if (action === 'input_bluetooth') {state.input='Bluetooth';state.source=10;state.bluetooth.selected=true;}
     }
-    const snapshot = {...state};
-    if (req.method === 'GET') await pause(getDelay);
-    res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify(snapshot)); return;
+    const result = snapshot();
+    if (req.method === 'GET') {stateGets++;await pause(getDelay);}
+    res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify(result)); return;
   }
   const name = {'/':'index.html','/style.css':'style.css','/app.js':'app.js'}[req.url];
   if (!name) {res.writeHead(404);res.end();return;}
@@ -41,6 +61,13 @@ try {
   const url='http://127.0.0.1:'+server.address().port;
   await page.goto(url);
   await page.waitForFunction(()=>document.querySelector('#connection').dataset.state==='online');
+  check(stateGets===0 && streamGets===1,'initial state uses one push connection');
+  const stale={...snapshot(),revision:revision-1,volume:200};
+  for(const res of streams)res.write('data: '+JSON.stringify(stale)+'\n\n');
+  await pause(100);
+  check((await page.locator('#volume').textContent())==='12','stale pushed states cannot rewind the UI');
+  check((await page.locator('#wifi-name').textContent())==='Example Wi-Fi','Wi-Fi network shown');
+  check(await page.locator('#rear-next').isDisabled(),'docked rear control disabled');
   await page.locator('[data-action=volume_down]').click();
   check(await page.locator('#volume').textContent()==='11','immediate optimistic volume');
   check(await page.locator('[data-action=volume_up]').isEnabled(),'volume remains interactive');
@@ -112,10 +139,11 @@ try {
   check((await page.locator('#bt-status').textContent()).includes('Starting'),'pairing progress');
   await page.waitForFunction(()=>document.querySelector('#bt-status').textContent==='Ready to pair');
   check(await page.locator('#bt-pair').isDisabled(),'discoverability readback confirms pairing');
-  state.bluetooth.discoverable=false;state.bluetooth.connected=true;state.bluetooth.audio='Streaming';
+  state.bluetooth.discoverable=false;state.bluetooth.connected=true;state.bluetooth.audio='Streaming';state.bluetooth.peer_name='Example phone';
   await page.locator('#refresh').click();
   await page.waitForFunction(()=>document.querySelector('#bt-status').textContent==='Streaming audio');
   check((await page.locator('#bt-pair-label').textContent())==='Pair another device','connected device pairing action');
+  check((await page.locator('#bt-help').textContent()).includes('Example phone'),'connected peer name shown separately from bar name');
   // Clearing queued taps leaves only the already-sent step.
   delay=1600;calls=[];
   const startingVolume=state.volume;
@@ -124,6 +152,22 @@ try {
   await page.locator('#cancel-volume').click();
   await page.waitForFunction(()=>document.querySelector('#message').dataset.kind==='success');
   check(calls.length===1,'cancel clears unsent volume intents');
+  state=initial();await page.locator('#refresh').click();await pause(200);
+  delay=120;
+  await page.locator('#bass-next').click();
+  await page.waitForFunction(()=>document.querySelector('#bass-value').textContent==='Level 2 of 5');
+  check(state.sound.bass===1,'bass cycle confirms readback');
+  await page.locator('#atmos-next').click();
+  await page.waitForFunction(()=>document.querySelector('#atmos-value').textContent==='High');
+  check(state.sound.atmos===2,'Atmos height cycle confirms readback');
+  state.input='AirPlay';state.source_state=7;state.streaming={service:'AirPlay',status:'Session active',active:true};
+  await page.waitForFunction(()=>document.querySelector('#playback-service').textContent==='AirPlay');
+  check((await page.locator('#playback-status').textContent())==='Session active','AirPlay updates via push without refresh');
+  state.input='Chromecast';state.streaming={service:'Chromecast',status:'Paused',active:false};
+  await page.waitForFunction(()=>document.querySelector('#playback-service').textContent==='Chromecast');
+  check((await page.locator('#playback-status').textContent())==='Paused','Chromecast pause state shown');
+  const beforeIdle=stateGets;await pause(1200);
+  check(stateGets===beforeIdle,'idle browser never polls the state endpoint');
   state=initial();await page.locator('#refresh').click();await pause(200);
   for (const width of [320,390,1024]) {
     await page.setViewportSize({width,height:900});
@@ -138,4 +182,4 @@ try {
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-desktop-new.png',root)),fullPage:true});
   check(errors.length===0,'no browser exceptions: '+errors.join(', '));
   console.log(checks+' browser UX checks passed');
-} finally {await browser.close();server.close();}
+} finally {await browser.close();clearInterval(pushTimer);for(const res of streams)res.destroy();server.close();}

@@ -97,7 +97,7 @@ The GAP descriptor at `0xc6d250` points to the static context `0xc6d2c0`.
 Its uint32 at +8 records connectability/discoverability: 0 = both, 1 = connectable
 only, 2 = discoverable only, 3 = neither. Pairing success requires **both**. The GAP
 info pointer is `0xc6d2cc`; its inline local name at +0x28 is bounded to 128 bytes,
-NUL-terminated and checked as UTF-8. No peer identity is exposed.
+NUL-terminated and checked as UTF-8. The peer address is used internally to match its cached friendly name; the address and pairing keys are never exposed.
 
 The A2DP descriptor at `0xcb6450` points to `0xe3757c`; uint32 at +4 is
 0 = disconnected, 1 = connected, 2 = suspended, 3 = streaming, as established by the
@@ -116,3 +116,39 @@ connected my phone and confirmed the page updated. The initial three-second
 completion timeout expired before the six-second hold finished; I extended
 the pairing acknowledgment window to nine seconds. I checked released-key
 fields and restored console values after the first attempt. No reboot was needed.
+
+## Streaming, sound and network additions
+
+I use config365 for **all** input labels:0 TV/ARC,1 Optical,2 Bluetooth,3 HDMI,
+4 AUX,5 USB,6 Chromecast,7 AirPlay. Config51 remains a raw setting only.
+Cast uint32`0xe30710` is2 Playing,3 Paused; AirPlay uint32`0xe3169c` is1 for an
+active session and0 after stop. I do not infer AirPlay pause state from that flag.
+The source dispatch and passive AirPlay capture are retained locally under
+`private/firmware-workspace/analysis/cast-ui/`.
+
+| Native control | Short key | Config ID | Raw values |
+| --- | --- | --- | --- |
+| Bass | `0x1f030` |238|0–4 (Levels1–5) |
+| Atmos height | `0x1f02f` |201|0–2 (Low/Mid/High) |
+| Rear | `0x1f031` |202|0–3 (Low/Mid/High/Muted) |
+
+Rear adjustment requires both dock bytes`0xe435ec`/`0xe435ed` to be zero.
+All controls retain the existing awake/idle/console checks and must produce
+the predicted next value. I confirmed full bass and Atmos cycles on hardware,
+restoring the starting values; the docked rear action was rejected. Generic
+EQ/IIR command strings alone do not establish a safe adjustable EQ path.
+The local `analysis/sound-controls/` ledger preserves those limits.
+
+For Bluetooth, GAP info+0xc8 supplies the current peer address. I return only
+`Name` from that exact section of`/data/misc/bluedroid/bt_config.conf`, bounded
+to128KiB, and recheck the address/connection afterward. It is a cache lookup,
+not a fresh remote-name request. No raw config, address or pairing key leaves
+the process. Wi-Fi uses fixed STATUS/SIGNAL_POLL requests over a connected
+UNIX datagram socket; no network configuration commands are exposed.
+
+The native hotspot defaults to192.168.255.249/29 with DNS disabled. Access
+requires an active ap0 address and a matching client subnet/local HTTP
+destination. Native setup/DHCP services stay intact. The bounded net_mgr trace
+found explicit hotspot-start dispatch and restart/retry paths, but did not
+establish automatic Wi-Fi-loss fallback for a provisioned bar. That needs an
+outage test or further vendor Cast-policy analysis; no outage was induced.

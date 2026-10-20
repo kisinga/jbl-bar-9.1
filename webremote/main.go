@@ -41,6 +41,7 @@ type config struct {
 	AllowedCIDR string `json:"allowed_cidr"`
 }
 type bluetoothState struct {
+	PeerName     string `json:"peer_name,omitempty"`
 	Selected     bool   `json:"selected"`
 	Name         string `json:"name,omitempty"`
 	Connectable  bool   `json:"connectable"`
@@ -49,23 +50,29 @@ type bluetoothState struct {
 	Audio        string `json:"audio,omitempty"`
 }
 type state struct {
-	Bluetooth *bluetoothState `json:"bluetooth,omitempty"`
-	Available bool            `json:"available"`
-	Error     string          `json:"error,omitempty"`
-	Power     string          `json:"power"`
-	Mode      string          `json:"mode"`
-	Volume    *uint32         `json:"volume,omitempty"`
-	Muted     *bool           `json:"muted,omitempty"`
-	Source    *uint32         `json:"source,omitempty"`
-	Input     string          `json:"input"`
-	Uptime    int64           `json:"uptime"`
-	Watcher   string          `json:"watcher"`
-	CSRF      string          `json:"csrf"`
+	Revision    uint64          `json:"revision"`
+	Sound       *soundState     `json:"sound,omitempty"`
+	Streaming   *streamState    `json:"streaming,omitempty"`
+	SourceState *uint32         `json:"source_state,omitempty"`
+	WiFi        wifiState       `json:"wifi"`
+	Bluetooth   *bluetoothState `json:"bluetooth,omitempty"`
+	Available   bool            `json:"available"`
+	Error       string          `json:"error,omitempty"`
+	Power       string          `json:"power"`
+	Mode        string          `json:"mode"`
+	Volume      *uint32         `json:"volume,omitempty"`
+	Muted       *bool           `json:"muted,omitempty"`
+	Source      *uint32         `json:"source,omitempty"`
+	Input       string          `json:"input"`
+	Uptime      int64           `json:"uptime"`
+	Watcher     string          `json:"watcher"`
+	CSRF        string          `json:"csrf"`
 }
 type device struct {
 	mu         sync.Mutex
 	pid        int
 	start      string
+	revision   uint64
 	cliChecked bool
 }
 type remote struct {
@@ -73,6 +80,8 @@ type remote struct {
 	network  *net.IPNet
 	csrf     string
 	device   *device
+	feed     stateFeed
+	stop     <-chan struct{}
 	actionMu sync.Mutex
 }
 
@@ -190,7 +199,9 @@ func (d *device) write(address int64, width int, value uint32) error {
 	return nil
 }
 func (d *device) configByte(id uint32) (uint32, error) {
-	if id != 50 && id != 51 && id != 155 && id != 365 {
+	switch id {
+	case 50, 51, 155, 365, 238, 201, 202:
+	default:
 		return 0, errors.New("unknown setting")
 	}
 	node := int64(0xf046d0) + int64(id)*0x4c
@@ -259,11 +270,7 @@ func (d *device) bluetooth() *bluetoothState {
 	if e != nil || mode > 3 {
 		return nil
 	}
-	selected, e := d.configByte(365)
-	if e != nil {
-		return nil
-	}
-	s := &bluetoothState{Selected: selected == 2, Connectable: mode == 0 || mode == 1, Discoverable: mode == 0 || mode == 2}
+	s := &bluetoothState{Connectable: mode == 0 || mode == 1, Discoverable: mode == 0 || mode == 2}
 	// GAP info's inline local-name buffer is 128 bytes, zero-terminated.
 	info, ie := d.read(0xc6d250+0x4c, 4)
 	if info == 0xc6d2cc && ie == nil {
@@ -285,11 +292,29 @@ func (d *device) bluetooth() *bluetoothState {
 			}
 		}
 	}
+	if s.Connected != nil && *s.Connected && info == 0xc6d2cc {
+		if f, e := os.Open(fmt.Sprintf("/proc/%d/mem", d.pid)); e == nil {
+			b := make([]byte, 32)
+			if _, e = f.ReadAt(b, int64(info)+0xc8); e == nil {
+				address := peerAddress(b)
+				name := readPeerName(address)
+				again := make([]byte, 32)
+				_, e = f.ReadAt(again, int64(info)+0xc8)
+				value, se := d.read(0xe3757c+4, 4)
+				connected, _, valid := bluetoothAudio(value)
+				if e == nil && se == nil && valid && connected && address != "" && peerAddress(again) == address {
+					s.PeerName = name
+				}
+			}
+			f.Close()
+		}
+	}
 	return s
 }
 func (d *device) snapshotLocked() state {
 	if e := d.identify(); e != nil {
-		return state{Power: "Starting", Mode: "Unknown", Input: "Unknown", Error: e.Error()}
+		d.revision++
+		return state{Revision: d.revision, WiFi: readWiFi(), Power: "Starting", Mode: "Unknown", Input: "Unknown", Error: e.Error()}
 	}
 	return d.snapshotCurrent()
 }
@@ -297,7 +322,8 @@ func (d *device) snapshotLocked() state {
 // During an action keep the original PID/start time; never restore saved
 // console fields into a replacement firmware process.
 func (d *device) snapshotCurrent() state {
-	s := state{Power: "Starting", Mode: "Unknown", Input: "Unknown"}
+	d.revision++
+	s := state{Revision: d.revision, Power: "Starting", Mode: "Unknown", Input: "Unknown"}
 	if b, e := os.ReadFile("/proc/uptime"); e == nil {
 		v, _ := strconv.ParseFloat(strings.Fields(string(b))[0], 64)
 		s.Uptime = int64(v)
@@ -314,6 +340,17 @@ func (d *device) snapshotCurrent() state {
 	}
 	s.Available = true
 	s.Bluetooth = d.bluetooth()
+	sound := d.sound()
+	s.Sound = &sound
+	if v, e := d.configByte(365); e == nil {
+		s.SourceState = &v
+		if s.Bluetooth != nil {
+			s.Bluetooth.Selected = v == 2
+		}
+		s.Input = sourceName(v)
+		s.Streaming = d.streaming(v)
+	}
+	s.WiFi = readWiFi()
 	if p == 1 && system == 0 {
 		s.Power = "On"
 	} else if system == 1 || system == 2 || system == 3 || p == 0 {
@@ -333,15 +370,6 @@ func (d *device) snapshotCurrent() state {
 	}
 	if v, e := d.configByte(51); e == nil {
 		s.Source = &v
-		s.Input = fmt.Sprintf("Input %d", v)
-		switch v {
-		case 1:
-			s.Input = "HDMI"
-		case 6, 12:
-			s.Input = "TV / ARC"
-		case 14:
-			s.Input = "AirPlay"
-		}
 	}
 	if s.Bluetooth != nil && s.Bluetooth.Selected {
 		s.Input = "Bluetooth"
@@ -422,13 +450,15 @@ func actionObserved(action string, before, after state) bool {
 	case "power":
 		return before.Power == "On" && after.Power == "Standby" || before.Power == "Standby" && after.Power == "On"
 	case "input_tv":
-		return after.Source != nil && (*after.Source == 6 || *after.Source == 12)
+		return after.SourceState != nil && *after.SourceState == 0
 	case "input_hdmi":
-		return after.Source != nil && *after.Source == 1
+		return after.SourceState != nil && *after.SourceState == 3
 	case "input_bluetooth":
 		return after.Bluetooth != nil && after.Bluetooth.Selected
 	case "bluetooth_pair":
 		return after.Bluetooth != nil && after.Bluetooth.Selected && after.Bluetooth.Discoverable && after.Bluetooth.Connectable
+	case "bass_next", "atmos_next", "rear_next":
+		return soundObserved(action, before.Sound, after.Sound)
 	case "standard":
 		return after.Mode == "Standard"
 	}
@@ -444,7 +474,7 @@ func controlBusy() bool {
 func (d *device) action(ctx context.Context, action string) (out state, err error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	keys := map[string]string{"volume_up": "0x6f000", "volume_down": "0x6f001", "mute": "0x6f002", "power": "0x8f000", "input_tv": "0x6f029", "input_hdmi": "0x6f01e", "input_bluetooth": "0x6f027", "bluetooth_pair": "0x6f027"}
+	keys := map[string]string{"volume_up": "0x6f000", "volume_down": "0x6f001", "mute": "0x6f002", "power": "0x8f000", "input_tv": "0x6f029", "input_hdmi": "0x6f01e", "input_bluetooth": "0x6f027", "bluetooth_pair": "0x6f027", "bass_next": "0x1f030", "atmos_next": "0x1f02f", "rear_next": "0x1f031"}
 	_, simple := keys[action]
 	if !simple && action != "standard" {
 		return out, errors.New("unknown control")
@@ -452,6 +482,14 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	before := d.snapshotLocked()
 	if !before.Available {
 		return before, errors.New(before.Error)
+	}
+	if strings.HasSuffix(action, "_next") {
+		if _, _, ok := soundValue(action, before.Sound); !ok {
+			return before, errors.New("sound setting unavailable")
+		}
+		if action == "rear_next" && (before.Sound.RearDocked == nil || *before.Sound.RearDocked) {
+			return before, errors.New("undock both rear speakers first")
+		}
 	}
 	if action == "bluetooth_pair" {
 		if before.Bluetooth == nil || !before.Bluetooth.Selected {
@@ -603,19 +641,31 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'")
-	host, _, e := net.SplitHostPort(q.RemoteAddr)
-	if e != nil || !r.network.Contains(net.ParseIP(host)) {
-		http.Error(w, "Local network only", http.StatusForbidden)
+	client, _, e := net.SplitHostPort(q.RemoteAddr)
+	if e != nil {
+		http.Error(w, "Local network only", 403)
 		return
 	}
-	// A login-free remote must not trust an arbitrary DNS hostname: otherwise a
-	// rebinding site could read its own CSRF token from a private-network address.
 	target := q.Host
 	if h, _, e := net.SplitHostPort(target); e == nil {
 		target = h
 	}
-	if ip := net.ParseIP(target); ip == nil || !r.network.Contains(ip) {
-		http.Error(w, "Open the remote using the bar's local IP address", http.StatusForbidden)
+	var destination net.IP
+	if address, ok := q.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
+		if h, _, e := net.SplitHostPort(address.String()); e == nil {
+			destination = net.ParseIP(h)
+		}
+	}
+	var ap net.IP
+	if !r.network.Contains(net.ParseIP(client)) {
+		ap = hotspotAddress()
+	}
+	if !allowedNetwork(net.ParseIP(client), net.ParseIP(target), destination, r.network, ap) {
+		http.Error(w, "Open the bar's local IP address from its trusted network", 403)
+		return
+	}
+	if q.URL.Path == "/api/events" && q.Method == "GET" {
+		r.stream(w, q)
 		return
 	}
 	if q.URL.Path == "/api/state" && q.Method == "GET" {
@@ -657,6 +707,7 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 			writeJSON(w, 409, map[string]any{"error": e.Error(), "state": s})
 			return
 		}
+		r.feed.publish(s)
 		writeJSON(w, 200, s)
 		return
 	}
@@ -706,6 +757,9 @@ func main() {
 	server := &http.Server{Addr: cfg.Listen, Handler: r, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	r.stop = ctx.Done()
+	go r.feed.run(ctx, r.device.snapshot)
+	go monitorWiFi(ctx)
 	stopped := make(chan struct{})
 	go func() {
 		<-ctx.Done()
@@ -714,9 +768,33 @@ func main() {
 		server.Shutdown(c)
 		close(stopped)
 	}()
-	log.Printf("JBL remote listening on %s", cfg.Listen)
-	if e = server.ListenAndServe(); e != nil && e != http.ErrServerClosed {
-		log.Fatal(e)
+	addresses := []string{cfg.Listen}
+	if cfg.Listen == ":80" {
+		addresses = append(addresses, ":8080")
+	} else if cfg.Listen == ":8080" {
+		addresses = append(addresses, ":80")
+	}
+	var listeners []net.Listener
+	for _, address := range addresses {
+		listener, e := net.Listen("tcp", address)
+		if e != nil {
+			log.Printf("Listener unavailable on %s: %v", address, e)
+			continue
+		}
+		listeners = append(listeners, listener)
+		log.Printf("JBL remote listening on %s", address)
+	}
+	if len(listeners) == 0 {
+		log.Fatal("No remote listener available")
+	}
+	finished := make(chan error, len(listeners))
+	for _, listener := range listeners {
+		go func(l net.Listener) { finished <- server.Serve(l) }(listener)
+	}
+	for range listeners {
+		if e := <-finished; e != nil && e != http.ErrServerClosed {
+			log.Printf("Listener stopped: %v", e)
+		}
 	}
 	if ctx.Err() != nil {
 		<-stopped
