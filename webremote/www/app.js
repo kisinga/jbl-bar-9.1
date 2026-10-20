@@ -249,7 +249,7 @@ function renderBluetooth(s, ready, awake) {
   const pairing = active === 'bluetooth_pair';
   const discoverable = !!bt?.discoverable && !!bt?.connectable;
   $('bluetooth-panel').classList.toggle('discoverable', discoverable && ready && awake);
-  $('bt-status').textContent = active === 'input_bluetooth' ? 'Switching to Bluetooth…' : pairing ? 'Starting pairing…' : !ready ? 'Connection unavailable' : !awake ? 'Soundbar in standby' : discoverable ? 'Ready to pair' : bt?.connected ? (bt.audio === 'Streaming' && selected ? 'Streaming audio' : 'Device connected') : 'Bluetooth source selected';
+  $('bt-status').textContent = active === 'input_bluetooth' ? 'Switching to Bluetooth…' : pairing ? 'Starting pairing…' : !ready ? 'Connection unavailable' : !awake ? 'Soundbar in standby' : discoverable ? 'Ready to pair' : bt?.connected ? (selected && bt.audio === 'Streaming' ? 'Streaming audio' : selected && bt.audio === 'Paused' ? 'Audio paused' : 'Device connected') : 'Bluetooth source selected';
   const peer = bt?.peer_name || 'A Bluetooth device';
   $('bt-help').textContent = !awake ? 'Turn on the bar to connect a device.' : !selected ? peer + ' is connected. Select Bluetooth above to listen.' : discoverable ? 'Choose ' + name + ' in your phone’s Bluetooth settings. The bar is discoverable now.' : bt?.connected ? peer + ' is connected. To use a different device, start pairing below.' : 'Open Bluetooth settings on your phone and choose ' + name + '. If it’s missing, start pairing below.';
   $('bt-pair-label').textContent = pairing ? 'Starting…' : discoverable ? 'Pairing is open' : bt?.connected ? 'Pair another device' : 'Pair a device';
@@ -258,6 +258,51 @@ function renderBluetooth(s, ready, awake) {
 }
 connectStream();
 
+function mediaTime(value) {
+  if (!Number.isFinite(value) || value < 0) return '';
+  const seconds = Math.floor(value);
+  return (seconds >= 3600 ? Math.floor(seconds / 3600) + ':' : '') + String(Math.floor(seconds / 60) % 60).padStart(seconds >= 3600 ? 2 : 1, '0') + ':' + String(seconds % 60).padStart(2, '0');
+}
+function watcherName(value) {
+  if (!value) return 'Not reported';
+  if (['STANDARD_THIS_WAKE', 'ALREADY_STANDARD_THIS_WAKE'].includes(value)) return 'Standard selected for this wake';
+  if (value.startsWith('WAITING_POWER_') || value === 'WAITING_FOR_POWER_ON') return 'Waiting for power-on';
+  if (value === 'WAITING_FOR_PROCESS') return 'Waiting for the soundbar';
+  if (value === 'APPLYING_STANDARD' || value.startsWith('AWAKE_STABILIZING_')) return 'Selecting Standard…';
+  if (value.startsWith('PROCESS_')) return 'Starting the watcher';
+  return 'Check automation logs';
+}
+function renderPlayback(s, ready, awake) {
+  const bt = s.bluetooth;
+  const bluetooth = s.input === 'Bluetooth';
+  const playback = bluetooth ? {
+    service: 'Bluetooth',
+    status: bt?.connected == null ? 'Status unavailable' : !bt.connected ? 'Waiting for a device' : bt.audio === 'Streaming' ? 'Playing' : bt.audio === 'Paused' ? 'Paused' : 'Connected',
+    active: bt?.connected && bt.audio === 'Streaming',
+  } : s.streaming;
+  const cast = playback?.cast;
+  $('playback').hidden = !awake || !playback;
+  $('playback-icon').setAttribute('href', bluetooth ? '#i-bluetooth' : '#i-cast');
+  $('playback-service').textContent = playback?.service || '';
+  $('playback-status').textContent = playback?.status || '';
+  const title = bluetooth ? (bt?.connected ? bt.peer_name || 'Connected device' : '') : cast?.title || '';
+  $('playback-title').hidden = !title;
+  $('playback-title').textContent = title;
+  const metadata = bluetooth ? '' : [cast?.artist, cast?.album].filter(Boolean).join(' · ');
+  $('playback-meta').hidden = !metadata;
+  $('playback-meta').textContent = metadata;
+  $('playback-app').hidden = !cast?.application;
+  $('playback-app').textContent = cast?.application || '';
+  $('playback-detail').hidden = !playback?.detail;
+  $('playback-detail').textContent = playback?.detail || '';
+  const timed = !cast?.mirroring && Number.isFinite(cast?.duration) && cast.duration > 0 && Number.isFinite(cast?.current_time);
+  $('playback-timeline').hidden = !timed;
+  $('playback-progress').max = timed ? cast.duration : 1;
+  $('playback-progress').value = timed ? Math.min(cast.current_time, cast.duration) : 0;
+  $('playback-time').textContent = timed ? mediaTime(cast.current_time) + ' / ' + mediaTime(cast.duration) : '';
+  $('playback').classList.toggle('active', ready && awake && !!playback?.active);
+  $('playback').classList.toggle('mirroring', !!cast?.mirroring);
+}
 function renderExtras(s, ready, awake) {
   const sound=s.sound || {};
   $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5';
@@ -269,17 +314,21 @@ function renderExtras(s, ready, awake) {
   }
   const wifi=s.wifi || {};
   $('wifi-name').textContent=wifi.available ? wifi.connected ? wifi.ssid || 'Connected network' : 'Not connected' : 'Status unavailable';
-  $('wifi-status').textContent=wifi.connected ? 'Connected to Wi-Fi' : wifi.hotspot_ip ? 'Setup hotspot is active' : wifi.available ? 'Waiting for a Wi-Fi connection' : 'The Wi-Fi service has not reported its state.';
+  const signal = wifi.signal_dbm;
+  const quality = signal == null ? '' : signal >= -55 ? 'Strong signal' : signal >= -67 ? 'Good signal' : signal >= -75 ? 'Fair signal' : 'Weak signal';
+  $('wifi-status').textContent=wifi.connected ? ['Connected', quality].filter(Boolean).join(' · ') : wifi.hotspot_ip ? 'Setup hotspot is active' : wifi.available ? 'Waiting for a Wi-Fi connection' : 'The Wi-Fi service has not reported its state.';
   $('wifi-ip').textContent=wifi.ip || 'No network address';
   const band=wifi.frequency_mhz ? (wifi.frequency_mhz>=5925?'6 GHz':wifi.frequency_mhz>=4900?'5 GHz':'2.4 GHz') : '';
   $('wifi-signal').textContent=[wifi.signal_dbm==null?'':wifi.signal_dbm+' dBm',band].filter(Boolean).join(' · ');
   $('hotspot-status').hidden=!wifi.hotspot_ip;
   $('hotspot-status').textContent=wifi.hotspot_ip ? 'Local hotspot control: http://' + wifi.hotspot_ip : '';
-  const playback=s.streaming;
-  const bt=s.bluetooth;
-  const bluetoothPlaying=bt?.selected && bt?.audio==='Streaming';
-  $('playback').hidden=!awake || (!playback&&!bluetoothPlaying);
-  $('playback-service').textContent=playback?.service || 'Bluetooth';
-  $('playback-status').textContent=playback?.status || bt?.peer_name || 'Playing audio';
-  $('playback').classList.toggle('active',ready && awake && (!!playback?.active || bluetoothPlaying));
+  renderPlayback(s, ready, awake);
+  $('device-name').textContent = s.bluetooth?.name || 'Not reported';
+  $('device-uptime').textContent = Number.isFinite(s.uptime) && s.uptime > 0 ? Math.floor(s.uptime / 86400) + 'd ' + Math.floor(s.uptime / 3600) % 24 + 'h ' + Math.floor(s.uptime / 60) % 60 + 'm' : 'Not reported';
+  $('device-automation').textContent = watcherName(s.watcher);
+  const cast = s.streaming?.cast;
+  const gains = [cast?.low_shelf_gain, cast?.high_shelf_gain];
+  const hasGains = gains.every(Number.isFinite);
+  $('cast-eq-row').hidden = !hasGains;
+  $('cast-eq').textContent = hasGains ? 'Low ' + gains[0] + ' dB · High ' + gains[1] + ' dB (read only)' : '';
 }

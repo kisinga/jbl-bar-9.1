@@ -1,6 +1,6 @@
 from pathlib import Path
 import tempfile,subprocess,hashlib,json,shutil,re
-base=Path(__file__).resolve().parents[1];package=base/'usb/JBLInstall'
+base=Path(__file__).resolve().parents[1];package=base/'smart-mode/JBLInstall'
 results=[]
 cases=['watch_drain','once_drain','both_drain','watch_stuck']
 for case in cases:

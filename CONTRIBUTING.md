@@ -1,7 +1,5 @@
 # Development
 
-On `work/faster-wake`, the builder pins an **untested revision 6 candidate** and emits `v0.2.0-dev.1` archives. The original revision 5 baseline remains in the fixtures and on `main`/`v0.1.0`. See [candidate notes below](#faster-wake-candidate--revision-6); descriptions of the release I tested below refer to revision 5.
-
 Keep the foundation small: readable scripts, reproducible packages and working recovery. Smart Mode, SSH and the browser remote are separate features. Preserve the working behavior and firmware identity guards. Do not add support for a build by merely changing its hash: its fields, event ABI and restoration behavior need validation.
 
 ## Build and test
@@ -15,21 +13,19 @@ python3 tools/test.py
 
 Archives and `SHA256SUMS` appear in `dist/`. Rebuilding the same inputs produces identical ZIP bytes. The build verifies payload hashes, embedded expected hashes, exact tested device files and shell syntax. It refuses stale or modified device code against the pinned baseline. No firmware image or external Python package is needed.
 
-The tests execute adapted temporary copies with fake process files and CLI behavior. They never connect to a soundbar or modify the real USB. The synthetic identity replacement is confined to those copies. Results go in ignored `build/test-results/`.
+The 121 host checks execute adapted temporary copies with fake process files and CLI behavior. They never connect to a soundbar or modify the real USB. The synthetic identity replacement is confined to those copies. Results go in ignored `build/test-results/`.
 
 Optional descriptor validation against a legally obtained extracted ARM BusyBox uses `JBL_ARM_BUSYBOX=/absolute/path/to/busybox python3 tests/check_descriptors.py`, with `qemu-arm` and registered ARM binfmt available for direct applet execution. That binary is not bundled.
 
 ## Layout
 
-- `usb/`: exact installable device source, with CRLF-preserved launcher/hook.
-- `README.md`: installation, removal, compatibility, troubleshooting, evidence and credits.
-- `COMMUNITY.md`: discussion links and a first-person draft.
-- `USB-README.txt` / `ROLLBACK.txt`: short guides included in the ZIPs.
-- `tools/`: package builders and test runner.
-- `ssh/`: portable SSH setup templates; generated passwords, Wi-Fi configuration and device keys stay out of Git.
-- `webremote/`: small Go server and embedded browser UI; root README records which controls have hardware evidence.
-- `tests/`: portable fixture suite and pinned revision 5 file hashes.
-- `research/`: public index plus ignored local-only artifacts; see its README.
+The three tools have separate source folders and share these root instructions:
+
+- [`webremote/`](webremote/): Go server and embedded browser interface.
+- [`smart-mode/`](smart-mode/): exact installable Smart Mode source, including the CRLF-preserved launcher/hook.
+- [`ssh/`](ssh/): portable SSH setup templates; generated credentials and device keys stay private.
+
+`tools/` contains builders and the test runner; `tests/` contains fixtures and pinned device-file hashes. `README.md` covers use and recovery, `COMMUNITY.md` collects discussion links, and `USB-README.txt` / `ROLLBACK.txt` ship in the Smart Mode ZIPs. [`research/README.md`](research/README.md) indexes the public research archive; local captures and vendor artifacts remain ignored.
 
 `main` and tag `v0.1.0` preserve the revision 5 I first confirmed on my bar. Experimental latency work belongs on a separate branch and must not replace that tested download until hardware validation. A new payload requires updated checksums, installer expectations, ownership/upgrade handling, tests and a fresh hardware result. The baseline verifier must not be casually bypassed to publish an untested change.
 
@@ -155,20 +151,25 @@ existing installation. Tests serve the real assets with delayed/failed mock
 responses, cover queued/cancelled controls, holds, keyboard input, reconnects,
 stale replies, standby, Bluetooth/Wi-Fi/streaming feedback and 320/390/1024px layouts. Go tests
 cover LAN/hotspot/Host/CSRF boundaries, event streams, native Wi-Fi datagrams,
-state confirmation, peer-name filtering and sound decoding.
+state confirmation, peer-name filtering, sound decoding and bounded read-only Cast framing/status queries.
 UI fixtures do not substitute for hardware pairing or audible tests.
 
 Live updates use Go’s standard HTTP server and the browser’s `EventSource`.
 A single reader samples native state once per second only while subscribed;
 unchanged state is suppressed and slow clients keep only the newest update.
-Wi-Fi is sampled separately every five seconds. Monotonic revisions prevent
+Wi-Fi is sampled separately every five seconds; Cast metadata uses a bounded
+loopback status query at most every two seconds while requested. Monotonic revisions prevent
 an older stream/HTTP reply from undoing a newer observation. No third-party
 Go module or database is needed. Both HTTP listeners share the same controls
 and access checks; an occupied port 80 leaves 8080 usable.
 
 On 20 October 2026 I confirmed live AirPlay and Wi-Fi readback, both HTTP
 ports, a 22-second single browser event connection with zero state-poll requests,
-and complete bass/Atmos cycles restored to their original levels. Connected
-Bluetooth-name and actual Chromecast playback checks remain pending; their
-decoders/UI have fixture coverage. Native hotspot activation/access still needs
-an outage test. No Wi-Fi loss, reboot or factory reset was induced.
+and complete bass/Atmos cycles restored to their original levels. The connected
+Bluetooth name was subsequently confirmed; native streaming/suspended status is now shown.
+The observed YouTube session uses Chrome Audio Mirroring (`85CDB22F`): its receiver
+keeps reporting PLAYING when playback pauses at the sender. I label this Audio
+mirroring and do not claim sender pause detection. Normal receiver media-state
+decoding has fixtures but no live validation. The deployed UI correctly identified that live mirroring session, with one
+event connection and no automatic state requests over 22 seconds. Native hotspot
+activation/access still needs an outage test. No Wi-Fi loss, reboot or factory reset was induced.

@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 const {chromium} = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = new URL('../', import.meta.url);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-const initial = () => ({available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, csrf:'fixture', watcher:'', sound:{bass:0,atmos:1,rear:2,rear_docked:true}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,audio:'Disconnected',name:'My speaker'}});
+const initial = () => ({available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,atmos:1,rear:2,rear_docked:true}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,audio:'Disconnected',name:'My speaker'}});
 let state = initial(), calls = [], delay = 300, failure = '', offline = false, getDelay = 0;
 const streams=new Set(); let stateGets=0, streamGets=0, revision=0, lastSnapshot='';
 function snapshot() {
@@ -67,6 +67,11 @@ try {
   await pause(100);
   check((await page.locator('#volume').textContent())==='12','stale pushed states cannot rewind the UI');
   check((await page.locator('#wifi-name').textContent())==='Example Wi-Fi','Wi-Fi network shown');
+  check((await page.locator('#wifi-status').textContent()).includes('Strong signal'),'Wi-Fi quality label');
+  await page.locator('.device-details summary').click();
+  check((await page.locator('#device-uptime').textContent())==='1d 1h 5m','uptime shown in readable units');
+  check((await page.locator('#device-automation').textContent())==='Standard selected for this wake','automation status explained');
+  await page.locator('.device-details summary').click();
   check(await page.locator('#rear-next').isDisabled(),'docked rear control disabled');
   await page.locator('[data-action=volume_down]').click();
   check(await page.locator('#volume').textContent()==='11','immediate optimistic volume');
@@ -144,6 +149,22 @@ try {
   await page.waitForFunction(()=>document.querySelector('#bt-status').textContent==='Streaming audio');
   check((await page.locator('#bt-pair-label').textContent())==='Pair another device','connected device pairing action');
   check((await page.locator('#bt-help').textContent()).includes('Example phone'),'connected peer name shown separately from bar name');
+  check((await page.locator('#playback-status').textContent())==='Playing','Bluetooth playback status shown');
+  check((await page.locator('#playback-title').textContent())==='Example phone','Bluetooth playback identifies peer');
+  state.bluetooth.audio='Paused';
+  await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Paused');
+  check(await page.locator('#playback').isVisible(),'Bluetooth paused card stays visible');
+  check((await page.locator('#bt-status').textContent())==='Audio paused','Bluetooth panel shows pause');
+  check(!await page.locator('#playback').evaluate(e=>e.classList.contains('active')),'paused audio stops playing indicator');
+  state.bluetooth.audio='Connected';
+  await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Connected');
+  check(await page.locator('#playback').isVisible(),'connected state does not imply playing');
+  state.bluetooth.connected=false;state.bluetooth.audio='Disconnected';
+  await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Waiting for a device');
+  check(await page.locator('#playback-title').isHidden(),'disconnected peer name clears');
+  state.bluetooth.connected=null;
+  await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Status unavailable');
+  check(await page.locator('#playback').isVisible(),'unknown Bluetooth state is explicit');
   // Clearing queued taps leaves only the already-sent step.
   delay=1600;calls=[];
   const startingVolume=state.volume;
@@ -166,6 +187,23 @@ try {
   state.input='Chromecast';state.streaming={service:'Chromecast',status:'Paused',active:false};
   await page.waitForFunction(()=>document.querySelector('#playback-service').textContent==='Chromecast');
   check((await page.locator('#playback-status').textContent())==='Paused','Chromecast pause state shown');
+  state.streaming={service:'Chromecast',status:'Audio mirroring',active:true,detail:'The sending app’s play/pause state isn’t reported by mirrored audio.',cast:{available:true,application:'Chrome Audio Mirroring',mirroring:true,player_state:'PLAYING',stream_type:'LIVE'}};
+  await page.waitForFunction(()=>document.querySelector('#playback-status').textContent==='Audio mirroring');
+  check((await page.locator('#playback-detail').textContent()).includes('isn’t reported'),'mirroring limitation explained');
+  check((await page.locator('#playback-app').textContent())==='Chrome Audio Mirroring','receiver application shown');
+  check(await page.locator('#playback-timeline').isHidden(),'mirroring never invents a track timeline');
+  state.streaming={service:'Chromecast',status:'Paused',active:false,cast:{available:true,application:'Music app',mirroring:false,player_state:'PAUSED',title:'<img src=x onerror=alert(1)> '+ 'Long title '.repeat(30),artist:'Example artist',album:'Example album',current_time:75,duration:240,low_shelf_gain:0,high_shelf_gain:-2}};
+  await page.waitForFunction(()=>document.querySelector('#playback-time').textContent==='1:15 / 4:00');
+  check((await page.locator('#playback-meta').textContent())==='Example artist · Example album','Cast artist and album shown');
+  check((await page.locator('#playback-title img').count())===0,'remote metadata is rendered as text');
+  check(await page.locator('#playback-progress').getAttribute('value')==='75','timeline uses receiver position');
+  await page.locator('.device-details summary').click();
+  check((await page.locator('#cast-eq').textContent())==='Low 0 dB · High -2 dB (read only)','Cast tone readback shown without unsafe controls');
+  for (const width of [320,390,1024]) {
+    await page.setViewportSize({width,height:900});
+    check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'long media metadata fits at '+width);
+  }
+  await page.locator('.device-details summary').click();
   const beforeIdle=stateGets;await pause(1200);
   check(stateGets===beforeIdle,'idle browser never polls the state endpoint');
   state=initial();await page.locator('#refresh').click();await pause(200);
@@ -174,7 +212,7 @@ try {
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow at '+width);
   }
   await page.setViewportSize({width:390,height:920});
-  state=initial(); await page.locator('#refresh').click();
+  state=initial();state.input='Bluetooth';state.bluetooth={...state.bluetooth,selected:true,connected:true,audio:'Streaming',peer_name:'Example phone'}; await page.locator('#refresh').click();
   await pause(200);
   await mkdir(new URL('build/',root),{recursive:true});
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-new.png',root)),fullPage:true});

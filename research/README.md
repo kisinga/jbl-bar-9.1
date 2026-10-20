@@ -62,7 +62,7 @@ These decimal process addresses are meaningful only for the exact `bdpprog` SHA-
 | 15427780 | 1 | Console input setting, temporarily changed/restored |
 | 15427784 | 4 | Console gate setting, temporarily changed/restored |
 
-The key route is `mw.iom.se`, with mute event `0x6f002` and volume-up `0x6f000`. Success requires observed mode readback and released input, not just a successful CLI write. Source in `usb/JBLInstall/payload/` is authoritative for all guard conditions and restoration order.
+The key route is `mw.iom.se`, with mute event `0x6f002` and volume-up `0x6f000`. Success requires observed mode readback and released input, not just a successful CLI write. Source in `smart-mode/JBLInstall/payload/` is authoritative for all guard conditions and restoration order.
 
 ## SSH findings I reproduced
 
@@ -152,3 +152,36 @@ destination. Native setup/DHCP services stay intact. The bounded net_mgr trace
 found explicit hotspot-start dispatch and restart/retry paths, but did not
 establish automatic Wi-Fi-loss fallback for a provisioned bar. That needs an
 outage test or further vendor Cast-policy analysis; no outage was induced.
+
+I confirmed the connected Bluetooth phone name on 20 October 2026. The page now
+shows the native Bluetooth streaming/suspended state as Playing/Paused and keeps
+the connected-device card visible while paused. These states describe A2DP audio,
+not an individual phone app; the pause transition still needs a fresh live check.
+
+The reported Chromecast mismatch reproduced with YouTube through **Chrome Audio
+Mirroring**, app ID `85CDB22F`. The receiver exposes a generic LIVE media session
+and remains PLAYING when YouTube pauses at the sender. Native Cast state likewise
+stays 2. This does not establish a broken native decoder; mirrored transport
+activity cannot establish sender content playback. The UI labels it **Audio
+mirroring** and explains that sender play/pause is unavailable.
+
+A bounded, read-only Cast V2 client queries the fixed loopback receiver on port
+8009 in the background, at most once every two seconds while Cast is selected
+and state is being requested. It uses only connection/status messages and
+heartbeat replies, never launches or controls media. I expose the application,
+optional title/artist/album, receiver position/duration and read-only shelf gains.
+Bluetooth addresses, pairing keys, Cast transport IDs and arbitrary payloads are
+not returned. Unknown Cast applications retain transport-level wording rather
+than claiming content is playing. Normal receiver media-state decoding is covered
+by fixtures; this live session only validates the mirroring case.
+
+
+I verified the deployed mirroring label and explanation against the live receiver,
+with one browser event connection lasting 22 seconds, no automatic state GETs,
+no browser errors and no mobile overflow. The current Go process used about
+9.5 MiB resident memory; the stripped ARM executable is 6,094,996 bytes. Only the
+web executable/config/manifest were updated: startup hooks, SSH and Smart Mode
+payloads were preserved. The source reorganization leaves revision 5 install and
+uninstall ZIP bytes unchanged; all 121 host fixtures passed. The web interface
+passes 59 browser checks plus Go race tests and vet. Public screenshots use
+example data rather than personal network or device details.

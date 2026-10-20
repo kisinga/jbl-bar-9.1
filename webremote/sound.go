@@ -55,9 +55,11 @@ func soundObserved(action string, before, after *soundState) bool {
 }
 
 type streamState struct {
-	Service string `json:"service"`
-	Status  string `json:"status"`
-	Active  bool   `json:"active"`
+	Detail  string        `json:"detail,omitempty"`
+	Cast    *CastSnapshot `json:"cast,omitempty"`
+	Service string        `json:"service"`
+	Status  string        `json:"status"`
+	Active  bool          `json:"active"`
 }
 
 func sourceName(value uint32) string {
@@ -84,17 +86,8 @@ func sourceName(value uint32) string {
 func (d *device) streaming(source uint32) *streamState {
 	switch source {
 	case 6:
-		s := &streamState{Service: "Chromecast", Status: "Selected"}
-		v, e := d.read(0xe30710, 4)
-		if e == nil {
-			if v == 2 {
-				s.Status = "Playing"
-				s.Active = true
-			} else if v == 3 {
-				s.Status = "Paused"
-			}
-		}
-		return s
+		native, _ := d.read(0xe30710, 4)
+		return castStream(native, cachedCastStatus())
 	case 7:
 		s := &streamState{Service: "AirPlay", Status: "Selected"}
 		v, e := d.read(0xe3169c, 4)

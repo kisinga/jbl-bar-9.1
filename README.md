@@ -1,19 +1,35 @@
-# JBL Bar 9.1 — community tinkering foundation
+# JBL Bar 9.1 — browser remote, Smart Mode fix and root SSH
 
-I started by stopping Smart Mode from coming back whenever I power on my JBL Bar 9.1. I now have root SSH that starts without USB and a local browser remote with live readback. This repository collects the source, reproducible setup and recovery tools so I can share that foundation with other owners.
+I’m turning my JBL Bar 9.1 into something I can control and tinker with. The browser remote runs on the bar itself; the Smart Mode helper and root SSH provide the foundation underneath it. Everything here is optional, reversible and specific to the firmware I tested.
 
-**Experimental: tested on my own bar and one firmware build.** I am not affiliated with JBL. The original repository name was `jbl-bar9-standard-mode`; I have kept the existing release filenames.
+| Tool | Source | What I use it for |
+| --- | --- | --- |
+| [Browser remote](#local-browser-remote) | [`webremote/`](webremote/) | Phone-friendly controls, Bluetooth devices, Wi-Fi status and sound settings. Written in Go. |
+| [Smart Mode off](#smart-mode-off) | [`smart-mode/`](smart-mode/) | Install once from USB, then select Standard Mode automatically after wake. |
+| [Root SSH](#root-ssh) | [`ssh/`](ssh/) | USB-free terminal access, SFTP and a base for my own experiments. |
 
-| Part | Current evidence |
-| --- | --- |
-| [Automatic Smart Mode off](#smart-mode-off) | Revision 5 / v0.1.0 confirmed on hardware; about 35 seconds after detecting power-on. |
-| [Root SSH](#root-ssh) | Password login, interactive shell, SFTP and USB-free startup confirmed on 20 October 2026; the generic installer is a separate reproducibility step. |
-| [Local browser remote](#local-browser-remote) | Live state, volume/mute and USB-free startup confirmed on hardware; phone-sized browser tested. Other mapped buttons remain experimental. |
-| [Faster Smart Mode wake](CONTRIBUTING.md#faster-wake-candidate--revision-6) | Revision 6 on `work/faster-wake` remains hardware untested. It requires its matching uninstall ZIP. |
+**Experimental: tested on my own bar and one firmware build.** I am not affiliated with JBL. The original repository name was `jbl-bar9-standard-mode`; existing release filenames stay the same.
 
-The foundation is **[touch MAX's 8 January 2024 AutoScript article](https://touch-max.ru/vzlom/zapusk-ssh-na-proshivke-jbl-9-1)** and its linked **[almirus/jbl9.1 project](https://github.com/almirus/jbl9.1)**. They published the USB entry point and invited work on keeping Smart Mode off. I built on that work; I did not discover AutoScript.
+I install features in this order: **Smart Mode → SSH → browser remote**, and remove them in reverse. Each installer preserves the startup hook it found. Extract only one USB package at a time; they share the AutoScript entry point.
 
-I install optional features in this order: **Smart Mode → SSH → browser remote**, and remove them in reverse order. Each startup installer preserves the hook it found; later additions must be removed before restoring an earlier snapshot.
+## Local browser remote
+
+![JBL Bar 9.1 browser remote with example settings](docs/web-remote.png)
+
+I open **`http://<bar-ip-address>`** from a phone or computer on my configured LAN. Port 80 needs no suffix; `:8080` remains available. There is no web login. SSH retains its separate password. [Build and install instructions](CONTRIBUTING.md#browser-remote) produce one static ARM Go executable with embedded assets, no external Go modules and no ongoing computer service.
+
+- **Controls:** volume, mute, power, input selection and Standard Mode, with live state. I can tap repeatedly, hold +/−, use the arrow keys or press M to mute. Queued changes show **Adjusting…** until confirmed and can be cleared.
+- **Bluetooth:** the bar’s name, connected device name, native streaming/suspended state and pairing status. **Pair a device** opens pairing; I finish connecting in the phone’s Bluetooth settings. The playback card stays visible when paused. A device name comes from the matching Bluetooth cache entry and may lag a rename.
+- **Wi-Fi:** current network, address, signal and band. This is read-only; credentials are never exposed. I read the native control socket directly from Go.
+- **Details:** uptime, Smart Mode automation status and read-only Cast tone settings when reported.
+- **Sound:** Bass Levels 1–5, Atmos height Low/Mid/High and rear Low/Mid/High/Muted. Rear controls are blocked while either speaker is docked. Atmos height is a setting, not proof the current source is decoding Atmos. Full graphic EQ needs more investigation.
+- **Streaming:** AirPlay session activity (which does not distinguish paused audio) and Chromecast receiver information. Chrome Audio Mirroring appears as **Audio mirroring**: pausing YouTube at the sender can leave the receiver reporting PLAYING, so sender pause is unavailable. Track title, artist, album and progress appear when supplied by a normal Cast receiver. Normal receiver Playing/Paused support has fixtures but has not been verified live.
+
+Go sends changed state over one event connection while the page is visible. Feedback is immediate, but the bar still takes roughly **1–2 seconds per volume step** to confirm a change. Unsent actions are discarded after an error or connection loss; controls are never replayed automatically.
+
+I confirmed volume/mute, Bluetooth pairing and the connected phone’s name, Wi-Fi readback and complete bass/height cycles, restoring my starting settings. The page and SSH returned after a USB-free reboot. Power/input transitions and manual Standard selection remain experimental; rear adjustment still needs an undocked hardware test. The server used about 10 MiB resident memory with Cast status enabled in my latest check.
+
+Access is restricted to my configured LAN, with fixed control names, firmware identity checks and same-origin/CSRF protection. When the bar’s native setup hotspot is already active, clients can also open **`http://192.168.255.249`** on that interface. Automatic hotspot activation after Wi-Fi loss and captive-portal opening remain unconfirmed; I have not changed Wi-Fi setup policy.
 
 ## Smart Mode off
 
@@ -49,7 +65,7 @@ The USB root must contain `AutoScript/AutoScript`, `JBLInstall/`, `README.txt`, 
 
 ### Remove or recover
 
-If I also enable SSH autostart, I [disable that first](CONTRIBUTING.md#ssh-package) to restore the original startup hook before upgrading or removing Smart Mode.
+If I also installed the browser remote or SSH autostart, I remove **browser remote → SSH → Smart Mode**, in that order, before changing the earlier startup hook. See [browser removal](CONTRIBUTING.md#browser-remote) and [SSH rollback](CONTRIBUTING.md#ssh-package).
 
 **Removing USB does not uninstall the helper.** Extract the matching uninstall ZIP to a clean FAT32 USB root, insert into the powered bar and wait **100 seconds**. Check `JBLInstall/UNINSTALL_STATUS.txt` for `UNINSTALLED` or `ALREADY_UNINSTALLED`, then remove USB and restart.
 
@@ -104,43 +120,23 @@ My first installation needed a retry. This evidence covers one post-install wake
 
 ## Root SSH
 
-I confirmed root password login, an interactive shell and SFTP, then installed a background startup hook and verified login after a reboot with **USB removed** on 20 October 2026. Wi-Fi reconnected and the bar's controls worked normally afterward. This hardware result applies to my installation; the portable package still needs an independent clean-install test.
+I confirmed root password login, an interactive shell, SFTP and startup after a reboot with **USB removed** on 20 October 2026. Wi-Fi reconnected and normal controls worked. The portable installer still needs an independent clean-install test; the ready-made Smart Mode ZIPs do **not** install SSH.
 
-The setup reuses the bar's native OpenSSH on **port 2222**, generates its own host key and accepts root password login only from the **one IPv4 address I choose for my computer**. I choose a password when building the package; there is no shared default password. Keep that computer's LAN address stable. I verify the host-key fingerprint exported to USB before the first login.
+[Build my SSH package](CONTRIBUTING.md#ssh-package) with Python 3 on Linux, choosing a password and the one computer IPv4 address permitted to connect. There is no shared default password. The installer reuses the bar’s native OpenSSH on port **2222**, generates a host key and can reuse existing Wi-Fi or configure it during setup. I verify the exported host-key fingerprint before logging in:
 
 ```sh
 ssh -p 2222 root@<bar-ip-address>
 ```
 
-The startup script and private account files live in writable `/var`. A private mount namespace supplies the compatible vendor loader, libraries and account lookup; a session wrapper also handles interactive commands and SFTP. A single background command in `/var/AutoScript.TSS` starts SSH after Wi-Fi is ready, with a bounded wait and inherited service sockets closed. I leave the Smart Mode command intact. I do not replace firmware binaries.
-
-See [the reproducible SSH build procedure](CONTRIBUTING.md#ssh-package) for requirements, configuration, installation and recovery. The original Smart Mode ZIPs above **do not install SSH**. Extract one USB package at a time: they share the `AutoScript/AutoScript` entry point. To use both, install Smart Mode first, then SSH. Before changing or removing Smart Mode, disable SSH autostart to restore the original hook; install SSH again afterward if wanted.
+The setup keeps its account files and startup scripts in writable `/var`, with a private loader/library view; it does not replace firmware binaries. Keep the matching recovery package and a stable computer LAN address. [Installation, validation and rollback](CONTRIBUTING.md#ssh-package) are documented together.
 
 ### What I can run
 
-This is a **32-bit ARM Linux** system with Android-derived services and Chromecast components, about **448 MiB RAM** and **25 MiB free writable internal storage** on my bar. Compatible native Linux programs can run; CPU, libraries, kernel and storage still constrain them. I found no APK package manager or normal Android app runtime. Root access does not add APK support.
-
-## Local browser remote
-
-I run a lightweight [browser remote](webremote/) directly on the bar at **`http://<bar-ip-address>`** (port 80; `:8080` also works), with live volume, mute, input and sound-mode readback. It opens without a login on my configured LAN, with same-origin/CSRF checks, a fixed set of permitted controls and exact firmware checks. [Build and install instructions](CONTRIBUTING.md#browser-remote) use a static ARM executable; no Android runtime or ongoing computer service is needed.
-
-On 20 October 2026 I verified volume `10 → 9 → 10` and mute `off → on → off` through the HTTP API and a phone-sized browser, restoring my original settings. After a reboot without USB, both the page and SSH returned automatically; the remote used about 3–6 MiB resident memory in these checks. Power, input switching and manual Standard selection are mapped from this firmware but remain experimental in this interface. It temporarily opens and restores the same console fields as the Smart Mode helper, with parser acknowledgments and state readback. I refuse known active Smart Mode transitions; simultaneous physical wake/control races need further testing.
-
-I can tap repeatedly, hold +/−, use the arrow keys or press M to mute. Volume changes appear immediately with an **Adjusting…** label until the bar confirms them; queued taps can be cleared. Go pushes changed state over one server-sent event connection while the page is visible; there is no browser polling. The page rejects stale replies and discards unsent controls after an error or connection loss. The native completion checks still take roughly 1–2 seconds per volume step on my bar; immediate feedback does not make that confirmation faster.
-
-Bluetooth shows the bar’s configured name, audio connection/streaming state and whether pairing is open. **Pair a device** performs the Bluetooth long press, then checks discoverability and released keys; I finish connecting from my phone’s Bluetooth settings. I confirmed pairing opened on the bar and my phone connected with the page updating its status. The connected phone’s name comes from its matching entry in the bar’s Bluetooth cache; names may lag a rename, and I show a generic label if no verified match exists.
-
-The page shows **AirPlay session activity**, **Chromecast Playing/Paused**, and the correct active source. AirPlay’s session flag does not distinguish paused audio. Wi-Fi is read-only: current network, IP, signal and band. I read its native control socket directly from Go, without shell commands or exposing credentials.
-
-**Sound** starts with native Bass Levels 1–5, Atmos height Low/Mid/High and rear Low/Mid/High/Muted. I verified complete bass/height cycles and restored my starting settings; rear controls are blocked while either speaker is docked. Full graphic EQ needs more investigation. These controls use the firmware’s own settings; listener configuration stays in JSON, so no SQLite database is needed.
-
-When the native setup hotspot is actually active at `192.168.255.249`, the page permits clients on that interface at **`http://192.168.255.249`**. This preserves the existing DHCP/setup services. Automatic hotspot activation after losing home Wi-Fi and captive-portal opening are **not confirmed**; I have not changed that policy or added Wi-Fi reconfiguration.
-
-![Browser remote preview with example settings](docs/web-remote.png)
+This is **32-bit ARM Linux** with Android-derived services and Chromecast components, about **448 MiB RAM** and **25 MiB free writable storage** on my bar. Compatible native Linux programs can run within those limits. I found no APK package manager or normal Android app runtime.
 
 ## Credits
 
-- **touch MAX and [almirus/jbl9.1](https://github.com/almirus/jbl9.1/tree/master/AutoScript):** USB execution, persistent-storage groundwork and the community invitation above. The article is credited to `admin` and links that GitHub handle; I make no claim about their personal identity. It also acknowledges earlier MediaTek/Blu-ray AutoScript work.
+- **[touch MAX’s 8 January 2024 article](https://touch-max.ru/vzlom/zapusk-ssh-na-proshivke-jbl-9-1) and [almirus/jbl9.1](https://github.com/almirus/jbl9.1/tree/master/AutoScript):** the published USB entry point, persistent-storage groundwork and invitation to automate Smart Mode. I built on their work; I did not discover AutoScript. The article is credited to `admin` and links that GitHub handle, without establishing their personal identity. It also acknowledges earlier MediaTek/Blu-ray AutoScript work.
 - **JBL:** [documents the manual sequence and Smart Mode reset on power-on](https://support.jbl.com/howto/jbl-bar-9-1-lacking-dialogue-too-much-surround-us/000017755.html).
 - **SimenCodes:** [related Smart Mode automation in JBL_Soundbar](https://github.com/MrBearPresident/JBL_Soundbar/pull/6), merged 11 November 2024 and tested on Bar 1000. This is separate network-based prior work, not evidence this USB package supports that model.
 

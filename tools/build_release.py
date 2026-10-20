@@ -16,7 +16,7 @@ def sha(data):
 
 
 def validate():
-    source = ROOT / 'usb'
+    source = ROOT / 'smart-mode'
     files = {str(p.relative_to(source)): p.read_bytes()
              for p in sorted(source.rglob('*')) if p.is_file()}
     baseline = json.loads((ROOT / 'tests/fixtures/revision5-sha256.json').read_text())

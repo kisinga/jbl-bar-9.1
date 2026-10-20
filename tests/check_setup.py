@@ -1,6 +1,6 @@
 from pathlib import Path
 import tempfile,subprocess,hashlib,json,shutil,re
-base=Path(__file__).resolve().parents[1];package=base/'usb/JBLInstall'
+base=Path(__file__).resolve().parents[1];package=base/'smart-mode/JBLInstall'
 results=[]
 cases=['install_uninstall','already_installed','existing_hook','hook_symlink','wrong_var','readonly','nested_tmpfs','bad_payload','failed_trial','stale_trial','copy_failure','link_failure','directory_race','mutation_busy','changed_hook','unowned_destination']
 for case in cases:

@@ -1,7 +1,7 @@
 from pathlib import Path
 import tempfile,subprocess,hashlib,json,struct
 base=Path(__file__).resolve().parents[1]
-package=base/'usb/JBLInstall/payload'
+package=base/'smart-mode/JBLInstall/payload'
 controller=(package/'controller.sh').read_text()
 helper=(package/'helper.sh').read_text()
 firmware=base/'tests/fixtures/firmware.txt'

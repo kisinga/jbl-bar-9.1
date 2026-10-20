@@ -1,6 +1,6 @@
 from pathlib import Path
 import tempfile,subprocess,hashlib,json,struct
-base=Path(__file__).resolve().parents[1];pkg=base/'usb/JBLInstall/payload';source=(pkg/'once.sh').read_text()
+base=Path(__file__).resolve().parents[1];pkg=base/'smart-mode/JBLInstall/payload';source=(pkg/'once.sh').read_text()
 firmware=base/'tests/fixtures/firmware.txt'
 results=[]
 cases=['success_then_wake','already_standard','asleep','bad_firmware','bad_cli','failed_controller','disable_write_fails','duplicate','rollback','payload_changed']

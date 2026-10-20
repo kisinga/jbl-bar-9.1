@@ -1,6 +1,6 @@
 from pathlib import Path
 import tempfile,subprocess,hashlib,json,struct,time,signal
-base=Path(__file__).resolve().parents[1];pkg=base/'usb/JBLInstall/payload';source=(pkg/'run.sh').read_text()
+base=Path(__file__).resolve().parents[1];pkg=base/'smart-mode/JBLInstall/payload';source=(pkg/'run.sh').read_text()
 firmware=base/'tests/fixtures/firmware.txt'
 cases=['late_power_on','two_wakes','already_standard','manual_smart_latched','process_restart','bad_firmware','payload_changed','failed_once','stale_once_status','duplicate','rollback_idle','disabled_idle','disable_during_once','rollback_during_once','signal_during_once','bounded_logs']
 results=[]

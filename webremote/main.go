@@ -760,6 +760,7 @@ func main() {
 	r.stop = ctx.Done()
 	go r.feed.run(ctx, r.device.snapshot)
 	go monitorWiFi(ctx)
+	go monitorCast(ctx)
 	stopped := make(chan struct{})
 	go func() {
 		<-ctx.Done()
