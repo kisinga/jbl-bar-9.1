@@ -37,8 +37,9 @@ const firmwareHash = "86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441
 const cliHash = "8910fb852d2f994a519615fede404fbb036e3a8f5264cc69cdff57038af3c78f"
 
 type config struct {
-	Listen      string `json:"listen"`
-	AllowedCIDR string `json:"allowed_cidr"`
+	AutoStandard bool   `json:"auto_standard"`
+	Listen       string `json:"listen"`
+	AllowedCIDR  string `json:"allowed_cidr"`
 }
 type bluetoothState struct {
 	peer         string // Current peer address stays inside native control code.
@@ -52,36 +53,39 @@ type bluetoothState struct {
 	Audio        string `json:"audio,omitempty"`
 }
 type state struct {
-	EQ            *frontEQState   `json:"eq,omitempty"`
-	System        *systemState    `json:"system,omitempty"`
-	Hostname      string          `json:"hostname,omitempty"`
-	MediaControls []string        `json:"media_controls,omitempty"`
-	Revision      uint64          `json:"revision"`
-	Sound         *soundState     `json:"sound,omitempty"`
-	Streaming     *streamState    `json:"streaming,omitempty"`
-	SourceState   *uint32         `json:"source_state,omitempty"`
-	WiFi          wifiState       `json:"wifi"`
-	Bluetooth     *bluetoothState `json:"bluetooth,omitempty"`
-	Available     bool            `json:"available"`
-	Error         string          `json:"error,omitempty"`
-	Power         string          `json:"power"`
-	Mode          string          `json:"mode"`
-	Volume        *uint32         `json:"volume,omitempty"`
-	Muted         *bool           `json:"muted,omitempty"`
-	Source        *uint32         `json:"source,omitempty"`
-	Input         string          `json:"input"`
-	Uptime        int64           `json:"uptime"`
-	Watcher       string          `json:"watcher"`
-	CSRF          string          `json:"csrf"`
+	Automation    *automationState `json:"automation,omitempty"`
+	EQ            *frontEQState    `json:"eq,omitempty"`
+	System        *systemState     `json:"system,omitempty"`
+	Hostname      string           `json:"hostname,omitempty"`
+	MediaControls []string         `json:"media_controls,omitempty"`
+	Revision      uint64           `json:"revision"`
+	Sound         *soundState      `json:"sound,omitempty"`
+	Streaming     *streamState     `json:"streaming,omitempty"`
+	SourceState   *uint32          `json:"source_state,omitempty"`
+	WiFi          wifiState        `json:"wifi"`
+	Bluetooth     *bluetoothState  `json:"bluetooth,omitempty"`
+	Available     bool             `json:"available"`
+	Error         string           `json:"error,omitempty"`
+	Power         string           `json:"power"`
+	Mode          string           `json:"mode"`
+	Volume        *uint32          `json:"volume,omitempty"`
+	Muted         *bool            `json:"muted,omitempty"`
+	Source        *uint32          `json:"source,omitempty"`
+	Input         string           `json:"input"`
+	Uptime        int64            `json:"uptime"`
+	Watcher       string           `json:"watcher"`
+	CSRF          string           `json:"csrf"`
 }
 type device struct {
-	eq         eqController
-	monitor    systemMonitor
-	mu         sync.Mutex
-	pid        int
-	start      string
-	revision   uint64
-	cliChecked bool
+	automation        *automationState
+	automationRunning bool
+	eq                eqController
+	monitor           systemMonitor
+	mu                sync.Mutex
+	pid               int
+	start             string
+	revision          uint64
+	cliChecked        bool
 }
 type remote struct {
 	cfg      config
@@ -324,7 +328,13 @@ func (d *device) bluetooth() *bluetoothState {
 func (d *device) snapshotLocked() state {
 	if e := d.identify(); e != nil {
 		d.revision++
-		return state{System: d.monitor.sample(time.Now()), Revision: d.revision, WiFi: readWiFi(), Power: "Starting", Mode: "Unknown", Input: "Unknown", Error: e.Error()}
+		s := state{System: d.monitor.sample(time.Now()), Revision: d.revision, WiFi: readWiFi(), Power: "Starting", Mode: "Unknown", Input: "Unknown", Error: e.Error()}
+		if d.automation != nil {
+			a := *d.automation
+			s.Automation = &a
+			s.Watcher = a.Status
+		}
+		return s
 	}
 	return d.snapshotCurrent()
 }
@@ -340,6 +350,11 @@ func (d *device) snapshotCurrent() state {
 	}
 	if b, e := os.ReadFile("/var/JBLStandard/WATCH_STATUS.txt"); e == nil {
 		s.Watcher = strings.TrimSpace(string(b))
+	}
+	if d.automation != nil {
+		a := *d.automation
+		s.Automation = &a
+		s.Watcher = a.Status
 	}
 	p, ep := d.read(14191893, 1)
 	system, es := d.read(12962676, 4)
@@ -541,7 +556,7 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	if _, e := os.Stat("/tmp/jbl-standard-hook-active"); e == nil {
 		return before, errors.New("Smart Mode automation is busy; try again shortly")
 	}
-	if strings.Contains(before.Watcher, "APPLYING") || strings.Contains(before.Watcher, "STABILIZING") {
+	if !d.automationRunning && (strings.Contains(before.Watcher, "APPLYING") || strings.Contains(before.Watcher, "STABILIZING")) {
 		return before, errors.New("sound settings are settling; try again shortly")
 	}
 	if !d.idleKeys() {
@@ -574,12 +589,28 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	if controlBusy() {
 		return before, errors.New("Smart Mode automation is busy; retry shortly")
 	}
+	keySent := false
 	// Restore both fields even if a command fails or the request disconnects.
 	defer func() {
+		if keySent && (action == "standard" || action == "night_toggle") {
+			deadline := time.Now().Add(5 * time.Second)
+			for d.same() && !d.idleKeys() && time.Now().Before(deadline) {
+				time.Sleep(50 * time.Millisecond)
+			}
+			if d.same() && !d.idleKeys() {
+				err = errors.New("key release failed; stop controls and collect logs")
+			}
+		}
 		a := d.write(15427784, 4, gate)
 		b := d.write(15427780, 1, input)
 		if a != nil || b != nil {
 			err = errors.New("console restoration failed; stop controls and collect logs")
+		} else if err != nil && action == "standard" && keySent && before.Muted != nil && d.same() && d.idleKeys() {
+			c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if e := d.eqMute(c, *before.Muted); e != nil {
+				err = errors.New("mute restoration failed; stop controls and collect logs")
+			}
 		}
 	}()
 	if e = d.write(15427780, 1, 1); e != nil {
@@ -601,6 +632,10 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 		if action == "standard" && before.Mode != "Smart" {
 			return before, errors.New("unknown sound mode")
 		}
+		if !d.awakeForGesture(action, before.SourceState) {
+			return before, errors.New("bar is no longer ready for the sound gesture")
+		}
+		keySent = true
 		if e = d.cli(ctx, "mw.iom.se", "0x6f002", "3500"); e != nil {
 			return before, e
 		}
@@ -620,6 +655,9 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 		}
 		if !ready {
 			return before, errors.New("mute hold was not confirmed")
+		}
+		if !d.awakeForGesture(action, before.SourceState) {
+			return before, errors.New("bar left active mode during the sound gesture")
 		}
 		comboKey := "0x6f000"
 		if action == "night_toggle" {
@@ -661,6 +699,9 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 		if d.idleKeys() {
 			out = d.snapshotCurrent()
 			if actionObserved(action, before, out) {
+				if action == "standard" && !standardSettingsPreserved(before, out) {
+					return out, errors.New("Standard selected but volume or mute changed; automatic retry stopped")
+				}
 				return out, nil
 			}
 		}
@@ -797,7 +838,14 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 func main() {
 	path := flag.String("config", "/var/JBLRemote/config.json", "private configuration file")
+	restoreSmart := flag.Bool("restore-smart-helper", false, "restore only this remote's paused legacy Smart Mode helper")
 	flag.Parse()
+	if *restoreSmart {
+		if e := restoreSmartHelperWithLock(); e != nil {
+			log.Fatal(e)
+		}
+		return
+	}
 	b, e := os.ReadFile(*path)
 	if e != nil {
 		log.Fatal(e)
@@ -861,6 +909,12 @@ func main() {
 	if len(listeners) == 0 {
 		log.Fatal("No remote listener available")
 	}
+	automationDone := make(chan struct{})
+	go func() { defer close(automationDone); r.monitorAutoStandard(ctx) }()
+	defer func() {
+		stop()
+		<-automationDone
+	}()
 	finished := make(chan error, len(listeners))
 	for _, listener := range listeners {
 		go func(l net.Listener) { finished <- server.Serve(l) }(listener)

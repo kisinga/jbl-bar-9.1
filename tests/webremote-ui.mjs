@@ -86,6 +86,15 @@ try {
   await page.waitForFunction(()=>document.querySelector('#connection').dataset.state==='online');
   check(stateGets===0 && streamGets===1,'initial state uses one push connection');
   check(await page.locator('h1').count()===1,'one clear page heading');
+  state.automation={enabled:true,engine:'go',status:'WAITING_FOR_POWER_ON'};
+  await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Go · Waiting for power-on');
+  check(true,'Go automation engine and state appear in device details');
+  state.automation={enabled:true,engine:'go',status:'AUTOMATION_FAILED',error:'Automatic retry stopped'};
+  await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Automatic retry stopped');
+  check(true,'automation failure shows its reason instead of claiming Standard selected');
+  delete state.automation;
+  await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Standard selected for this wake');
+
   check(await page.locator('#eq-panel h2').textContent()==='Front EQ','front-channel equalizer is explicit');
   check((await page.locator('#eq-panel').textContent()).includes('Experimental') && (await page.locator('#eq-processing').textContent()).includes('custom DSP mode'),'EQ experimental processing mode is disclosed');
   check(await page.locator('#eq-panel input[type=range]').count()===5 && await page.locator('#eq-panel input').evaluateAll(inputs=>inputs.every(input=>input.min==='-6'&&input.max==='0'&&input.step==='0.5')),'five real cuts-only half-decibel sliders');

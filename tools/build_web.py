@@ -13,7 +13,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None):
+def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None, auto_standard=False):
     network = ipaddress.ip_network(allowed_cidr, strict=False)
     if network.version != 4 or not network.is_private or network.prefixlen < 16:
         raise ValueError("Choose your private IPv4 LAN subnet, /16 or narrower")
@@ -34,7 +34,7 @@ def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None):
     subprocess.run(["go", "build", "-buildvcs=false", "-trimpath", "-ldflags=" + ldflags, "-o", str(output / "remote"), "."],
                    cwd=ROOT / "webremote", env=env, check=True)
     (output / "config.json").write_text(json.dumps({
-        "listen": ":80", "allowed_cidr": str(network),
+        "listen": ":80", "allowed_cidr": str(network), "auto_standard": bool(auto_standard),
     }, indent=2) + "\n")
     (output / "config.json").chmod(0o600)
     (output / "OWNER.txt").write_text("JBL_WEB_REMOTE_REV1\n")
@@ -53,5 +53,6 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, default=ROOT / "dist/webremote-private")
     parser.add_argument("--bluetooth-helper", type=Path, help="Optional native AVRCP helper built with tools/build_bt.py")
     parser.add_argument("--eq-parser", type=Path, help="Optional native EQ parser built with tools/build_eq.py")
+    parser.add_argument("--auto-standard", action="store_true", help="Let Go own automatic Standard Mode after wake")
     args = parser.parse_args()
-    print("Private device files:", build(args.output, args.allowed_cidr, args.bluetooth_helper, args.eq_parser))
+    print("Private device files:", build(args.output, args.allowed_cidr, args.bluetooth_helper, args.eq_parser, args.auto_standard))

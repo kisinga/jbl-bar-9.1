@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-20",
+  "scope": "One owned JBL Bar 9.1, Go web service over existing root SSH; no firmware flash. Timing is first observed awake sample to confirmed Standard and key release, with approximately one second sampling uncertainty.",
+  "firmware_sha256": "86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441c90b63",
+  "poll_seconds": 1,
+  "stable_awake_samples": 3,
+  "normal_mute_hold_ms": 3500,
+  "cases": [
+    {
+      "case": "go-wake-1",
+      "build": "initial",
+      "standby_seconds": 23.04,
+      "observed_awake_to_standard_seconds": 7.82,
+      "wake_trigger": "test_power_command",
+      "standard_confirmed": true,
+      "keys_released": true,
+      "console_restored": true,
+      "volume_mute_input_sound_preserved_during_gesture": true
+    },
+    {
+      "case": "go-wake-short",
+      "build": "initial",
+      "standby_seconds": 9.12,
+      "observed_awake_to_standard_seconds": 7.82,
+      "wake_trigger": "test_power_command",
+      "standard_confirmed": true,
+      "keys_released": true,
+      "console_restored": true,
+      "volume_mute_input_sound_preserved_during_gesture": true
+    },
+    {
+      "case": "go-final-short",
+      "build": "final",
+      "standby_seconds": 9.07,
+      "observed_awake_to_standard_seconds": 7.77,
+      "wake_trigger": "test_power_command",
+      "standard_confirmed": true,
+      "keys_released": true,
+      "console_restored": true,
+      "volume_mute_input_sound_preserved_during_gesture": true
+    }
+  ],
+  "lifecycle": {
+    "stop_uninstall_restored_verified_legacy_worker": true,
+    "reinstall_reclaimed_owned_marker_and_stopped_legacy_worker": true,
+    "combined_startup_hook_preserved_byte_for_byte": true,
+    "recovery_command_refused_while_go_owner_active": true,
+    "volume_and_night_mode_roundtrips_preserved_other_settings": true,
+    "final_payload_checksums_verified": true
+  },
+  "browser": {
+    "javascript_errors": 0,
+    "horizontal_overflow_at_390px": false,
+    "event_stream_connections": 1,
+    "periodic_state_polling": false,
+    "automation_status_visible": true
+  },
+  "observations": [
+    "The firmware cleared mute at wake before the automation gesture; preservation is checked immediately around the gesture.",
+    "A separate long-standby attempt woke externally and switched input to TV/ARC. Native logs confirmed Standard and key/console restoration. The trigger is unknown; this is not counted as a controlled unchanged-input cycle."
+  ],
+  "remaining": "Mains cold boot, controlled CEC wake, other devices and a clean portable install remain unqualified. The normal gesture is retained; a complete direct DSP Smart Mode action is not validated."
+}

@@ -74,6 +74,23 @@ python3 tools/build_web.py --allowed-cidr <trusted-lan-subnet>
 
 Use the actual trusted IPv4 subnet, such as `192.168.1.0/24`. Output goes to `dist/webremote-private/`. The builder strips local source paths and VCS metadata; identical inputs/toolchains produce identical binaries. Configuration varies by owner. The normal Go-only build disables Bluetooth transport controls and Front EQ.
 
+### Optional Go wake automation
+
+Add `--auto-standard` to the build command to let the Go service select Standard Mode after wake. Keep the Bluetooth/EQ helper flags if those features are needed:
+
+```sh
+python3 tools/build_web.py --allowed-cidr <trusted-lan-subnet> --auto-standard \
+  --bluetooth-helper build/bt-remote --eq-parser build/eq-parser
+```
+
+Go shares native controls, locking and readback with the web interface. An OS-held ownership lock excludes duplicate Go automation and recovery commands. It samples readiness every second, requires three stable awake samples, and acts once per wake. Standby has no deadline. Manual Smart selection is respected until the next standby or service/firmware restart. A failed gesture stops automatic attempts for that wake and leaves the reason in the page’s device details and `remote.log`.
+
+An installed revision 5/6 shell helper is verified, paused with an owned `DISABLED` marker and retained intact. Unknown/modified helpers and existing manual disable flags are preserved. No legacy helper is required if SSH and the web service are already available. The original button sequence is still used; this is not a direct native Smart Mode setter.
+
+Set `auto_standard` to `false` in `/var/JBLRemote/config.json` and restart the service to return automation to the shell helper. Normal service shutdown and remote uninstall also restore only the verified helper paused by Go. For recovery after an interrupted removal, run `/var/JBLRemote/remote -restore-smart-helper` with the service stopped. Do not delete an unknown disable flag. Removing the USB Smart Mode package alone does not disable Go’s separately enabled automation.
+
+Volume/mute are checked against the state immediately before the gesture. The firmware can clear mute itself on power-on. Keep CEC, other input layouts and mains cold boots separate from the measured standby/wake tests ([device record](research/validation/go-automation-device.json)).
+
 ### Optional Bluetooth helper
 
 Use an ARM hard-float GNU/Linux GCC toolchain and an extracted copy of the supported firmware:
@@ -149,9 +166,9 @@ npx playwright install chromium
 node tests/webremote-ui.mjs
 ```
 
-Set `PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` to reuse an installation. The current **156 browser checks** cover queues/cancellation, held and keyboard controls, failures/reconnects, stale replies, standby, Bluetooth/streaming, single Play/Pause, EQ presets/manual drafts/application gating, system sample history/gaps/availability, reduced motion and 320/390/1024px layouts. Public screenshots use fixtures, never live personal data.
+Set `PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` to reuse an installation. The current **158 browser checks** cover queues/cancellation, held and keyboard controls, failures/reconnects, stale replies, standby, Bluetooth/streaming, single Play/Pause, EQ presets/manual drafts/application gating, Go automation status/errors, system sample history/gaps/availability, reduced motion and 320/390/1024px layouts. Public screenshots use fixtures, never live personal data.
 
-Go tests cover access boundaries, event streams, native Wi-Fi datagrams, readback, peer filtering, sound decoding, Bonjour, Cast framing/status, system parsing/cache behavior, native EQ route guards and full-block recipe preservation. Run race tests and vet after backend changes. Fixtures do not establish audible behavior.
+Go tests cover access boundaries, event streams, native Wi-Fi datagrams, readback, peer filtering, sound decoding, Bonjour, Cast framing/status, system parsing/cache behavior, native EQ route guards and full-block recipe preservation, wake state transitions and legacy takeover/restoration. Run race tests and vet after backend changes. Fixtures do not establish audible behavior.
 
 Hardware confirmation includes volume/mute, pairing/name/native stream states, AirPlay/Wi-Fi readback, Night Mode Off → On → Off and bass/Atmos cycles restored to initial settings. Rear changes require an undocked test; power/source/manual Standard remain experimental. Chrome Audio Mirroring (`85CDB22F`) keeps receiver PLAYING when sender playback pauses; label mirroring without claiming sender pause detection. Automatic hotspot activation/access needs a separate outage test.
 

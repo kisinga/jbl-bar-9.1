@@ -305,6 +305,8 @@ function mediaTime(value) {
 }
 function watcherName(value) {
   if (!value) return 'Not reported';
+  if (value === 'PAUSING_LEGACY') return 'Starting automation';
+  if (value === 'WAITING_FOR_READY') return 'Waiting for sound controls';
   if (['STANDARD_THIS_WAKE', 'ALREADY_STANDARD_THIS_WAKE'].includes(value)) return 'Standard selected for this wake';
   if (value.startsWith('WAITING_POWER_') || value === 'WAITING_FOR_POWER_ON') return 'Waiting for power-on';
   if (value === 'WAITING_FOR_PROCESS') return 'Waiting for the soundbar';
@@ -385,7 +387,7 @@ function renderExtras(s, ready, awake) {
   renderPlayback(s, ready, awake);
   $('device-name').textContent = s.bluetooth?.name || 'Not reported';
   $('device-uptime').textContent = Number.isFinite(s.uptime) && s.uptime > 0 ? Math.floor(s.uptime / 86400) + 'd ' + Math.floor(s.uptime / 3600) % 24 + 'h ' + Math.floor(s.uptime / 60) % 60 + 'm' : 'Not reported';
-  $('device-automation').textContent = watcherName(s.watcher);
+  $('device-automation').textContent = s.automation?.enabled ? (s.automation.error || 'Go · ' + watcherName(s.automation.status)) : watcherName(s.watcher);
   const cast = s.streaming?.cast;
   const gains = [cast?.low_shelf_gain, cast?.high_shelf_gain];
   const hasGains = gains.every(Number.isFinite);

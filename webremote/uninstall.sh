@@ -21,8 +21,14 @@ if [ -f "$STORE/remote.pid" ]; then
     case "$pid" in ''|*[!0-9]*) exit 1;; esac
     if [ -r "/proc/$pid/cmdline" ]; then
         cmd=$("$BB" tr '\000' ' ' < "/proc/$pid/cmdline")
-        case "$cmd" in "$STORE/remote -config $STORE/config.json "*) kill -TERM "$pid";; esac
+        case "$cmd" in "$STORE/remote -config $STORE/config.json "*)
+            kill -TERM "$pid"
+            n=0
+            while kill -0 "$pid" 2>/dev/null && [ "$n" -lt 35 ]; do "$BB" sleep 1; n=$((n+1)); done
+            kill -0 "$pid" 2>/dev/null && { printf 'Remote is still stopping; retain recovery files.\n'; exit 1; }
+        ;; esac
     fi
 fi
+"$STORE/remote" -restore-smart-helper || exit 1
 "$BB" sync
 printf 'Web remote disabled. Files retained in /var/JBLRemote.\n'
