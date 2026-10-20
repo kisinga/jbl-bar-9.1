@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111214"><title>JBL Bar 9.1 · Remote</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<main>
+  <header><a href="/" aria-label="JBL Bar 9.1 home"><span class="brand">JBL</span><span class="wordmark">BAR 9.1<span>YOUR SOUNDBAR, YOUR WAY</span></span></a><span id="connection" class="connection">Connecting</span></header>
+  <section class="intro"><p class="eyebrow">LOCAL REMOTE</p><div class="title-line"><h1>Make yourself<br>heard.</h1><button id="power" class="power" data-action="power" aria-label="Toggle soundbar power" title="Power / standby"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9M7 5.5a8 8 0 1 0 10 0"/></svg></button></div><p id="summary">Connecting to your soundbar…</p></section>
+  <section class="volume-panel" aria-labelledby="volume-label"><div class="panel-top"><span id="volume-label">VOLUME</span><span id="power-state" class="tag">—</span></div><div class="volume-controls"><button data-action="volume_down" class="step" aria-label="Volume down">−</button><div class="volume-display"><span id="volume">—</span><span id="volume-caption">LISTENING LEVEL</span></div><button data-action="volume_up" class="step" aria-label="Volume up">+</button></div><button id="mute" data-action="mute" class="mute"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4 6 8H3v8h3l5 4V4Zm5 5 5 6m0-6-5 6"/></svg><span>Mute sound</span></button></section>
+  <section class="inputs" aria-labelledby="inputs-label"><div class="section-heading"><h2 id="inputs-label">Choose your source</h2><span id="input-name">—</span></div><div class="input-buttons"><button data-action="input_tv" data-input="TV / ARC"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>TV / ARC</button><button data-action="input_hdmi" data-input="HDMI"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v9l-4 4H7l-4-4V6Zm4 4h10M9 14h6"/></svg>HDMI</button><button data-action="input_bluetooth" data-input="Bluetooth"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10-5 4V3l5 4L7 17"/></svg>Bluetooth</button></div></section>
+  <section class="mode-panel"><div><p class="eyebrow">SOUND MODE</p><h2 id="mode">—</h2><p id="mode-description">Your current listening mode.</p></div><button id="standard" data-action="standard">Use Standard <span>↗</span></button></section>
+  <div id="message" class="message" role="status" aria-live="polite"></div>
+  <footer><span><i></i> Direct to your soundbar</span><span>No cloud required</span></footer>
+</main>
+</body></html>

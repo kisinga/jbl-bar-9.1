@@ -1,6 +1,6 @@
 # Research workspace
 
-The public repository contains the implementation, reproducible tests and a concise evidence record in the root `README.md`. The working branch also carries research notes for continued latency and wake testing.
+I keep the public implementation, reproducible tests and concise evidence in the root [README](../README.md). The working branch also carries research notes for continued latency, SSH and browser-control work.
 
 The original project materials have been consolidated into these **local-only, Git-ignored** directories:
 
@@ -8,6 +8,7 @@ The original project materials have been consolidated into these **local-only, G
 | --- | --- |
 | `private/firmware-workspace/` | Original firmware downloads, release candidates, REA exports, scripts, hardware captures and investigation reports |
 | `private/spikes-jbl-firmware/` | Earlier firmware spike: extracted rootfs, Ghidra projects/scripts, binary analysis and tool installations |
+| `private/local-ssh/` | Original Wi-Fi/SSH experiments, hardware outcomes, private configuration and boot rollback evidence |
 | `private/migration.json` | Per-file SHA-256/size or symlink target, plus verified migration records |
 
 Compatibility symlinks at the original locations preserve older scripts and analysis database paths. The original trees were moved, with file hashes checked before and after; they are not duplicate copies. These directories are not present in a public clone, Git history or release assets. Proprietary firmware, raw device dumps, local paths and large tool caches are deliberately kept local.
@@ -62,6 +63,18 @@ These decimal process addresses are meaningful only for the exact `bdpprog` SHA-
 | 15427784 | 4 | Console gate setting, temporarily changed/restored |
 
 The key route is `mw.iom.se`, with mute event `0x6f002` and volume-up `0x6f000`. Success requires observed mode readback and released input, not just a successful CLI write. Source in `usb/JBLInstall/payload/` is authoritative for all guard conditions and restoration order.
+
+## SSH findings I reproduced
+
+On 20 October 2026 I confirmed a fresh USB-free reboot followed by root password login, an interactive shell and SFTP. Wi-Fi reconnected, the Smart Mode watcher restarted and I confirmed normal power/remote behavior. The public portable installer is derived from this installation; independent clean-install evidence remains a separate requirement.
+
+- The native OpenSSH tools need the vendor glibc 2.18 loader and libraries; the default runtime includes glibc 2.27. A library-path change alone did not fix loader incompatibility.
+- A private mount namespace supplies account/NSS lookup and the compatible loader without overwriting the system view. Host-key generation must happen inside that view too.
+- A session wrapper selects the compatible environment for commands, interactive shells and SFTP. Successful `sshd -t` alone did not prove these paths worked.
+- A background startup hook closes inherited sockets and waits a bounded time for Wi-Fi. It preserves the Smart Mode command and has a matching rollback that preserves unknown later hook changes.
+- I measured ARM32 userspace, Linux 4.9.134, about 448 MiB RAM and 25 MiB free writable storage. Android-derived services coexist with Chromecast; I found no package manager/framework for normal APK apps.
+
+The local-only `local-ssh/README.txt` is chronological: later outcomes supersede earlier “unconfirmed” entries. It and the raw attempts contain personal configuration; publish reviewed findings and templates rather than those files.
 
 ## Remaining questions
 
