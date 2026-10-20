@@ -122,11 +122,15 @@ This is a **32-bit ARM Linux** system with Android-derived services and Chromeca
 
 ## Local browser remote
 
-I run a lightweight [browser remote](webremote/) directly on the bar, port **8080**, with live volume, mute, input and sound-mode readback. It uses password authentication, same-origin/CSRF checks, a fixed set of permitted controls and exact firmware checks. [Build and install instructions](CONTRIBUTING.md#browser-remote) use a static ARM executable; no Android runtime or ongoing computer service is needed.
+I run a lightweight [browser remote](webremote/) directly on the bar, port **8080**, with live volume, mute, input and sound-mode readback. It opens without a login on my configured LAN, with same-origin/CSRF checks, a fixed set of permitted controls and exact firmware checks. [Build and install instructions](CONTRIBUTING.md#browser-remote) use a static ARM executable; no Android runtime or ongoing computer service is needed.
 
 On 20 October 2026 I verified volume `10 → 9 → 10` and mute `off → on → off` through the HTTP API and a phone-sized browser, restoring my original settings. After a reboot without USB, both the page and SSH returned automatically; the remote used about 3–6 MiB resident memory in these checks. Power, input switching and manual Standard selection are mapped from this firmware but remain experimental in this interface. It temporarily opens and restores the same console fields as the Smart Mode helper, with parser acknowledgments and state readback. I refuse known active Smart Mode transitions; simultaneous physical wake/control races need further testing.
 
-![Local JBL Bar 9.1 browser remote](docs/web-remote.png)
+I can tap repeatedly, hold +/−, use the arrow keys or press M to mute. Volume changes appear immediately with an **Adjusting…** label until the bar confirms them; queued taps can be cleared. The page pauses polling in the background, rejects stale replies and discards unsent controls after an error or connection loss. The native completion checks still take roughly 1–2 seconds per volume step on my bar; immediate feedback does not make that confirmation faster.
+
+Bluetooth shows the bar’s configured name, audio connection/streaming state and whether pairing is open. **Pair a device** performs the Bluetooth long press, then checks discoverability and released keys; I finish connecting from my phone’s Bluetooth settings. I confirmed pairing opened on the bar and my phone connected with the page updating its status. It does not scan for phones or display an unverified peer name.
+
+![Browser remote preview with example settings](docs/web-remote.png)
 
 ## Credits
 

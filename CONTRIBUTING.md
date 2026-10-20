@@ -100,9 +100,9 @@ python3 tools/build_web.py --allowed-cidr <trusted-lan-subnet>
 cd webremote && go test ./...
 ```
 
-Use the actual trusted IPv4 subnet, for example `192.168.1.0/24`, and choose
-a web password when prompted. The private output directory is
-`dist/webremote-private/`. It includes a password hash; keep it out of Git.
+Use the actual trusted IPv4 subnet, for example `192.168.1.0/24`. The output
+directory is `dist/webremote-private/`; its config contains the listener and
+local subnet. The browser remote requires no login. SSH keeps its own password.
 The builder strips local source paths and VCS metadata. Identical sources
 and Go toolchain produce the same server binary; owner settings differ.
 
@@ -119,8 +119,9 @@ bye
 ssh -p 2222 root@<bar-ip-address> '/bin/sh /var/JBLRemote/install.sh'
 ```
 
-Open `http://<bar-ip-address>:8080`, username `root`, using the web password.
-This is local HTTP with Basic authentication; use it only on the trusted LAN.
+Open `http://<bar-ip-address>:8080` directly; there is no web login.
+Anyone on the configured trusted subnet can use these controls. Use the bar’s
+IP address in the URL; DNS hostnames are rejected to prevent rebinding.
 The server accepts requests only from the configured subnet. Fixed control
 names, JSON-only POSTs, CSRF tokens and same-origin checks protect mutations;
 it does not accept arbitrary commands or serve filesystem paths.
@@ -137,3 +138,19 @@ It restores its recorded hook if still recognized, stops its own process and
 retains files for inspection. Later unknown hook edits are preserved. Keep
 SSH usable while experimenting. Volume/mute and readback are hardware-tested;
 power, input transitions and manual Standard selection remain experimental.
+
+The UI test uses Node and Playwright on the development computer:
+
+```sh
+# First time only:
+npm install --no-save --package-lock=false playwright
+npx playwright install chromium
+node tests/webremote-ui.mjs
+```
+
+`PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` can reuse an
+existing installation. Tests serve the real assets with delayed/failed mock
+responses, cover queued/cancelled controls, holds, keyboard input, reconnects,
+stale polls, standby, Bluetooth feedback and 320/390/1024px layouts. Go tests
+cover network/Host/CSRF boundaries, state confirmation and Bluetooth decoding.
+UI fixtures do not substitute for hardware pairing or audible tests.

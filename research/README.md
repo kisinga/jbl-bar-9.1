@@ -44,7 +44,7 @@ Revision 4 closed sockets but could exit before starting the watcher. Enumeratin
 | Earlier spike | `spikes-jbl-firmware/` | Rootfs, Ghidra databases/scripts, disassembly and other investigated routes |
 | Extra exploratory note | `other-notes/XOR_ANALYSIS.md` | Earlier XOR/container analysis, not an implemented release technique |
 
-Earlier exploit, Bluetooth and signature-bypass ideas in the archive are exploratory records, **not prerequisites or claims of working techniques**. They are not part of the USB release. The relevant solution uses the published AutoScript mechanism plus the build-specific controller and startup fixes.
+Earlier exploit and signature-bypass ideas in the archive are exploratory records, **not prerequisites or claims of working techniques**. They are not part of the USB release. The relevant solution uses the published AutoScript mechanism plus the build-specific controller and startup fixes.
 
 ## Verified-build field map
 
@@ -85,3 +85,34 @@ The local-only `local-ssh/README.txt` is chronological: later outcomes supersede
 - Which other exact firmware identities can be supported after analysis and testing?
 
 Keep the confirmed release available while investigating these questions. Do not replace verified evidence with local-model suggestions or infer success from a passing host fixture alone.
+
+## Bluetooth readback and pairing
+
+REA analysis of the pinned `bdpprog` found that config **365 == 2** selects
+Bluetooth (`0x61af14`, used by the pairing worker at `0x73e030`). Config51 is a
+separate setting; my live Bluetooth value was10, so the earlier value9 label
+was incorrect. The browser uses the validated source-state field for Bluetooth.
+
+The GAP descriptor at `0xc6d250` points to the static context `0xc6d2c0`.
+Its uint32 at +8 records connectability/discoverability: 0 = both, 1 = connectable
+only, 2 = discoverable only, 3 = neither. Pairing success requires **both**. The GAP
+info pointer is `0xc6d2cc`; its inline local name at +0x28 is bounded to 128 bytes,
+NUL-terminated and checked as UTF-8. No peer identity is exposed.
+
+The A2DP descriptor at `0xcb6450` points to `0xe3757c`; uint32 at +4 is
+0 = disconnected, 1 = connected, 2 = suspended, 3 = streaming, as established by the
+connect/disconnect/start/suspend handlers. I check exact context pointers in
+addition to the executable hash; unknown states remain unavailable.
+
+The misc key handler (`0x6432f0`) enters pairing on Bluetooth key `0x6f027` at
+repeat 25. Its 400 ms initial delay and 200 ms repeat interval require a longer
+hold than Standard mode: the web control uses 6000 ms, a matching completion
+wait, released-key checks and live GAP readback. The transient worker flag is
+not evidence that pairing is open. Raw disassembly and passive captures stay
+local in `private/firmware-workspace/analysis/bluetooth-ui/`.
+
+On 20 October 2026 I observed the pairing control open discoverability, then
+connected my phone and confirmed the page updated. The initial three-second
+completion timeout expired before the six-second hold finished; I extended
+the pairing acknowledgment window to nine seconds. I checked released-key
+fields and restored console values after the first attempt. No reboot was needed.

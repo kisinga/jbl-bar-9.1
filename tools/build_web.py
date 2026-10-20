@@ -2,7 +2,6 @@
 """Build a self-contained ARM remote plus an owner-specific private config."""
 from pathlib import Path
 import argparse
-import getpass
 import hashlib
 import ipaddress
 import json
@@ -13,12 +12,10 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(output, allowed_cidr, password):
+def build(output, allowed_cidr):
     network = ipaddress.ip_network(allowed_cidr, strict=False)
     if network.version != 4 or not network.is_private or network.prefixlen < 16:
         raise ValueError("Choose your private IPv4 LAN subnet, /16 or narrower")
-    if len(password) < 8:
-        raise ValueError("Choose a password of at least eight characters")
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True, mode=0o700)
     env = dict(os.environ, CGO_ENABLED="0", GOOS="linux", GOARCH="arm", GOARM="7")
@@ -26,7 +23,6 @@ def build(output, allowed_cidr, password):
                    cwd=ROOT / "webremote", env=env, check=True)
     (output / "config.json").write_text(json.dumps({
         "listen": ":8080", "allowed_cidr": str(network),
-        "password_sha256": hashlib.sha256(password.encode()).hexdigest(),
     }, indent=2) + "\n")
     (output / "config.json").chmod(0o600)
     (output / "OWNER.txt").write_text("JBL_WEB_REMOTE_REV1\n")
@@ -44,7 +40,4 @@ if __name__ == "__main__":
     parser.add_argument("--allowed-cidr", required=True, help="Your trusted IPv4 LAN, e.g. 192.168.1.0/24")
     parser.add_argument("--output", type=Path, default=ROOT / "dist/webremote-private")
     args = parser.parse_args()
-    password = getpass.getpass("Web remote password: ")
-    if password != getpass.getpass("Repeat password: "):
-        raise SystemExit("Passwords differ")
-    print("Private device files:", build(args.output, args.allowed_cidr, password))
+    print("Private device files:", build(args.output, args.allowed_cidr))

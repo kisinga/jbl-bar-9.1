@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -26,6 +27,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 )
 
 //go:embed www/*
@@ -35,22 +37,30 @@ const firmwareHash = "86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441
 const cliHash = "8910fb852d2f994a519615fede404fbb036e3a8f5264cc69cdff57038af3c78f"
 
 type config struct {
-	Listen       string `json:"listen"`
-	AllowedCIDR  string `json:"allowed_cidr"`
-	PasswordHash string `json:"password_sha256"`
+	Listen      string `json:"listen"`
+	AllowedCIDR string `json:"allowed_cidr"`
+}
+type bluetoothState struct {
+	Selected     bool   `json:"selected"`
+	Name         string `json:"name,omitempty"`
+	Connectable  bool   `json:"connectable"`
+	Discoverable bool   `json:"discoverable"`
+	Connected    *bool  `json:"connected,omitempty"`
+	Audio        string `json:"audio,omitempty"`
 }
 type state struct {
-	Available bool    `json:"available"`
-	Error     string  `json:"error,omitempty"`
-	Power     string  `json:"power"`
-	Mode      string  `json:"mode"`
-	Volume    *uint32 `json:"volume,omitempty"`
-	Muted     *bool   `json:"muted,omitempty"`
-	Source    *uint32 `json:"source,omitempty"`
-	Input     string  `json:"input"`
-	Uptime    int64   `json:"uptime"`
-	Watcher   string  `json:"watcher"`
-	CSRF      string  `json:"csrf"`
+	Bluetooth *bluetoothState `json:"bluetooth,omitempty"`
+	Available bool            `json:"available"`
+	Error     string          `json:"error,omitempty"`
+	Power     string          `json:"power"`
+	Mode      string          `json:"mode"`
+	Volume    *uint32         `json:"volume,omitempty"`
+	Muted     *bool           `json:"muted,omitempty"`
+	Source    *uint32         `json:"source,omitempty"`
+	Input     string          `json:"input"`
+	Uptime    int64           `json:"uptime"`
+	Watcher   string          `json:"watcher"`
+	CSRF      string          `json:"csrf"`
 }
 type device struct {
 	mu         sync.Mutex
@@ -61,7 +71,6 @@ type device struct {
 type remote struct {
 	cfg      config
 	network  *net.IPNet
-	password [32]byte
 	csrf     string
 	device   *device
 	actionMu sync.Mutex
@@ -181,7 +190,7 @@ func (d *device) write(address int64, width int, value uint32) error {
 	return nil
 }
 func (d *device) configByte(id uint32) (uint32, error) {
-	if id != 50 && id != 51 && id != 155 {
+	if id != 50 && id != 51 && id != 155 && id != 365 {
 		return 0, errors.New("unknown setting")
 	}
 	node := int64(0xf046d0) + int64(id)*0x4c
@@ -213,6 +222,71 @@ func (d *device) configByte(id uint32) (uint32, error) {
 	}
 	return d.read(int64(base)+int64(offset), 1)
 }
+
+// REA: BT_GAP mode at context+8; the version-pinned context is static.
+// 0/2 are discoverable; 1/3 are not. A2DP state is distinct from source selection.
+func bluetoothAudio(value uint32) (bool, string, bool) {
+	switch value {
+	case 0:
+		return false, "Disconnected", true
+	case 1:
+		return true, "Connected", true
+	case 2:
+		return true, "Paused", true
+	case 3:
+		return true, "Streaming", true
+	}
+	return false, "", false
+}
+func bluetoothName(b []byte) string {
+	end := bytes.IndexByte(b, 0)
+	if end < 1 || !utf8.Valid(b[:end]) {
+		return ""
+	}
+	for _, r := range string(b[:end]) {
+		if r < 32 || r == 127 {
+			return ""
+		}
+	}
+	return string(b[:end])
+}
+func (d *device) bluetooth() *bluetoothState {
+	gap, e := d.read(0xc6d250+0x44, 4)
+	if e != nil || gap != 0xc6d2c0 {
+		return nil
+	}
+	mode, e := d.read(int64(gap)+8, 4)
+	if e != nil || mode > 3 {
+		return nil
+	}
+	selected, e := d.configByte(365)
+	if e != nil {
+		return nil
+	}
+	s := &bluetoothState{Selected: selected == 2, Connectable: mode == 0 || mode == 1, Discoverable: mode == 0 || mode == 2}
+	// GAP info's inline local-name buffer is 128 bytes, zero-terminated.
+	info, ie := d.read(0xc6d250+0x4c, 4)
+	if info == 0xc6d2cc && ie == nil {
+		if f, e := os.Open(fmt.Sprintf("/proc/%d/mem", d.pid)); e == nil {
+			b := make([]byte, 128)
+			if _, e = f.ReadAt(b, int64(gap)+0x34); e == nil {
+				s.Name = bluetoothName(b)
+			}
+			f.Close()
+		}
+	}
+	a2dp, e := d.read(0xcb6450+0x44, 4)
+	if e == nil && a2dp == 0xe3757c {
+		value, e := d.read(int64(a2dp)+4, 4)
+		if e == nil {
+			if connected, audio, ok := bluetoothAudio(value); ok {
+				s.Connected = &connected
+				s.Audio = audio
+			}
+		}
+	}
+	return s
+}
 func (d *device) snapshotLocked() state {
 	if e := d.identify(); e != nil {
 		return state{Power: "Starting", Mode: "Unknown", Input: "Unknown", Error: e.Error()}
@@ -239,6 +313,7 @@ func (d *device) snapshotCurrent() state {
 		return s
 	}
 	s.Available = true
+	s.Bluetooth = d.bluetooth()
 	if p == 1 && system == 0 {
 		s.Power = "On"
 	} else if system == 1 || system == 2 || system == 3 || p == 0 {
@@ -264,11 +339,12 @@ func (d *device) snapshotCurrent() state {
 			s.Input = "HDMI"
 		case 6, 12:
 			s.Input = "TV / ARC"
-		case 9:
-			s.Input = "Bluetooth"
 		case 14:
 			s.Input = "AirPlay"
 		}
+	}
+	if s.Bluetooth != nil && s.Bluetooth.Selected {
+		s.Input = "Bluetooth"
 	}
 	if !d.same() {
 		s.Available = false
@@ -307,7 +383,7 @@ func (d *device) idleKeys() bool {
 	}
 	return true
 }
-func (d *device) acknowledge(ctx context.Context) error {
+func (d *device) acknowledge(ctx context.Context, wait time.Duration) error {
 	dir, e := os.MkdirTemp("/tmp", "jbl-web-ack-")
 	if e != nil {
 		return e
@@ -319,7 +395,7 @@ func (d *device) acknowledge(ctx context.Context) error {
 	if e = d.cli(ctx, "exec", "/bin/busybox", "touch", marker); e != nil {
 		return e
 	}
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(wait)
 	for time.Now().Before(deadline) {
 		if e := ctx.Err(); e != nil {
 			return e
@@ -350,7 +426,9 @@ func actionObserved(action string, before, after state) bool {
 	case "input_hdmi":
 		return after.Source != nil && *after.Source == 1
 	case "input_bluetooth":
-		return after.Source != nil && *after.Source == 9
+		return after.Bluetooth != nil && after.Bluetooth.Selected
+	case "bluetooth_pair":
+		return after.Bluetooth != nil && after.Bluetooth.Selected && after.Bluetooth.Discoverable && after.Bluetooth.Connectable
 	case "standard":
 		return after.Mode == "Standard"
 	}
@@ -366,7 +444,7 @@ func controlBusy() bool {
 func (d *device) action(ctx context.Context, action string) (out state, err error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	keys := map[string]string{"volume_up": "0x6f000", "volume_down": "0x6f001", "mute": "0x6f002", "power": "0x8f000", "input_tv": "0x6f029", "input_hdmi": "0x6f01e", "input_bluetooth": "0x6f027"}
+	keys := map[string]string{"volume_up": "0x6f000", "volume_down": "0x6f001", "mute": "0x6f002", "power": "0x8f000", "input_tv": "0x6f029", "input_hdmi": "0x6f01e", "input_bluetooth": "0x6f027", "bluetooth_pair": "0x6f027"}
 	_, simple := keys[action]
 	if !simple && action != "standard" {
 		return out, errors.New("unknown control")
@@ -374,6 +452,14 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	before := d.snapshotLocked()
 	if !before.Available {
 		return before, errors.New(before.Error)
+	}
+	if action == "bluetooth_pair" {
+		if before.Bluetooth == nil || !before.Bluetooth.Selected {
+			return before, errors.New("select Bluetooth first; pairing status must be available")
+		}
+		if before.Bluetooth.Discoverable && before.Bluetooth.Connectable {
+			return before, nil
+		}
 	}
 	if action == "standard" && before.Mode == "Standard" {
 		return before, nil
@@ -431,8 +517,8 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	if e = d.cli(ctx, ""); e != nil {
 		return before, e
 	}
-	if e = d.acknowledge(ctx); e != nil {
-		return before, e
+	if e = d.acknowledge(ctx, 3*time.Second); e != nil {
+		return before, fmt.Errorf("console readiness: %w", e)
 	}
 	if action == "standard" {
 		if before.Mode != "Smart" {
@@ -462,14 +548,27 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 			return before, e
 		}
 	} else {
-		if e = d.cli(ctx, "mw.iom.se", keys[action], "60"); e != nil {
+		duration := "60"
+		// Misc repeat callback: 400 ms initial delay, 200 ms repeats, 25 to pair.
+		if action == "bluetooth_pair" {
+			duration = "6000"
+		}
+		if e = d.cli(ctx, "mw.iom.se", keys[action], duration); e != nil {
 			return before, e
 		}
 	}
-	if e = d.acknowledge(ctx); e != nil {
-		return before, e
+	ackWait := 3 * time.Second
+	if action == "bluetooth_pair" {
+		ackWait = 9 * time.Second
 	}
-	deadline := time.Now().Add(3 * time.Second)
+	if e = d.acknowledge(ctx, ackWait); e != nil {
+		return before, fmt.Errorf("control completion: %w", e)
+	}
+	wait := 3 * time.Second
+	if action == "bluetooth_pair" {
+		wait = 9 * time.Second
+	}
+	deadline := time.Now().Add(wait)
 	for time.Now().Before(deadline) {
 		if e := ctx.Err(); e != nil {
 			return before, e
@@ -492,12 +591,7 @@ func newRemote(cfg config) (*remote, error) {
 	if e != nil {
 		return nil, e
 	}
-	p, e := hex.DecodeString(cfg.PasswordHash)
-	if e != nil || len(p) != 32 {
-		return nil, errors.New("invalid password hash")
-	}
 	r := &remote{cfg: cfg, network: network, device: &device{}}
-	copy(r.password[:], p)
 	token := make([]byte, 32)
 	if _, e = rand.Read(token); e != nil {
 		return nil, e
@@ -514,11 +608,14 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 		http.Error(w, "Local network only", http.StatusForbidden)
 		return
 	}
-	user, pass, ok := q.BasicAuth()
-	sum := sha256.Sum256([]byte(pass))
-	if !ok || user != "root" || subtle.ConstantTimeCompare(sum[:], r.password[:]) != 1 {
-		w.Header().Set("WWW-Authenticate", `Basic realm="JBL Bar 9.1", charset="UTF-8"`)
-		http.Error(w, "Sign in to the soundbar", 401)
+	// A login-free remote must not trust an arbitrary DNS hostname: otherwise a
+	// rebinding site could read its own CSRF token from a private-network address.
+	target := q.Host
+	if h, _, e := net.SplitHostPort(target); e == nil {
+		target = h
+	}
+	if ip := net.ParseIP(target); ip == nil || !r.network.Contains(ip) {
+		http.Error(w, "Open the remote using the bar's local IP address", http.StatusForbidden)
 		return
 	}
 	if q.URL.Path == "/api/state" && q.Method == "GET" {
