@@ -132,6 +132,34 @@ Keep the system monitor auxiliary to sound controls. Two-second cached samples p
 
 Use the current fixture suite rather than historical intermediate check totals: **141 host checks, 158 browser checks**, plus Go race tests and vet. Screenshots contain example values. Original Smart Mode ZIP bytes remain unchanged. CLI/discovery/capability ideas came from [the reviewed k1rnt revision](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309); its newer Linkplay transport and one-shot Smart Mode setter do not supply this bar’s native implementation or wake watcher.
 
+## Control paths
+
+| Control | Current implementation |
+| --- | --- |
+| Volume, mute, power, inputs, bass/height/rear | Native IOM key events via `/bin/cli mw.iom.se` |
+| Smart/Standard and Night Mode | Native Mute-hold/button combination with readback |
+| Bluetooth playback | Native MediaTek AVRCP RPC; protocol key-down/key-up, without soundbar IOM emulation |
+| Cast playback | Native C4A handler reached through IOM media keys |
+| Front EQ | Native JSON parser/watched DSP recipe and fixed PPC reset commands; temporary mute still uses IOM |
+
+The [reviewed CLI HTTP client](https://github.com/k1rnt/jbl-soundbar-cli/blob/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309/src/client/http_api.rs) sets an absolute volume with `setPlayerCmd:vol:N` and explicit mute with `setPlayerCmd:mute:0/1`. Its [UPnP client](https://github.com/k1rnt/jbl-soundbar-cli/blob/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309/src/client/upnp.rs) uses RenderingControl `SetVolume`/`SetMute`. The upstream commit is unchanged on 21 October 2026. On the owned Bar 9.1, both expected ports (443/59152) refused connections and were absent from the local listening-socket table. These implementations are useful design references, not established Bar 9.1 endpoints.
+
+The [21 October control audit](validation/control-shortcuts.json) traces complete handlers and external command registration on the pinned firmware. **New commands below are static candidates; none was actuated or integrated in this pass.** Preserve firmware/process guards, serialized controls, console restoration and native readback before qualifying them.
+
+| Control | Direct route found | Remaining boundary |
+| --- | --- | --- |
+| Power on / standby | `app.amb.po` / `app.amb.sb` | State-specific AM requests invoke the normal power handler without IOM; stock suspend policy remains. Live parser/readback untested. |
+| Source cycle | `app.sourceswitch.next` | Includes legacy routes; does not provide explicit TV/HDMI/Bluetooth selection. |
+| Bluetooth pairing | `app.bt.pair` | Legacy request path differs from the product pairing worker; equivalence unproved. |
+| AirPlay playback | `app.misc.ap_control N`: 0 Play, 1 Stop, 2 Pause, 3 Next, 4 Previous | Help text mislabels actions. Native consumer requires generic source51=14, corresponding to product source365=7; sender response untested. |
+| Volume / mute | Cast receiver master-volume protocol candidate | Mapping and callbacks vary by source. Changed percentages unmute; repeating an identical percentage can toggle mute on other inputs. No setter tested. |
+| Chromecast playback | Existing Cast V2 media connection | Active session/capability guards and receiver readback required; direct mutations untested. |
+| Smart / Night / bass / height / rear | Complete internal handlers located | No complete fixed external shortcut established. Native addresses and process-local handles are not external Go APIs. |
+
+Cast volume generally maps integer percentage to native level0–32 with `ceil(percent*32/100)`, including hotel/source exceptions; other-source percentages97–99 map31,100 maps32. The passive receiver query explained the earlier scale discrepancy, but does not validate setter routing or idempotence. Middleware gain, MTKCFG and factory UART volume commands omit parts of the normal display/Bluetooth/Cast synchronization sequence. Keep them separate from product volume controls.
+
+The sound audit also identified HPP parameters `0x840006` bass, `0x840007` height and `0x840008` rear. Native bass levels map to signed gains −15/−10/−5/−1/+3; height/rear use −6/−3/0, with separate rear-mute routing. These DSP primitives omit saved levels, display updates and full route/dock guards. `sub_vol` is wireless transport and `sub_vol_set` targets `0x84000b`; neither is a replacement for Bass Level. Use complete native actions for a future controlled in-process/task adapter rather than cached-state writes.
+
 ## Direct Smart Mode control
 
 The pinned native audio table exposes `app.audio.eq_set VALUE`. Its handler reaches the same HPP parameter `0x840001` setter used by Smart Mode’s audio task: Standard maps to 0, Smart to 1 or 2 according to source. This establishes a direct DSP candidate, not a complete replacement. No live validation of this CLI entry was performed in this pass.
