@@ -45,6 +45,9 @@ func mediaCommands(s state) []string {
 	if *s.SourceState == 2 && s.Bluetooth != nil && s.Bluetooth.Selected && s.Bluetooth.Connected != nil && *s.Bluetooth.Connected && s.Bluetooth.MediaReady {
 		return []string{"media_previous", "media_play", "media_pause", "media_next", "media_stop"}
 	}
+	if airplayReady(s) {
+		return []string{"media_previous", "media_play", "media_pause", "media_next", "media_stop"}
+	}
 	if *s.SourceState != 6 || s.Streaming == nil || s.Streaming.Cast == nil {
 		return nil
 	}

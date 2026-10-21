@@ -118,7 +118,7 @@ The Bluetooth IOM focus handler discards ordinary media key events. Use the proj
 
 Normal Cast media controls use the native C4A handler with session/capability guards; mirroring is excluded. Receiver state at `0xe30710` maps 2 Playing/3 Paused. AirPlay `0xe3169c` maps 1 active session/0 stopped, without pause distinction. YouTube through Chrome Audio Mirroring (`85CDB22F`) retains receiver/native PLAYING when sender playback pauses; label transport activity without claiming sender-state detection.
 
-The bounded read-only Cast V2 client queries fixed loopback port 8009 at most every two seconds while requested. Only status/connection/heartbeat messages are sent. Expose optional receiver metadata/progress and shelf gains; omit transport IDs/arbitrary payloads. Normal receiver media-state decoding has fixtures, but the live test validates mirroring only.
+The bounded read-only Cast V2 client queries fixed loopback port 8009 at most every two seconds while requested. The monitor sends only status/connection/heartbeat messages. A separate, serialized control client uses a distinct sender identity and correlates mutation replies to the exact request. Expose optional receiver metadata/progress and shelf gains; omit transport IDs/arbitrary payloads. A generated local silent stream subsequently qualified direct normal receiver Play/Pause/Stop; queue and sender-specific behavior remain separate.
 
 The connected Bluetooth middleware cache had no title/artist during the streaming test. Unlike that disconnect-cleared cache, older `bdpprog` metadata can retain the previous peer’s track. AirPlay legacy metadata pointers were empty, without a verified newer-SDK bridge. Keep the experimental reader/tests under `analysis/track-ui/experimental-reader/`; do not show stale track information or publish listening history.
 
@@ -130,33 +130,38 @@ Register `jbl.local` with the existing Bonjour daemon using DNS-SD Any scope. In
 
 Keep the system monitor auxiliary to sound controls. Two-second cached samples provide aggregate CPU, cache-aware RAM, `/var` storage, Wi-Fi byte rates, load/uptime and process count. Display temperature only when reported; no sensor was exposed on the tested bar. Retain at most 60 unique browser-local samples, break unavailable data, and clear history across disconnect/reset/long gaps. No database or extra state polling is needed. Load average can include native tasks waiting on I/O; do not present it as CPU utilization or a standalone fault alarm.
 
-Use the current fixture suite rather than historical intermediate check totals: **141 host checks, 158 browser checks**, plus Go race tests and vet. Screenshots contain example values. Original Smart Mode ZIP bytes remain unchanged. CLI/discovery/capability ideas came from [the reviewed k1rnt revision](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309); its newer Linkplay transport and one-shot Smart Mode setter do not supply this bar’s native implementation or wake watcher.
+Use the current fixture suite rather than historical intermediate check totals: **141 host checks, 164 browser checks**, plus Go race tests and vet. Screenshots contain example values. Original Smart Mode ZIP bytes remain unchanged. CLI/discovery/capability ideas came from [the reviewed k1rnt revision](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309); its newer Linkplay transport and one-shot Smart Mode setter do not supply this bar’s native implementation or wake watcher.
 
 ## Control paths
 
 | Control | Current implementation |
 | --- | --- |
-| Volume, mute, power, inputs, bass/height/rear | Native IOM key events via `/bin/cli mw.iom.se` |
+| Bluetooth volume/mute | Direct Cast receiver master-volume protocol, qualified interior native levels; IOM for other routes/boundaries/custom EQ |
+| Power, inputs, bass/height/rear | Native IOM key events via `/bin/cli mw.iom.se`; TV/HDMI now use the product source dispatcher |
 | Smart/Standard and Night Mode | Native Mute-hold/button combination with readback |
 | Bluetooth playback | Native MediaTek AVRCP RPC; protocol key-down/key-up, without soundbar IOM emulation |
-| Cast playback | Native C4A handler reached through IOM media keys |
+| Cast playback | Direct Cast V2 media session commands with fresh capabilities and correlated receiver/native readback |
+| AirPlay playback | Native `app.misc.ap_control` SDK events; sender listening test pending |
+| Bluetooth pairing | Direct `app.bt.pair`, with native GAP flags verified |
 | Front EQ | Native JSON parser/watched DSP recipe and fixed PPC reset commands; temporary mute still uses IOM |
 
 The [reviewed CLI HTTP client](https://github.com/k1rnt/jbl-soundbar-cli/blob/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309/src/client/http_api.rs) sets an absolute volume with `setPlayerCmd:vol:N` and explicit mute with `setPlayerCmd:mute:0/1`. Its [UPnP client](https://github.com/k1rnt/jbl-soundbar-cli/blob/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309/src/client/upnp.rs) uses RenderingControl `SetVolume`/`SetMute`. The upstream commit is unchanged on 21 October 2026. On the owned Bar 9.1, both expected ports (443/59152) refused connections and were absent from the local listening-socket table. These implementations are useful design references, not established Bar 9.1 endpoints.
 
-The [21 October control audit](validation/control-shortcuts.json) traces complete handlers and external command registration on the pinned firmware. **New commands below are static candidates; none was actuated or integrated in this pass.** Preserve firmware/process guards, serialized controls, console restoration and native readback before qualifying them.
+The [21 October control audit](validation/control-shortcuts.json) traces complete handlers and external command registration on the pinned firmware. The original audit was static. The [subsequent device qualification](validation/direct-controls-device.json) now distinguishes deployed controls, untested candidates and a rejected power shortcut. Preserve firmware/process guards, serialized controls, console restoration and native readback.
 
 | Control | Direct route found | Remaining boundary |
 | --- | --- | --- |
-| Power on / standby | `app.amb.po` / `app.amb.sb` | State-specific AM requests invoke the normal power handler without IOM; stock suspend policy remains. Live parser/readback untested. |
+| Power on / standby | `app.amb.po` / `app.amb.sb` | **Rejected:** `po` crashed `bdpprog` (exit139/SIGSEGV). Recovery restored the service; neither AM command is deployed. A static NULL-name/`strcmp` defect is consistent with the crash, without PC/core attribution. |
 | Source cycle | `app.sourceswitch.next` | Includes legacy routes; does not provide explicit TV/HDMI/Bluetooth selection. |
-| Bluetooth pairing | `app.bt.pair` | Legacy request path differs from the product pairing worker; equivalence unproved. |
-| AirPlay playback | `app.misc.ap_control N`: 0 Play, 1 Stop, 2 Pause, 3 Next, 4 Previous | Help text mislabels actions. Native consumer requires generic source51=14, corresponding to product source365=7; sender response untested. |
-| Volume / mute | Cast receiver master-volume protocol candidate | Mapping and callbacks vary by source. Changed percentages unmute; repeating an identical percentage can toggle mute on other inputs. No setter tested. |
-| Chromecast playback | Existing Cast V2 media connection | Active session/capability guards and receiver readback required; direct mutations untested. |
+| Bluetooth pairing | `app.bt.pair` | Qualified on active Bluetooth: connectable/discoverable flags became true in 2.75 seconds; settings and console preserved. |
+| AirPlay playback | `app.misc.ap_control N`: 0 Play, 1 Stop, 2 Pause, 3 Next, 4 Previous | Help text mislabels actions. Native consumer requires generic source51=14, corresponding to product source365=7; integrated with active-session guards; sender listening test declined, so audible behavior remains unconfirmed. |
+| Volume / mute | Cast receiver master-volume protocol candidate | Qualified Bluetooth interior levels only, with two seven-command settled roundtrips. Fresh receiver no-op guards prevent repeated-value side effects; native volume/mute must match. Other routes retain IOM. |
+| Chromecast playback | Existing Cast V2 media connection | Direct Play/Pause twice and Stop passed on a generated silent stream; fresh transport/session/capability guards and receiver/native readback required. The generated queue did not advertise navigation; Next/Previous stayed disabled and remain unconfirmed. |
 | Smart / Night / bass / height / rear | Complete internal handlers located | No complete fixed external shortcut established. Native addresses and process-local handles are not external Go APIs. |
 
-Cast volume generally maps integer percentage to native level0–32 with `ceil(percent*32/100)`, including hotel/source exceptions; other-source percentages97–99 map31,100 maps32. The passive receiver query explained the earlier scale discrepancy, but does not validate setter routing or idempotence. Middleware gain, MTKCFG and factory UART volume commands omit parts of the normal display/Bluetooth/Cast synchronization sequence. Keep them separate from product volume controls.
+Product input keys are TV/ARC `0x1f00c`, HDMI `0x5f03e` and Bluetooth `0x6f027`; the controlled sequence reached product sources 0 → 3 → 2 with idle keys and restored console. Previous TV `0x6f029` can negotiate ARC without switching; previous HDMI `0x6f01e` uses a legacy path. Optical `0x1f00e` and automatic TV `0x1f02c` (ARC or Optical) are static candidates, not newly exposed controls. These remain native key actions, rather than direct function calls.
+
+Cast volume generally maps integer percentage to native level0–32 with `ceil(percent*32/100)`, including hotel/source exceptions; other-source percentages97–99 map31,100 maps32. The passive receiver query explained the earlier scale discrepancy; subsequent Bluetooth qualification is scoped above and does not establish routing/idempotence on other inputs. Middleware gain, MTKCFG and factory UART volume commands omit parts of the normal display/Bluetooth/Cast synchronization sequence. Keep them separate from product volume controls.
 
 The sound audit also identified HPP parameters `0x840006` bass, `0x840007` height and `0x840008` rear. Native bass levels map to signed gains −15/−10/−5/−1/+3; height/rear use −6/−3/0, with separate rear-mute routing. These DSP primitives omit saved levels, display updates and full route/dock guards. `sub_vol` is wireless transport and `sub_vol_set` targets `0x84000b`; neither is a replacement for Bass Level. Use complete native actions for a future controlled in-process/task adapter rather than cached-state writes.
 

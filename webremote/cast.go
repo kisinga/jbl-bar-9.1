@@ -167,11 +167,15 @@ func readCastMessage(r io.Reader) (castMessage, error) {
 	return decodeCastMessage(b)
 }
 func sendCastMessage(w io.Writer, namespace, destination string, payload any) error {
+	return sendCastMessageFrom(w, castSender, namespace, destination, payload)
+}
+
+func sendCastMessageFrom(w io.Writer, sender, namespace, destination string, payload any) error {
 	j, e := json.Marshal(payload)
 	if e != nil {
 		return e
 	}
-	b := encodeCastMessage(castMessage{source: castSender, destination: destination, namespace: namespace, payload: string(j)})
+	b := encodeCastMessage(castMessage{source: sender, destination: destination, namespace: namespace, payload: string(j)})
 	packet := make([]byte, 4, 4+len(b))
 	binary.BigEndian.PutUint32(packet, uint32(len(b)))
 	packet = append(packet, b...)

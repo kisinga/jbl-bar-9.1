@@ -166,11 +166,13 @@ npx playwright install chromium
 node tests/webremote-ui.mjs
 ```
 
-Set `PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` to reuse an installation. The current **158 browser checks** cover queues/cancellation, held and keyboard controls, failures/reconnects, stale replies, standby, Bluetooth/streaming, single Play/Pause, EQ presets/manual drafts/application gating, Go automation status/errors, system sample history/gaps/availability, reduced motion and 320/390/1024px layouts. Public screenshots use fixtures, never live personal data.
+Set `PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs` to reuse an installation. The current **164 browser checks** cover queues/cancellation, held and keyboard controls, failures/reconnects, stale replies, standby, Bluetooth/streaming, single Play/Pause, EQ presets/manual drafts/application gating, Go automation status/errors, system sample history/gaps/availability, reduced motion and 320/390/1024px layouts. Public screenshots use fixtures, never live personal data.
+
+Direct controls use fixed native/protocol commands, fresh source/capability checks and readback. Bluetooth pairing uses `app.bt.pair`; qualified Bluetooth volume/mute uses Cast receiver volume. Cast media uses current receiver sessions; AirPlay uses the verified SDK command mapping. Uncertain requests are never retried through a second path. Keep IOM for unsupported volume routes and complete sound actions. **Do not use `app.amb.po`/`app.amb.sb`: the former crashed the native service during qualification.** See the [control qualification record](research/validation/direct-controls-device.json).
 
 Go tests cover access boundaries, event streams, native Wi-Fi datagrams, readback, peer filtering, sound decoding, Bonjour, Cast framing/status, system parsing/cache behavior, native EQ route guards and full-block recipe preservation, wake state transitions and legacy takeover/restoration. Run race tests and vet after backend changes. Fixtures do not establish audible behavior.
 
-Hardware confirmation includes volume/mute, pairing/name/native stream states, AirPlay/Wi-Fi readback, Night Mode Off → On → Off and bass/Atmos cycles restored to initial settings. Rear changes require an undocked test; power/source/manual Standard remain experimental. Chrome Audio Mirroring (`85CDB22F`) keeps receiver PLAYING when sender playback pauses; label mirroring without claiming sender pause detection. Automatic hotspot activation/access needs a separate outage test.
+Hardware confirmation includes volume/mute, pairing/name/native stream states, AirPlay/Wi-Fi readback, Night Mode Off → On → Off and bass/Atmos cycles restored to initial settings. Rear changes require an undocked test; product TV/ARC, HDMI and Bluetooth selection now have a controlled roundtrip, while broader power/source/manual Standard coverage remains experimental. Chrome Audio Mirroring (`85CDB22F`) keeps receiver PLAYING when sender playback pauses; label mirroring without claiming sender pause detection. Automatic hotspot activation/access needs a separate outage test.
 
 ### Optional CLI
 

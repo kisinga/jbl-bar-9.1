@@ -153,5 +153,6 @@
     "Bounded negative searches do not prove absence elsewhere. Native handles, function addresses and task context are not external Go APIs.",
     "No memory writes, native calls, process injection/restart, firmware patches or control behavior changes in this pass."
   ],
-  "next_validation": "Qualify explicit power and AirPlay commands through the existing serialized CLI transport. Validate pairing separately. Establish Cast volume/mute callback behavior before integration. Unresolved sound actions need a controlled in-process/native-task bridge."
+  "next_validation": "See subsequent_hardware_validation. Direct AM power is rejected after a native crash; do not execute po/sb. Unresolved sound controls require a complete native task bridge.",
+  "subsequent_hardware_validation": "direct-controls-device.json"
 }

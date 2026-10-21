@@ -5,7 +5,7 @@ const isVolume = action => action === 'volume_up' || action === 'volume_down';
 const delta = action => action === 'volume_up' ? 1 : action === 'volume_down' ? -1 : 0;
 let current, csrf = '', online = false, active = null, queue = [], epoch = 0;
 let refreshing = false, stream = null, latestState = null, lastSync = 0, holdTimer, repeatTimer, heldButton;
-// A successful AVRCP request changes the next button action, not the reported stream state.
+// A successful sender request changes the next button action, not reported playback.
 let mediaIntent = null, mediaPeer = '', mediaAudio = '';
 let eqDraft = null, eqCommitted = '';
 const eqSliders = Array.from({length: 5}, (_, index) => $('eq-slider-' + index));
@@ -20,10 +20,11 @@ const eqPresets = Object.freeze({
 });
 function mediaIdentity(s) {
   const bt = s?.bluetooth;
+  if (s?.source_state === 7 && s?.streaming?.service === 'AirPlay' && s.streaming.active) return 'airplay';
   return s?.input === 'Bluetooth' && bt?.connected ? JSON.stringify([bt.peer_name || '', bt.name || '']) : '';
 }
 function syncMediaIntent(s) {
-  const peer = mediaIdentity(s), audio = s?.bluetooth?.audio || '';
+  const peer = mediaIdentity(s), audio = peer === 'airplay' ? 'Session active' : s?.bluetooth?.audio || '';
   if (!peer || peer !== mediaPeer || audio !== mediaAudio) mediaIntent = null;
   mediaPeer = peer; mediaAudio = audio;
 }
@@ -346,7 +347,8 @@ function renderPlayback(s, ready, awake) {
   $('playback').classList.toggle('mirroring', !!cast?.mirroring);
   syncMediaIntent(s);
   const controls = s.media_controls || [];
-  const wantsPause = bluetooth ? (mediaIntent ? mediaIntent === 'media_play' : bt?.audio === 'Streaming') : cast?.player_state === 'PLAYING';
+  const airplay = playback?.service === 'AirPlay';
+  const wantsPause = bluetooth ? (mediaIntent ? mediaIntent === 'media_play' : bt?.audio === 'Streaming') : airplay ? (mediaIntent ? mediaIntent === 'media_play' : !!playback.active) : cast?.player_state === 'PLAYING';
   let toggle = wantsPause ? 'media_pause' : 'media_play';
   if (!controls.includes(toggle) && controls.includes(wantsPause ? 'media_play' : 'media_pause')) toggle = wantsPause ? 'media_play' : 'media_pause';
   const label = toggle === 'media_pause' ? 'Pause' : 'Play';
@@ -358,7 +360,7 @@ function renderPlayback(s, ready, awake) {
   for (const id of ['media-previous','media-toggle','media-next','media-stop']) {
     $(id).disabled = !ready || !awake || !!active || !controls.includes($(id).dataset.action);
   }
-  $('media-help').textContent = controls.length ? (bluetooth ? 'Sent to your device. Audio streaming may continue while an app is paused.' : 'Controls request changes from the receiver.') : cast?.mirroring ? 'Use playback controls in the sending app.' : bluetooth && bt?.connected ? 'Playback controls are unavailable for this connection.' : 'Playback controls aren’t available on this source.';
+  $('media-help').textContent = controls.length ? (bluetooth ? 'Sent to your device. Audio streaming may continue while an app is paused.' : airplay ? 'Sent to the AirPlay sender. Its play/pause state isn’t reported.' : 'Controls request changes from the receiver.') : cast?.mirroring ? 'Use playback controls in the sending app.' : bluetooth && bt?.connected ? 'Playback controls are unavailable for this connection.' : 'Playback controls aren’t available on this source.';
 }
 function renderExtras(s, ready, awake) {
   const sound=s.sound || {};

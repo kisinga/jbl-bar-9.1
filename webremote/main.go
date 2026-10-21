@@ -508,7 +508,7 @@ func controlBusy() bool {
 func (d *device) action(ctx context.Context, action string) (out state, err error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	keys := map[string]string{"volume_up": "0x6f000", "volume_down": "0x6f001", "mute": "0x6f002", "power": "0x8f000", "input_tv": "0x6f029", "input_hdmi": "0x6f01e", "input_bluetooth": "0x6f027", "bluetooth_pair": "0x6f027", "bass_next": "0x1f030", "atmos_next": "0x1f02f", "rear_next": "0x1f031", "media_play": "0x9f000", "media_pause": "0x9f001", "media_stop": "0x9f002", "media_next": "0x9f005", "media_previous": "0x9f006"}
+	keys := map[string]string{"volume_up": "0x6f000", "volume_down": "0x6f001", "mute": "0x6f002", "power": "0x8f000", "input_tv": "0x1f00c", "input_hdmi": "0x5f03e", "input_bluetooth": "0x6f027", "bluetooth_pair": "0x6f027", "bass_next": "0x1f030", "atmos_next": "0x1f02f", "rear_next": "0x1f031", "media_play": "0x9f000", "media_pause": "0x9f001", "media_stop": "0x9f002", "media_next": "0x9f005", "media_previous": "0x9f006"}
 	_, simple := keys[action]
 	if !simple && action != "standard" && action != "night_toggle" {
 		return out, errors.New("unknown control")
@@ -565,6 +565,12 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	if controlBusy() {
 		return before, errors.New("Smart Mode automation is busy; retry shortly")
 	}
+	if (action == "volume_up" || action == "volume_down" || action == "mute") && !d.eq.active && castVolumeReady(before) {
+		return d.castVolumeAction(ctx, action, before)
+	}
+	if strings.HasPrefix(action, "media_") && castMediaReady(before) {
+		return d.castMediaAction(ctx, action, before)
+	}
 	if strings.HasPrefix(action, "media_") && before.SourceState != nil && *before.SourceState == 2 {
 		return d.bluetoothAction(ctx, action, before)
 	}
@@ -590,6 +596,7 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 		return before, errors.New("Smart Mode automation is busy; retry shortly")
 	}
 	keySent := false
+	airplay := strings.HasPrefix(action, "media_") && airplayReady(before)
 	// Restore both fields even if a command fails or the request disconnects.
 	defer func() {
 		if keySent && (action == "standard" || action == "night_toggle") {
@@ -666,6 +673,22 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 		if e = d.cli(ctx, "mw.iom.se", comboKey, "50"); e != nil {
 			return before, e
 		}
+	} else if action == "bluetooth_pair" && before.Source != nil && *before.Source == 10 {
+		current := d.snapshotCurrent()
+		if current.Power != "On" || current.Source == nil || *current.Source != 10 || current.SourceState == nil || *current.SourceState != 2 {
+			return current, errors.New("Bluetooth source changed before pairing; refresh before retrying")
+		}
+		if e = d.cli(ctx, "app.bt.pair"); e != nil {
+			return before, e
+		}
+	} else if airplay {
+		command, ok := airplayCommand(action)
+		if !ok {
+			return before, errors.New("unsupported AirPlay control")
+		}
+		if e = d.cli(ctx, command...); e != nil {
+			return before, e
+		}
 	} else {
 		duration := "60"
 		// Misc repeat callback: 400 ms initial delay, 200 ms repeats, 25 to pair.
@@ -698,6 +721,13 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 		time.Sleep(100 * time.Millisecond)
 		if d.idleKeys() {
 			out = d.snapshotCurrent()
+			if airplay {
+				if !airplaySettingsPreserved(before, out) {
+					return out, errors.New("AirPlay settings changed during the request; check playback before retrying")
+				}
+				// SDK acceptance is a request, not sender playback feedback.
+				return out, nil
+			}
 			if actionObserved(action, before, out) {
 				if action == "standard" && !standardSettingsPreserved(before, out) {
 					return out, errors.New("Standard selected but volume or mute changed; automatic retry stopped")

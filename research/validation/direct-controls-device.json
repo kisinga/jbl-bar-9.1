@@ -1,0 +1,267 @@
+{
+  "date": "2026-10-21",
+  "target": "JBL Bar 9.1",
+  "firmware_sha256": "86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441c90b63",
+  "scope": "One owned bar; serialized web API tests against pinned native process and firmware. Personal captures retained privately. No firmware flash or native executable patch.",
+  "volume": {
+    "route": "Bluetooth only; custom Front EQ inactive; initial native volume1..30",
+    "method": "Cast receiver master SET_VOLUME; native config50/155 readback; source/mode/sound preserved; idle keys; no IOM or console writes",
+    "settled_roundtrips": [
+      [
+        {
+          "action": "volume_down",
+          "seconds": 0.371,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "volume_up",
+          "seconds": 0.338,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "mute",
+          "seconds": 0.409,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "mute",
+          "seconds": 0.333,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "mute",
+          "seconds": 0.459,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "volume_down",
+          "seconds": 0.568,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "volume_up",
+          "seconds": 0.435,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        }
+      ],
+      [
+        {
+          "action": "volume_down",
+          "seconds": 0.394,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "volume_up",
+          "seconds": 0.35,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "mute",
+          "seconds": 0.404,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "mute",
+          "seconds": 2.187,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "mute",
+          "seconds": 0.669,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "volume_down",
+          "seconds": 0.408,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        },
+        {
+          "action": "volume_up",
+          "seconds": 0.494,
+          "native_readback": true,
+          "settings_preserved": true,
+          "keys_released": true,
+          "console_restored": true
+        }
+      ]
+    ],
+    "settling_seconds_after_each_action": 3,
+    "fallback": "Other sources, boundary levels and active custom EQ retain IOM. Uncertain direct requests do not fall back or retry.",
+    "observed_start_levels": [
+      8,
+      8
+    ]
+  },
+  "bluetooth_pair": {
+    "command": "app.bt.pair",
+    "result": {
+      "seconds": 2.747,
+      "gap_connectable": true,
+      "gap_discoverable": true,
+      "other_settings_preserved": true,
+      "console_restored": true,
+      "keys_released": true
+    },
+    "limits": "Active Bluetooth route only. Native GAP flags establish pairing readiness, not completed peer pairing."
+  },
+  "cast_media": {
+    "method": "Cast V2 current application transport and media session; separate control sender; exact response IDs",
+    "test_media": "Generated local silent MP3, normal Default Media Receiver",
+    "events": [
+      {
+        "action": "media_pause",
+        "seconds": 0.744,
+        "receiver_state": "PAUSED",
+        "native_settings_preserved": true,
+        "keys_released": true,
+        "console_restored": true
+      },
+      {
+        "action": "media_play",
+        "seconds": 1.865,
+        "receiver_state": "PLAYING",
+        "native_settings_preserved": true,
+        "keys_released": true,
+        "console_restored": true
+      },
+      {
+        "action": "media_pause",
+        "seconds": 1.915,
+        "receiver_state": "PAUSED",
+        "native_settings_preserved": true,
+        "keys_released": true,
+        "console_restored": true
+      },
+      {
+        "action": "media_play",
+        "seconds": 1.892,
+        "receiver_state": "PLAYING",
+        "native_settings_preserved": true,
+        "keys_released": true,
+        "console_restored": true
+      },
+      {
+        "action": "media_stop",
+        "seconds": 1.919,
+        "receiver_state": "IDLE",
+        "native_settings_preserved": true,
+        "keys_released": true,
+        "console_restored": true
+      }
+    ],
+    "limits": [
+      "Receiver and native playback/settings readback; silent stream does not establish audible sender behavior.",
+      "Generated queue did not advertise Next/Previous capabilities; controls stayed disabled and no navigation mutations were sent.",
+      "Mirroring is excluded; sender/application-specific testing remains."
+    ]
+  },
+  "source_inputs": {
+    "method": "Complete native product source dispatcher through bounded IOM keys; not a direct function bridge",
+    "keys": {
+      "input_tv": "0x1f00c",
+      "input_hdmi": "0x5f03e",
+      "input_bluetooth": "0x6f027"
+    },
+    "events": [
+      {
+        "action": "input_tv",
+        "seconds": 1.552,
+        "product_source": 0,
+        "keys_released": true,
+        "console_restored": true
+      },
+      {
+        "action": "input_hdmi",
+        "seconds": 1.585,
+        "product_source": 3,
+        "keys_released": true,
+        "console_restored": true
+      },
+      {
+        "action": "input_bluetooth",
+        "seconds": 1.583,
+        "product_source": 2,
+        "keys_released": true,
+        "console_restored": true
+      }
+    ],
+    "limits": "One TV/ARC\u2192HDMI\u2192Bluetooth sequence; not an HDMI/eARC listening or CEC qualification."
+  },
+  "airplay": {
+    "implemented": true,
+    "method": "Fixed app.misc.ap_control codes0Play/1Stop/2Pause/3Next/4Previous; both native source enums and active session required",
+    "hardware_listening_test": false,
+    "limits": "Listening test declined. Static mapping, backend guard tests and UI fixtures passed; session activity is not Play/Pause feedback."
+  },
+  "power": {
+    "direct_command": "app.amb.po",
+    "result": "FAILED: bdpprog exited139/SIGSEGV; OS/SSH/Go remained available",
+    "recovery": "Restored earlier Go binary and rebooted OS; native service and normal controls returned. Candidate power code removed.",
+    "deployed_method": "Original bounded IOM power action",
+    "related_standby_command": "app.amb.sb also excluded; not actuated",
+    "static_hypothesis": "Legacy AM name lookup can return NULL for special app_mngr target, which can reach strcmp in the receiver. No PC/core proves that instruction caused this crash."
+  },
+  "remaining_sound_controls": {
+    "status": "Complete Smart/Night/bass/height/rear internal handlers located; no working complete external bridge established. Retain native keys/gestures.",
+    "excluded": "Config-only or DSP-only setters omit runtime/display, decoder/route/dock or saved-setting behavior."
+  },
+  "software_checks": {
+    "host_checks": 141,
+    "browser_checks": 164,
+    "go": "Full race suite and vet passed"
+  },
+  "limits": [
+    "No model-wide or other-firmware support claim.",
+    "Original v0.1.0 Smart Mode release archives unchanged.",
+    "Static registration is not runtime qualification; no unconfirmed mutation is automatically replayed."
+  ],
+  "final_health": {
+    "existing_iom_power_standby_wake": "passed",
+    "automatic_standard_after_wake": "passed",
+    "native_process_identity": "preserved through successful direct-control tests and final wake",
+    "keys_released": true,
+    "console_restored": true,
+    "installed_binary_matches_built_candidate": true,
+    "installed_manifest_and_startup_hook": "verified",
+    "final_state": "On, Standard, Bluetooth; normal control service available"
+  }
+}

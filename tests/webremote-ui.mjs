@@ -14,6 +14,7 @@ const streams=new Set(); let stateGets=0, streamGets=0, revision=0, lastSnapshot
 function snapshot() {
  state.media_controls=[];
  if(state.power==='On' && state.input==='Bluetooth' && state.bluetooth?.connected && state.bluetooth.media_ready)state.media_controls=['media_previous','media_play','media_pause','media_next','media_stop'];
+ if(state.power==='On' && state.source===14 && state.source_state===7 && state.streaming?.service==='AirPlay' && state.streaming.active)state.media_controls=['media_previous','media_play','media_pause','media_next','media_stop'];
  const c=state.streaming?.cast;
  if(state.power==='On' && state.input==='Chromecast' && c?.has_media && !c.mirroring){
   if(c.supported_commands&64)state.media_controls.push('media_next');
@@ -383,9 +384,23 @@ try {
   delete state.sound.night;
   await page.waitForFunction(()=>document.querySelector('#night').disabled);
   check((await page.locator('#night-value').textContent())==='Unavailable','missing night readback stays unavailable');
-  state.input='AirPlay';state.source_state=7;state.streaming={service:'AirPlay',status:'Session active',active:true};
+  state.input='AirPlay';state.source=14;state.source_state=7;state.streaming={service:'AirPlay',status:'Session active',active:true};
   await page.waitForFunction(()=>document.querySelector('#playback-service').textContent==='AirPlay');
   check((await page.locator('#playback-status').textContent())==='Session active','AirPlay updates via push without refresh');
+  check(await page.locator('#media-toggle').getAttribute('aria-label')==='Pause' && await page.locator('#media-next').isEnabled(),'active AirPlay exposes direct sender controls');
+  await page.locator('#media-toggle').click();
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').dataset.action==='media_play' && !document.querySelector('#media-toggle').disabled);
+  check(calls.at(-1)==='media_pause' && await page.locator('#playback-status').textContent()==='Session active','AirPlay pause intent never invents sender playback feedback');
+  check((await page.locator('#media-help').textContent()).includes('isn’t reported'),'AirPlay sender feedback limit is explicit');
+  await page.locator('#media-toggle').click();
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').dataset.action==='media_pause' && !document.querySelector('#media-toggle').disabled);
+  check(calls.at(-1)==='media_play','AirPlay single transport alternates requested Play and Pause');
+  state.streaming.active=false;
+  await page.waitForFunction(()=>document.querySelector('#media-toggle').disabled);
+  check(await page.locator('#media-next').isDisabled(),'ended AirPlay sessions disable sender controls');
+  state.streaming.active=true;
+  await page.waitForFunction(()=>!document.querySelector('#media-toggle').disabled);
+  check(await page.locator('#media-toggle').getAttribute('aria-label')==='Pause','new AirPlay session clears earlier playback intent');
   state.input='Chromecast';state.streaming={service:'Chromecast',status:'Paused',active:false};
   await page.waitForFunction(()=>document.querySelector('#playback-service').textContent==='Chromecast');
   check((await page.locator('#playback-status').textContent())==='Paused','Chromecast pause state shown');
