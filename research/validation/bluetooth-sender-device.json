@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-21",
+  "firmware_sha256": "86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441c90b63",
+  "deployed_commit": "047c621",
+  "sender": "Linux desktop, Brave, YouTube; one owned setup",
+  "report": "Bluetooth Play/Pause did not pause playback",
+  "observations": {
+    "native_api": "Pause and Play accepted, native A2DP remained Streaming",
+    "pc_capture": "Pause0x46/release0xc6 and Play0x44/release0xc4 received; corresponding AV/C Accepted0x09 replies sent",
+    "control_frames": [
+      {
+        "pc_direction": "received",
+        "avctp_payload_hex": "10 11 0e 00 48 7c 46 00"
+      },
+      {
+        "pc_direction": "received",
+        "avctp_payload_hex": "40 11 0e 00 48 7c c6 00"
+      },
+      {
+        "pc_direction": "sent",
+        "avctp_payload_hex": "12 11 0e 09 48 7c 46 00"
+      },
+      {
+        "pc_direction": "sent",
+        "avctp_payload_hex": "42 11 0e 09 48 7c c6 00"
+      },
+      {
+        "pc_direction": "received",
+        "avctp_payload_hex": "10 11 0e 00 48 7c 44 00"
+      },
+      {
+        "pc_direction": "received",
+        "avctp_payload_hex": "40 11 0e 00 48 7c c4 00"
+      },
+      {
+        "pc_direction": "sent",
+        "avctp_payload_hex": "12 11 0e 09 48 7c 44 00"
+      },
+      {
+        "pc_direction": "sent",
+        "avctp_payload_hex": "42 11 0e 09 48 7c c4 00"
+      }
+    ],
+    "desktop_player_status": [
+      "Playing",
+      "Playing after Pause",
+      "Playing after Play"
+    ],
+    "local_desktop_pause": "Direct MPRIS Pause/Play/PlayPause returned successfully without changing reported Playing state",
+    "advertised_desktop_capabilities": {
+      "CanPause": true,
+      "CanPlay": true,
+      "CanControl": true
+    }
+  },
+  "conclusion": "This failure is downstream of soundbar transmission: the PC received and accepted the controls. Current browser/session behavior remains unresolved; native RPC acceptance must not be presented as sender playback confirmation.",
+  "limits": [
+    "Prior audible Pause confirmation does not establish compatibility with every sender/session.",
+    "A2DP stream status and successful desktop RPC replies do not prove audible playback.",
+    "Full HCI/audio capture, peer identifiers and listening history stay private."
+  ],
+  "references": [
+    "https://kernel.googlesource.com/pub/scm/bluetooth/bluez/+/master/tools/parser/avrcp.c",
+    "https://specifications.freedesktop.org/mpris/latest/Player_Interface.html"
+  ]
+}

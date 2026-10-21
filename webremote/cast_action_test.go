@@ -71,3 +71,26 @@ func TestCastMediaConfirmationRequiresReceiverAndNative(t *testing.T) {
 		t.Fatal("unknown action accepted")
 	}
 }
+
+func TestCastStopCannotBeConfirmedByAnotherRoute(t *testing.T) {
+	for _, change := range []func(*state){
+		func(s *state) { s.Available = false },
+		func(s *state) { s.Power = "Standby" },
+		func(s *state) { s.Source = nil },
+		func(s *state) { *s.Source = 10 },
+		func(s *state) { s.SourceState = nil },
+		func(s *state) { *s.SourceState = 2 },
+		func(s *state) { s.Streaming = nil },
+		func(s *state) { s.Streaming.Cast = nil },
+		func(s *state) { s.Streaming.Cast.Available = false },
+		func(s *state) { s.Streaming.Cast.Mirroring = true },
+	} {
+		s := castActionState()
+		s.Streaming.Cast.HasMedia = false
+		s.Streaming.Cast.PlayerState = "IDLE"
+		change(&s)
+		if castMediaConfirmed("media_stop", castControlResult{}, s) {
+			t.Fatal("unavailable, changed or mirrored route confirmed Stop")
+		}
+	}
+}

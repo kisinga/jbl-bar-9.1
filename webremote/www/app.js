@@ -19,6 +19,7 @@ const eqPresets = Object.freeze({
   vocal_focus: Object.freeze([-4,-2,0,-1,-2]),
 });
 function mediaIdentity(s) {
+  if (!s?.available || s.power !== 'On') return '';
   const bt = s?.bluetooth;
   if (s?.source_state === 7 && s?.streaming?.service === 'AirPlay' && s.streaming.active) return 'airplay';
   return s?.input === 'Bluetooth' && bt?.connected ? JSON.stringify([bt.peer_name || '', bt.name || '']) : '';
@@ -116,7 +117,7 @@ function connectStream() {
   };
   source.onerror = () => {
     if (stream !== source) return;
-    online = false; queue = []; latestState = null; stopHold();
+    online = false; queue = []; latestState = null; mediaIntent = null; stopHold();
     feedback('Live connection lost. Reconnecting; pending taps were cleared.', 'error');
     render();
     if (!current) { $('connection-label').textContent='Reconnecting';$('refresh').disabled=false; }
@@ -141,6 +142,7 @@ async function refresh() {
   } catch {
     if (version !== epoch || active) return;
     online = false;
+    mediaIntent = null;
     queue = [];
     stopHold();
     feedback('Connection lost. Reconnecting automatically; no controls will be replayed.', 'error');
@@ -225,6 +227,7 @@ async function pump() {
     stopHold();
     if (error.name === 'TypeError' || error.name === 'TimeoutError') {
       online = false;
+      mediaIntent = null;
       feedback('Connection interrupted. The last change may have applied; pending taps were cleared.', 'error');
     } else feedback(error.message, 'error');
   } finally {
@@ -360,7 +363,7 @@ function renderPlayback(s, ready, awake) {
   for (const id of ['media-previous','media-toggle','media-next','media-stop']) {
     $(id).disabled = !ready || !awake || !!active || !controls.includes($(id).dataset.action);
   }
-  $('media-help').textContent = controls.length ? (bluetooth ? 'Sent to your device. Audio streaming may continue while an app is paused.' : airplay ? 'Sent to the AirPlay sender. Its play/pause state isn’t reported.' : 'Controls request changes from the receiver.') : cast?.mirroring ? 'Use playback controls in the sending app.' : bluetooth && bt?.connected ? 'Playback controls are unavailable for this connection.' : 'Playback controls aren’t available on this source.';
+  $('media-help').textContent = controls.length ? (bluetooth ? 'Your app must support remote controls. Streaming may continue while an app is paused.' : airplay ? 'Sent to the AirPlay sender. Its play/pause state isn’t reported.' : 'Controls request changes from the receiver.') : cast?.mirroring ? 'Use playback controls in the sending app.' : bluetooth && bt?.connected ? 'Playback controls are unavailable for this connection.' : 'Playback controls aren’t available on this source.';
 }
 function renderExtras(s, ready, awake) {
   const sound=s.sound || {};

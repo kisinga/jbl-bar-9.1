@@ -7,21 +7,27 @@ import (
 	"time"
 )
 
-func castMediaReady(s state) bool {
+func castMediaRouteReady(s state) bool {
 	return s.Available && s.Power == "On" && s.Source != nil && *s.Source == 13 &&
 		s.SourceState != nil && *s.SourceState == 6 && s.Streaming != nil &&
-		s.Streaming.Cast != nil && s.Streaming.Cast.Available && s.Streaming.Cast.HasMedia && !s.Streaming.Cast.Mirroring
+		s.Streaming.Cast != nil && s.Streaming.Cast.Available && !s.Streaming.Cast.Mirroring
+}
+
+func castMediaReady(s state) bool {
+	return castMediaRouteReady(s) && s.Streaming.Cast.HasMedia
 }
 
 func castMediaConfirmed(action string, result castControlResult, after state) bool {
+	if !castMediaRouteReady(after) {
+		return false
+	}
 	switch action {
 	case "media_play":
 		return result.PlayerState == "PLAYING" && mediaObserved(action, after)
 	case "media_pause":
 		return result.PlayerState == "PAUSED" && mediaObserved(action, after)
 	case "media_stop":
-		return (result.PlayerState == "" || result.PlayerState == "IDLE") && after.Streaming != nil &&
-			after.Streaming.Cast != nil && after.Streaming.Cast.Available &&
+		return (result.PlayerState == "" || result.PlayerState == "IDLE") &&
 			(!after.Streaming.Cast.HasMedia || after.Streaming.Cast.PlayerState == "IDLE")
 	case "media_next", "media_previous":
 		// A correlated receiver response acknowledges navigation, not which song

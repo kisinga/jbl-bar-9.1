@@ -263,5 +263,6 @@
     "installed_binary_matches_built_candidate": true,
     "installed_manifest_and_startup_hook": "verified",
     "final_state": "On, Standard, Bluetooth; normal control service available"
-  }
+  },
+  "qualified_commit": "047c621"
 }

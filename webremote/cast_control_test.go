@@ -191,6 +191,39 @@ func TestCastControlMediaCommands(t *testing.T) {
 	}
 }
 
+func TestCastControlRejectsUnrelatedOrIncompleteMediaReplies(t *testing.T) {
+	for _, tc := range []struct {
+		name, action, fields string
+		wantErr              bool
+	}{
+		{"matching", "pause", `,"status":[{"mediaSessionId":17,"playerState":"PAUSED"}]`, false},
+		{"different session", "pause", `,"status":[{"mediaSessionId":18,"playerState":"PAUSED"}]`, true},
+		{"missing session", "pause", `,"status":[{"playerState":"PAUSED"}]`, true},
+		{"multiple sessions", "pause", `,"status":[{"mediaSessionId":17,"playerState":"PAUSED"},{"mediaSessionId":18,"playerState":"PLAYING"}]`, true},
+		{"missing playback", "pause", `,"status":[{"mediaSessionId":17}]`, true},
+		{"unknown playback", "pause", `,"status":[{"mediaSessionId":17,"playerState":"UNKNOWN"}]`, true},
+		{"empty pause", "pause", `,"status":[]`, true},
+		{"empty stop", "stop", `,"status":[]`, false},
+		{"missing stop status", "stop", ``, true},
+		{"null stop status", "stop", `,"status":null`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, e := castControlPipe(t, castControlRequest{Action: tc.action}, func(conn net.Conn) error {
+				if e := fakeCastControlMedia(conn, "PLAYING", 1); e != nil {
+					return e
+				}
+				if _, e := fakeCastControlRead(conn, castMedia, "fixture-transport", strings.ToUpper(tc.action), 3); e != nil {
+					return e
+				}
+				return writeFakeCastControl(conn, "fixture-transport", castMedia, `{"type":"MEDIA_STATUS","requestId":3`+tc.fields+`}`)
+			})
+			if (e != nil) != tc.wantErr {
+				t.Fatalf("reply accepted=%v, want error=%v: %v", e == nil, tc.wantErr, e)
+			}
+		})
+	}
+}
+
 func TestCastControlRejectsUnsupportedMediaBeforeMutation(t *testing.T) {
 	for _, tc := range []struct {
 		action, state string

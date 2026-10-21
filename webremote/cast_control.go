@@ -227,9 +227,24 @@ func castControlConnection(conn net.Conn, request castControlRequest) (castContr
 	if e != nil {
 		return castControlResult{}, e
 	}
+	// A matching request ID alone does not identify the media that replied.
+	// Stop may remove its session; other commands require one matching session.
+	var reply castMediaReply
+	if e := json.Unmarshal(b, &reply); e != nil || reply.Status == nil {
+		return castControlResult{}, errors.New("Cast control omitted media status")
+	}
+	if request.Action == "stop" && len(reply.Status) == 0 {
+		return castControlResult{}, nil
+	}
+	if len(reply.Status) != 1 || reply.Status[0].MediaSessionID == nil || *reply.Status[0].MediaSessionID != *m.MediaSessionID {
+		return castControlResult{}, errors.New("Cast media session changed during control")
+	}
 	var result CastSnapshot
 	if e := applyCastMedia(&result, b); e != nil {
 		return castControlResult{}, e
+	}
+	if result.PlayerState == "" {
+		return castControlResult{}, errors.New("Cast control omitted playback state")
 	}
 	return castControlResult{PlayerState: result.PlayerState}, nil
 }
