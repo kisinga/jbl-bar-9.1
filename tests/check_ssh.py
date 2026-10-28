@@ -78,7 +78,13 @@ def archive_tests():
             assert encoded == expected
             assert all(passphrase.encode() not in archive.read(n) for n in archive.namelist())
         passed("per_owner_lan_optional_wpa2_derivation_usb_only")
-        for pc in ("8.8.8.8", "127.0.0.1", "0.0.0.0", "::1", "10.0.0.999", "10.0.0.1;echo"):
+        for network in ("192.168.1.0/24", "10.0.0.0/8"):
+            assert builder.allowed_ipv4(network) == network
+        cidr = builder.build(folder / "cidr", "192.168.1.0/24", password)
+        with zipfile.ZipFile(cidr[0]) as archive:
+            assert b"ALLOWED_PC=192.168.1.0/24\n" in archive.read("JBLLocalSSH/settings.conf")
+        for pc in ("8.8.8.8", "127.0.0.1", "0.0.0.0", "::1", "10.0.0.999", "10.0.0.1;echo",
+                   "192.168.1.5/24", "8.8.8.0/24", "192.168.1.0/31", "192.168.1.0/32", "192.168.1.0/24;echo"):
             try:
                 builder.allowed_ipv4(pc)
             except ValueError:
@@ -169,6 +175,11 @@ def address_tests():
             ("192.168.44.7", "192.168.44.21/24", "192.168.44.21"),
             ("10.23.4.7", "10.23.4.7/24", ""),
             ("10.23.4.7", "8.8.8.8/8", ""),
+            ("192.168.1.0/24", "192.168.1.109/24", "192.168.1.109"),
+            ("192.168.1.0/24", "192.168.1.109/16", "192.168.1.109"),
+            ("192.168.1.0/24", "192.168.2.9/24", ""),
+            ("10.0.0.0/8", "10.23.5.20/24", "10.23.5.20"),
+            ("192.168.1.0/24", "8.8.8.8/8", ""),
         )
         for pc, cidr, expected in tests:
             env = dict(os.environ, JBL_BUSYBOX=str(wrapper), ALLOWED_PC=pc, INTERFACE="wlan0",

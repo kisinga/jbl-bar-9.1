@@ -47,7 +47,7 @@ Build on Linux with Python 3:
 python3 tools/build_ssh.py --allowed-pc <computer-ipv4-address>
 ```
 
-Enter a new root password twice, at least eight characters. The builder embeds its SHA-512 crypt hash and limits login to the supplied computer address. Keep generated packages private, including password hashes and derived Wi-Fi PSKs.
+Enter a new root password twice, at least eight characters. The builder embeds its SHA-512 crypt hash and limits login to the supplied computer address. `--allowed-pc` also accepts a private IPv4 CIDR such as `192.168.1.0/24` to allow any host on that subnet; the bar’s own address on the chosen interface must lie inside it. Keep generated packages private, including password hashes and derived Wi-Fi PSKs.
 
 Default behavior reuses configured Wi-Fi and enables SSH autostart. Add `--wifi` for interactive SSID/WPA2 credentials or `--usb-only` to require USB insertion after each reboot. The default interface is `wlan0`.
 
