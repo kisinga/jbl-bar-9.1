@@ -72,6 +72,10 @@
           <div class="sound-row"><div><span>Bass</span><small id="bass-value">—</small></div><button data-action="bass_next" id="bass-next" disabled aria-label="Change bass level">Change <span aria-hidden="true">↗</span></button></div>
           <div class="sound-row"><div><span>Atmos height</span><small id="atmos-value">—</small></div><button data-action="atmos_next" id="atmos-next" disabled aria-label="Change Atmos height level">Change <span aria-hidden="true">↗</span></button></div>
           <div class="sound-row"><div><span>Rear speakers</span><small id="rear-value">—</small></div><button data-action="rear_next" id="rear-next" disabled aria-label="Change rear speaker level">Change <span aria-hidden="true">↗</span></button></div>
+          <div class="sound-row"><div class="rear-battery-panel"><span>Rear batteries</span><small>Last reported. May lag when speakers are off</small><div class="rear-batteries">
+            <div><span id="rear-battery-left">Left: Unavailable</span><meter id="rear-battery-left-meter" min="0" max="100" value="0" aria-label="Left rear battery" hidden></meter></div>
+            <div><span id="rear-battery-right">Right: Unavailable</span><meter id="rear-battery-right-meter" min="0" max="100" value="0" aria-label="Right rear battery" hidden></meter></div>
+          </div></div></div>
           <div class="sound-row night-row"><div><span>Night mode</span><small id="night-value">—</small></div><button data-action="night_toggle" id="night" disabled aria-pressed="false"><span id="night-label">Turn on</span></button></div>
         </div>
         <p class="sound-note">Change cycles through levels. Atmos height applies to Atmos audio.</p>
