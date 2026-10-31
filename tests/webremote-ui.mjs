@@ -87,6 +87,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('#connection').dataset.state==='online');
   check(stateGets===0 && streamGets===1,'initial state uses one push connection');
   check(await page.locator('h1').count()===1,'one clear page heading');
+  check(await page.locator('#system-panel .rear-battery-panel').count()===1 && await page.locator('.mode-panel .rear-battery-panel').count()===0,'rear battery indicators belong to System monitor');
   check(await page.locator('#rear-battery-left').textContent()==='Left: 80%' && await page.locator('#rear-battery-right-meter').getAttribute('value')==='90','independent rear battery levels render with meters');
   state.sound.rear_battery_left=0;delete state.sound.rear_battery_right;
   await page.waitForFunction(()=>document.querySelector('#rear-battery-left').textContent==='Left: 0%');
