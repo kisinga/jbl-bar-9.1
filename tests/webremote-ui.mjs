@@ -80,7 +80,7 @@ const browser = await chromium.launch({headless:true});
 let checks=0;
 function check(value,message) {assert.ok(value,message);checks++;}
 try {
-  const page = await browser.newPage({viewport:{width:390,height:844}, reducedMotion:'reduce'});
+  const page = await browser.newPage({locale:'en-US',viewport:{width:390,height:844}, reducedMotion:'reduce'});
   const errors=[]; page.on('pageerror',error=>errors.push(error.message));
   const url='http://127.0.0.1:'+server.address().port;
   await page.goto(url);
