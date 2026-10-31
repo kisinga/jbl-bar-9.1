@@ -374,6 +374,7 @@ function renderExtras(s, ready, awake) {
     const meter = $('rear-battery-' + side + '-meter');
     meter.hidden = !available;
     meter.value = available ? value : 0;
+    meter.dataset.level = !available ? 'unknown' : value < 20 ? 'critical' : value < 40 ? 'low' : 'normal';
   }
   $('night-value').textContent = sound.night == null ? 'Unavailable' : sound.night ? 'On' : 'Off';
   $('night-label').textContent = active === 'night_toggle' ? 'Changing…' : sound.night ? 'Turn off' : 'Turn on';

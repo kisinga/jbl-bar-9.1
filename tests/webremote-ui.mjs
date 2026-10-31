@@ -89,6 +89,11 @@ try {
   check(await page.locator('h1').count()===1,'one clear page heading');
   check(await page.locator('#system-panel .rear-battery-panel').count()===1 && await page.locator('.mode-panel .rear-battery-panel').count()===0,'rear battery indicators belong to System monitor');
   check(await page.locator('#rear-battery-left').textContent()==='Left: 80%' && await page.locator('#rear-battery-right-meter').getAttribute('value')==='90','independent rear battery levels render with meters');
+  for (const [value,level,color] of [[19,'critical','#ed8585'],[20,'low','#e7c66a'],[39,'low','#e7c66a'],[40,'normal','#b6dba9']]) {
+    state.sound.rear_battery_left=value;
+    await page.waitForFunction(v=>document.querySelector('#rear-battery-left-meter').value===v,value);
+    check(await page.locator('#rear-battery-left-meter').getAttribute('data-level')===level && await page.locator('#rear-battery-left-meter').evaluate(e=>getComputedStyle(e).getPropertyValue('--battery-color').trim())===color,'battery threshold color at '+value+'%');
+  }
   state.sound.rear_battery_left=0;delete state.sound.rear_battery_right;
   await page.waitForFunction(()=>document.querySelector('#rear-battery-left').textContent==='Left: 0%');
   check(await page.locator('#rear-battery-right').textContent()==='Right: Unavailable' && await page.locator('#rear-battery-right-meter').isHidden(),'zero is a real reading and missing side has no misleading meter');
@@ -452,6 +457,7 @@ try {
   check((await page.locator('#cast-eq').textContent())==='Low 0 dB · High -2 dB (read only)','Cast tone readback shown without unsafe controls');
   for (const width of [320,390,1024]) {
     await page.setViewportSize({width,height:900});
+    check(await page.locator('#rear-battery-left-meter').evaluate(e=>{const a=e.getBoundingClientRect(),b=document.querySelector('#storage-progress').getBoundingClientRect();return a.height===b.height && Math.abs(a.width-b.width)<1;}),'battery bar matches Storage dimensions at '+width);
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'long media metadata fits at '+width);
     check(await page.locator('.transport button').evaluateAll(buttons=>buttons.every(button=>{const r=button.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.left>=0 && r.right<=innerWidth;})),'four 44px transport targets fit at '+width);
   }
