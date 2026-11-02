@@ -31,6 +31,7 @@ const (
 const (
 	msgSubNotConnected = 2
 	msgSubConnected    = 3
+	msgAudioSync       = 26
 	msgCalibration1    = 58
 	msgCalibration2    = 59
 	msgCountdownLast   = 64 // 60..64 = countdown 1..5

@@ -9,15 +9,16 @@ import (
 
 // Audio sync (lip-sync delay), as described in the owner's manual: hold the
 // remote's TV key for more than three seconds, release, then press + or -
-// within five seconds. The first press only shows the current delay; each
-// following press changes it by 10 ms. The saved delay is config 375, in ms,
+// within five seconds. The hold shows the audio sync message on the front
+// display, which is checked before any + or -. The first press only shows the
+// current delay; each following press changes it by 10 ms. The saved delay is config 375, in ms,
 // so every step is confirmed by read-back.
 //
 // The bar stays in audio sync mode for five seconds after the last press and
 // would treat + or - as sync changes meanwhile, so the control keeps the
 // native lock until that window has closed. If the hold did not open sync
-// mode, the first + reaches volume instead: that is detected, undone and
-// reported before any sync change is attempted.
+// mode, nothing else is sent; should the first + still reach the volume, that
+// is detected, undone and reported before any sync change is attempted.
 const (
 	avSyncConfig       = 375
 	avSyncStepMS       = 10
@@ -126,6 +127,11 @@ func (d *device) avSyncAction(ctx context.Context, target int) (state, error) {
 	e = d.withEQConsole(ctx, func(ctx context.Context) error {
 		if e := d.avSyncPress(ctx, avSyncKey, avSyncHold); e != nil {
 			return e
+		}
+		// The hold alone shows the audio sync message (26): confirm sync mode
+		// before any + so that a missed hold never reaches the volume.
+		if !d.waitDisplay(ctx, time.Second, func(message, _ uint32) bool { return message == msgAudioSync }) {
+			return errors.New("audio sync mode did not open; nothing else was sent")
 		}
 		// Display-only press: must change neither the delay nor the volume.
 		if e := d.avSyncPress(ctx, "0x6f000", "60"); e != nil {
