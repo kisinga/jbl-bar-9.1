@@ -47,7 +47,7 @@ Build on Linux with Python 3:
 python3 tools/build_ssh.py --allowed-pc <computer-ipv4-address>
 ```
 
-Enter a new root password twice, at least eight characters. The builder embeds its SHA-512 crypt hash and limits login to the supplied computer address. Keep generated packages private, including password hashes and derived Wi-Fi PSKs.
+Enter a new root password twice, at least eight characters. The builder embeds its SHA-512 crypt hash and limits login to the supplied computer address. `--allowed-pc` also accepts a private IPv4 CIDR such as `192.168.1.0/24` to allow any host on that subnet; the bar’s own address on the chosen interface must lie inside it. Keep generated packages private, including password hashes and derived Wi-Fi PSKs.
 
 Default behavior reuses configured Wi-Fi and enables SSH autostart. Add `--wifi` for interactive SSID/WPA2 credentials or `--usb-only` to require USB insertion after each reboot. The default interface is `wlan0`.
 
@@ -173,6 +173,12 @@ Direct controls use fixed native/protocol commands, fresh source/capability chec
 Go tests cover access boundaries, event streams, native Wi-Fi datagrams, readback, peer filtering, sound decoding, Bonjour, Cast framing/status, system parsing/cache behavior, native EQ route guards and full-block recipe preservation, wake state transitions and legacy takeover/restoration. Run race tests and vet after backend changes. Fixtures do not establish audible behavior.
 
 Hardware confirmation includes volume/mute, pairing/name/native stream states, AirPlay/Wi-Fi readback, Night Mode Off → On → Off and bass/Atmos cycles restored to initial settings. Rear changes require an undocked test; product TV/ARC, HDMI and Bluetooth selection now have a controlled roundtrip, while broader power/source/manual Standard coverage remains experimental. Chrome Audio Mirroring (`85CDB22F`) keeps receiver PLAYING when sender playback pauses; label mirroring without claiming sender pause detection. Automatic hotspot activation/access needs a separate outage test.
+
+### Center level (experimental)
+
+The firmware has no native center setting. `center_next` cycles five levels by writing the per-channel digital gain of the TAS5825M at 8-bit address `0x98` (left = center tweeter, right = center driver): book `0x8C`, page `0x0B`, registers `0x0C`/`0x10`, Q9.23 big-endian (`0x00800000` = 0 dB). Transfers use bdpprog's `/dev/i2c` write ioctl `0x40047301` and 36-byte descriptor (bus `0x63/0x62`), always ending on book 0 / page 0. Levels 0–5 map to 0, +2.4, +4.8, +7.2, +9.6 and +12 dB (boost only); level 0 writes nothing until another level has been chosen. +6 dB was validated by ear; above it, loud passages can clip, so lower other volume rather than pushing the top levels at high volume.
+
+Amplifiers reload defaults on wake, so a saved non-default level (`/var/JBLRemote/center-level`) is re-applied 4 s and 15 s after each observed wake or firmware restart, only with idle keys and no other control running. Front EQ is not reset by this control (different processing stage). Limits: the read ioctl fails on the qualified unit, so the page shows the requested level; bdpprog shares the device and could interleave its own amplifier writes during the short book/page window. Channel identification and audible +6 dB dialogue boost were checked by ear on one bar; standby/wake persistence needs further qualification.
 
 ### Optional CLI
 

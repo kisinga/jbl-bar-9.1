@@ -8,6 +8,9 @@ type soundState struct {
 	Atmos            *uint32 `json:"atmos,omitempty"`
 	Rear             *uint32 `json:"rear,omitempty"`
 	RearDocked       *bool   `json:"rear_docked,omitempty"`
+	// Center is the requested center-channel level (0-5, 0 = original).
+	Center      *uint32 `json:"center,omitempty"`
+	CenterError string  `json:"center_error,omitempty"`
 }
 
 func (d *device) sound() soundState {
@@ -33,6 +36,9 @@ func (d *device) sound() soundState {
 	}
 	s.RearBatteryLeft = d.rearBattery(0xe435f9)
 	s.RearBatteryRight = d.rearBattery(0xe435fb)
+	center := d.centerLevel()
+	s.Center = &center
+	s.CenterError = d.center.problem
 	return s
 }
 func soundValue(action string, s *soundState) (uint32, uint32, bool) {

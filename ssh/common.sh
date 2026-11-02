@@ -26,6 +26,7 @@ verify_tools() {
 find_address() {
     # Restrict SSH to a private IPv4 interface sharing the owner's PC subnet.
     # Honor the actual interface prefix rather than assuming a /24 or address.
+    # If ALLOWED_PC is a net/prefix, use the first private interface address inside it.
     "$BB" ip -4 -o addr show dev "$INTERFACE" 2>/dev/null |
     "$BB" awk -v pc="$ALLOWED_PC" '
     function number(s, a,n,i,v) {
@@ -34,8 +35,16 @@ find_address() {
         return v
     }
     $3=="inet" {
-        split($4,c,"/"); split(c[1],b,"."); ip=number(c[1]); owner=number(pc);
+        split($4,c,"/"); split(c[1],b,"."); ip=number(c[1]);
         private=(b[1]==10 || (b[1]==172 && b[2]>=16 && b[2]<=31) || (b[1]==192 && b[2]==168));
+        if(index(pc,"/")) {
+            split(pc,p,"/"); net=number(p[1]);
+            if(ip<0 || net<0 || p[2]!~/^[0-9]+$/ || p[2]<1 || p[2]>32 || !private) next;
+            unit=1; for(i=0;i<32-p[2];i++) unit*=2;
+            if(int(ip/unit)==int(net/unit)) {print c[1]; exit}
+            next
+        }
+        owner=number(pc);
         if(ip<0 || owner<0 || c[2]<1 || c[2]>32 || !private || ip==owner) next;
         unit=1; for(i=0;i<32-c[2];i++) unit*=2;
         if(int(ip/unit)==int(owner/unit)) {print c[1]; exit}
