@@ -9,6 +9,8 @@ type soundState struct {
 	// Center is the requested center-channel level (0-5, 0 = original).
 	Center      *uint32 `json:"center,omitempty"`
 	CenterError string  `json:"center_error,omitempty"`
+	// AVSyncMS is the saved audio sync (lip-sync) delay in ms.
+	AVSyncMS *uint32 `json:"av_sync_ms,omitempty"`
 }
 
 func (d *device) sound() soundState {
@@ -35,6 +37,9 @@ func (d *device) sound() soundState {
 	center := d.centerLevel()
 	s.Center = &center
 	s.CenterError = d.center.problem
+	if v, e := d.configByte(avSyncConfig); e == nil && v <= avSyncMaxMS {
+		s.AVSyncMS = &v
+	}
 	return s
 }
 func soundValue(action string, s *soundState) (uint32, uint32, bool) {

@@ -76,6 +76,12 @@
           <div class="sound-row night-row"><div><span>Night mode</span><small id="night-value">—</small></div><button data-action="night_toggle" id="night" disabled aria-pressed="false"><span id="night-label">Turn on</span></button></div>
         </div>
         <p class="sound-note">Change cycles through levels. Center boosts the dialogue channel from 0 (original) to +12 dB; high levels can distort at loud volume. Atmos height applies to Atmos audio.</p>
+        <details class="advanced" id="advanced"><summary>Advanced <span aria-hidden="true">+</span></summary>
+          <div class="sound-settings">
+            <div class="sound-row"><div><span>Audio sync</span><small id="av-sync-value">—</small></div><div class="stepper"><button data-action="av_sync_down" id="av-sync-down" disabled aria-label="Decrease audio delay by 10 ms">−</button><button data-action="av_sync_up" id="av-sync-up" disabled aria-label="Increase audio delay by 10 ms">+</button></div></div>
+          </div>
+          <p class="sound-note">Audio sync delays sound to match the picture, in 10 ms steps, on the TV input. Each change takes about ten seconds: the bar keeps other controls for five seconds afterwards.</p>
+        </details>
       </section>
       <section id="eq-panel" class="eq-panel panel" aria-labelledby="eq-heading" data-state="unavailable">
         <div class="section-heading"><div><p class="section-kicker">SHAPE YOUR SOUND</p><h2 id="eq-heading">Front EQ</h2></div><span class="development-tag">Experimental</span></div>

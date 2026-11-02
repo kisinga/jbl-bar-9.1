@@ -417,9 +417,9 @@ func (d *device) awakeForGesture(action string, source *uint32) bool {
 	if e != nil || current != *source {
 		return false
 	}
-	if action == "standard" {
+	if action == "standard" || action == "smart" {
 		mode, e := d.read(13378532, 4)
-		return e == nil && mode == 3
+		return e == nil && (action == "standard" && mode == 3 || action == "smart" && mode == 0)
 	}
 	return true
 }

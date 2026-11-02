@@ -64,13 +64,15 @@ function render() {
     b.setAttribute('aria-pressed', String(selected));
   });
   $('mode').textContent = s.mode === 'Standard' ? 'Standard' : s.mode === 'Smart' ? 'Smart Mode' : 'Checking mode';
-  $('mode-description').textContent = !awake ? 'Turn on to adjust your sound.' : s.mode === 'Standard' ? 'Smart Mode is off.' : 'Use Standard to turn Smart Mode off.';
-  $('standard-label').textContent = active === 'standard' ? 'Selecting…' : s.mode === 'Standard' ? 'Selected' : 'Use Standard';
-  $('standard').classList.toggle('confirmed', s.mode === 'Standard');
+  $('mode-description').textContent = !awake ? 'Turn on to adjust your sound.' : s.mode === 'Standard' ? 'Smart Mode is off. Use Smart to turn it back on.' : 'Use Standard to turn Smart Mode off.';
+  // One button toggles between the two native modes.
+  $('standard').dataset.action = s.mode === 'Standard' ? 'smart' : 'standard';
+  $('standard-label').textContent = active === 'standard' || active === 'smart' ? 'Selecting…' : s.mode === 'Standard' ? 'Use Smart' : 'Use Standard';
+  $('standard').classList.toggle('confirmed', false);
   $('volume-hint').textContent = !awake ? 'Turn the bar on to adjust volume.' : s.muted ? 'Sound is muted. Tap above to unmute.' : 'Tap to adjust. Hold to keep going.';
   buttons.forEach(b => {
     const action = b.dataset.action;
-    b.disabled = !ready || !['On', 'Standby'].includes(s.power) || (action !== 'power' && !awake) || (pending && !(isVolume(action) && isVolume(active))) || (action === 'standard' && s.mode === 'Standard');
+    b.disabled = !ready || !['On', 'Standby'].includes(s.power) || (action !== 'power' && !awake) || (pending && !(isVolume(action) && isVolume(active))) || ((action === 'standard' || action === 'smart') && !['Standard', 'Smart'].includes(s.mode));
     b.classList.toggle('pending-control', action === active && !isVolume(action));
     b.setAttribute('aria-busy', String(action === active));
   });
@@ -175,6 +177,8 @@ function success(action, s) {
   if (action === 'atmos_next') return 'Atmos height: ' + ['Low','Mid','High'][s.sound.atmos] + '.';
   if (action === 'rear_next') return 'Rear speakers: ' + ['Low','Mid','High','Muted'][s.sound.rear] + '.';
   if (action === 'standard') return 'Standard selected. Smart Mode is off.';
+  if (action === 'smart') return 'Smart Mode selected.';
+  if (action === 'av_sync_up' || action === 'av_sync_down') return 'Audio sync ' + s.sound?.av_sync_ms + ' ms.';
   if (action === 'input_bluetooth') return s.bluetooth?.connected ? 'Bluetooth selected. A device is connected.' : 'Bluetooth selected. Choose ' + (s.bluetooth?.name || 'JBL Bar 9.1') + ' on your phone.';
   if (action === 'bluetooth_pair') return 'Pairing is open. Choose ' + (s.bluetooth?.name || 'JBL Bar 9.1') + ' in your phone’s Bluetooth settings.';
   return sourceName(s) + ' selected.';
@@ -186,9 +190,18 @@ function pendingMessage() {
 	if (active?.startsWith('media_')) return 'Sending playback control…';
   if (isVolume(active)) return 'Adjusting volume' + (queue.length ? ' · ' + queue.length + ' queued' : '') + '…';
   if (active === 'standard') return 'Selecting Standard… audio may briefly mute.';
+  if (active === 'smart') return 'Selecting Smart Mode… audio may briefly mute.';
+  if (active === 'av_sync_up' || active === 'av_sync_down') return 'Adjusting audio sync… other controls wait a few seconds.';
   if (active === 'input_bluetooth') return 'Switching to Bluetooth…';
   if (active === 'bluetooth_pair') return 'Starting Bluetooth pairing…';
   return active === 'power' ? 'Changing power state…' : 'Applying your change…';
+}
+const AV_SYNC_MAX = 250;
+// Client-side +/- buttons map to one server av_sync_set request of 10 ms.
+function avSyncTarget(action, s) {
+  if (action !== 'av_sync_up' && action !== 'av_sync_down') return null;
+  const ms = s?.sound?.av_sync_ms;
+  return Number.isInteger(ms) ? ms + (action === 'av_sync_up' ? 10 : -10) : null;
 }
 function enqueue(action) {
   const button = buttons.find(b => b.dataset.action === action);
@@ -204,13 +217,14 @@ async function pump() {
   if (active || !queue.length || !online) return;
   active = queue.shift();
   const gains = active === 'eq_apply' ? eqDraft?.slice() : null;
+  const syncTarget = avSyncTarget(active, current);
   epoch++;
   render();
   feedback(pendingMessage(), 'pending');
   const action = active;
   const requestPeer = mediaIdentity(current);
   try {
-    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(action === 'eq_apply' ? {action, gains_db: gains} : {action}), signal: AbortSignal.timeout(20000)});
+    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(action === 'eq_apply' ? {action, gains_db: gains} : syncTarget !== null ? {action: 'av_sync_set', value: syncTarget} : {action}), signal: AbortSignal.timeout(20000)});
     const text = await response.text();
     let data;
     try { data = JSON.parse(text); } catch { throw new Error(text.trim() || 'Control unavailable. Refresh and try again.'); }
@@ -374,6 +388,10 @@ function renderExtras(s, ready, awake) {
   $('night').disabled = !ready || !awake || !!active || sound.night == null;
   $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5';
   $('center-value').textContent=sound.center == null ? 'Unavailable' : 'Level ' + sound.center + ' · +' + ['0','2.4','4.8','7.2','9.6','12'][sound.center] + ' dB' + (sound.center_error ? ' · ' + sound.center_error : '');
+  const sync = sound.av_sync_ms, tvInput = s.source_state === 0;
+  $('av-sync-value').textContent = sync == null ? 'Unavailable' : sync + ' ms' + (tvInput ? '' : ' · select TV to adjust');
+  $('av-sync-down').disabled = !ready || !awake || !!active || sync == null || !tvInput || sync <= 0;
+  $('av-sync-up').disabled = !ready || !awake || !!active || sync == null || !tvInput || sync >= AV_SYNC_MAX;
   $('atmos-value').textContent=['Low','Mid','High'][sound.atmos] || 'Unavailable';
   const rear=['Low','Mid','High','Muted'][sound.rear] || 'Unavailable';
   $('rear-value').textContent=sound.rear_docked ? rear + ' · speakers docked' : rear;
