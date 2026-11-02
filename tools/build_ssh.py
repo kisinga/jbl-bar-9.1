@@ -20,7 +20,12 @@ PRIVATE_LANS = tuple(ipaddress.IPv4Network(n) for n in ("10.0.0.0/8", "172.16.0.
 
 
 def allowed_ipv4(value: str) -> str:
-    """Restrict access to one explicitly chosen PC on a private LAN."""
+    """Restrict access to one PC, or one private /8../30 subnet, on a private LAN."""
+    if "/" in value:
+        network = ipaddress.IPv4Network(value, strict=True)
+        if not 8 <= network.prefixlen <= 30 or not any(network.subnet_of(lan) for lan in PRIVATE_LANS):
+            raise ValueError("Choose a private LAN IPv4 network with a /8 to /30 prefix")
+        return str(network)
     address = ipaddress.IPv4Address(value)
     if not any(address in network for network in PRIVATE_LANS):
         raise ValueError("Choose the PC's private LAN IPv4 address")
@@ -137,7 +142,7 @@ def build(output_dir: Path, pc: str, password: str, *, interface: str = "wlan0",
         "Wait 3 minutes; return USB to computer, leaving bar on.\n"
         "Read JBLLocalSSH/STATUS.txt and connection.txt. Verify the exported\n"
         "host_ed25519.pub fingerprint against your SSH client's prompt.\n"
-        f"Only PC {pc} can log in; reserve its DHCP address. Port 2222.\n"
+        f"Only {pc} can log in ({'any host on this subnet' if '/' in pc else 'reserve its DHCP address'}). Port 2222.\n"
         "Password is the one you chose during the build; none is printed.\n"
         f"Automatic startup requested: {'yes' if autostart else 'no'}.\n"
         "An existing live installation keeps its current password.\n"
@@ -177,7 +182,7 @@ def build(output_dir: Path, pc: str, password: str, *, interface: str = "wlan0",
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--allowed-pc", required=True, help="PC's private LAN IPv4 address; only this client may log in")
+    parser.add_argument("--allowed-pc", required=True, help="PC's private LAN IPv4 address, or a private IPv4 CIDR network such as 192.168.1.0/24; only that client or subnet may log in")
     parser.add_argument("--interface", default="wlan0", help="bar's LAN interface (default: wlan0)")
     parser.add_argument("--usb-only", action="store_true", help="start by USB insertion; do not enable boot startup")
     parser.add_argument("--wifi", action="store_true", help="optionally provision WPA2 Wi-Fi; prompts for SSID/passphrase")
