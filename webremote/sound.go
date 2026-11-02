@@ -11,6 +11,9 @@ type soundState struct {
 	CenterError string  `json:"center_error,omitempty"`
 	// AVSyncMS is the saved audio sync (lip-sync) delay in ms.
 	AVSyncMS *uint32 `json:"av_sync_ms,omitempty"`
+	// AudioFormat is the text the bar last showed for the incoming stream,
+	// for example "DOLBY SURROUND DD+" (reported while the bar is on).
+	AudioFormat string `json:"audio_format,omitempty"`
 }
 
 func (d *device) sound() soundState {

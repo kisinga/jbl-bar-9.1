@@ -179,6 +179,8 @@ function success(action, s) {
   if (action === 'standard') return 'Standard selected. Smart Mode is off.';
   if (action === 'smart') return 'Smart Mode selected.';
   if (action === 'av_sync_up' || action === 'av_sync_down') return 'Audio sync ' + s.sound?.av_sync_ms + ' ms.';
+  if (action === 'calibrate') return 'Calibration started. Keep the room quiet.';
+  if (action === 'sub_pair') return 'Subwoofer pairing is open. Hold the button on the back of the subwoofer until it flashes white quickly.';
   if (action === 'input_bluetooth') return s.bluetooth?.connected ? 'Bluetooth selected. A device is connected.' : 'Bluetooth selected. Choose ' + (s.bluetooth?.name || 'JBL Bar 9.1') + ' on your phone.';
   if (action === 'bluetooth_pair') return 'Pairing is open. Choose ' + (s.bluetooth?.name || 'JBL Bar 9.1') + ' in your phone’s Bluetooth settings.';
   return sourceName(s) + ' selected.';
@@ -192,6 +194,8 @@ function pendingMessage() {
   if (active === 'standard') return 'Selecting Standard… audio may briefly mute.';
   if (active === 'smart') return 'Selecting Smart Mode… audio may briefly mute.';
   if (active === 'av_sync_up' || active === 'av_sync_down') return 'Adjusting audio sync… other controls wait a few seconds.';
+  if (active === 'calibrate') return 'Starting calibration…';
+  if (active === 'sub_pair') return 'Opening subwoofer pairing…';
   if (active === 'input_bluetooth') return 'Switching to Bluetooth…';
   if (active === 'bluetooth_pair') return 'Starting Bluetooth pairing…';
   return active === 'power' ? 'Changing power state…' : 'Applying your change…';
@@ -392,6 +396,15 @@ function renderExtras(s, ready, awake) {
   $('av-sync-value').textContent = sync == null ? 'Unavailable' : sync + ' ms' + (tvInput ? '' : ' · select TV or HDMI to adjust');
   $('av-sync-down').disabled = !ready || !awake || !!active || sync == null || !tvInput || sync <= 0;
   $('av-sync-up').disabled = !ready || !awake || !!active || sync == null || !tvInput || sync >= AV_SYNC_MAX;
+  $('audio-format-row').hidden = !awake || !sound.audio_format;
+  $('audio-format').textContent = sound.audio_format || '—';
+  const setup = s.setup, calibration = setup?.calibration || '';
+  const measuring = /starting|Starting in|Measuring/.test(calibration);
+  for (const row of document.querySelectorAll('.setup-row')) row.hidden = !setup;
+  $('calibration-value').textContent = calibration || (sound.rear_docked === false ? 'Ready' : 'Undock both rear speakers first');
+  $('calibrate').disabled = !ready || !awake || !!active || !setup || measuring || setup.sub_pairing || sound.rear_docked !== false;
+  $('sub-value').textContent = setup?.sub_pairing ? 'Pairing… hold the subwoofer button' : setup?.subwoofer || '—';
+  $('sub-pair').disabled = !ready || !awake || !!active || !setup || measuring || setup.sub_pairing;
   $('atmos-value').textContent=['Low','Mid','High'][sound.atmos] || 'Unavailable';
   const rear=['Low','Mid','High','Muted'][sound.rear] || 'Unavailable';
   $('rear-value').textContent=sound.rear_docked ? rear + ' · speakers docked' : rear;

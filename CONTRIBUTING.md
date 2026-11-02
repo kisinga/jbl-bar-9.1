@@ -187,6 +187,14 @@ Amplifiers reload defaults on wake, so a saved non-default level (`/var/JBLRemot
 
 Hardware evidence (2 Nov 2026, HDMI input, config 365 = 3 before and after): Smart ↔ Standard three times with read-back and restored console; audio sync 0 → 20 → 0 ms and 0 → 250 (limit) → 0 ms with config 375 read-back and no other setting changed. `0x1f00c` (TV input key) does not open sync mode; `0x1f00e` selects the TV input. Holding Atmos for 11 s showed NOT SUPPORTED on the TV input in Smart Mode (DTS Neural:X control not qualified).
 
+Display state (`setup.go`): firmware 23.06.41.80 keeps the front display's message selectors in a static VFDMG structure at `0xc65494`. Offset `0x1c` is the temporary message (117 = none, five seconds each), offset `0x10` the pairing overlay (18 = none, 17 = subwoofer pairing). The text of the last audio stream message is at `0xd8a088 + 0x10a` (64 bytes) and is reported as `sound.audio_format` while the bar is on. All reads are read-only and use the existing identity check.
+
+`calibrate` holds HDMI (`0x5f03e`) for six seconds, the manual's calibration gesture, then requires message 58 (`1-CALIBRATION`), 59 (`2-CALIBRATION`) or the countdown within three seconds; otherwise it reports that nothing started. The bar chooses the step itself and runs it alone (about 35 s), so the request returns once the step has started and `setup.calibration` reports progress: countdown 64…60, `CALIBRATING` 66, then 67/68 (step done), 69 (retry) or 65 (cancelled). Both rear speakers must be undocked. While messages 58–66 are shown, every control is refused because native keys would interrupt the measurement.
+
+`sub_pair` holds Bass (`0x1f030`) for six seconds, releases, then presses −, as the manual describes, and requires the pairing overlay (17) within three seconds. If it does not appear, − reached the volume: the step is undone and an error is returned. Bass level, volume and mute must be unchanged afterwards. `setup.sub_pairing` stays true while the bar waits (up to three minutes); the subwoofer's rear button must be held until it flashes white quickly, then `setup.subwoofer` shows Connected (message 3).
+
+Hardware evidence (2 Nov 2026, read with `jblkey.sh watch`): calibration step 1 `58 → 64…60 → 66 (20 s) → 67`, step 2 two minutes later `59 → 64…60 → 66 → 68`, each about 34 s, rear speakers undocked. Subwoofer: the Bass-hold-then-− gesture set overlay 17 without touching the subwoofer; holding the subwoofer button then gave message 3 and overlay 18. Audio format read `DOLBY SURROUND DD+` while a TV programme played.
+
 ### Optional CLI
 
 Use Python’s standard library against the same deployed API:

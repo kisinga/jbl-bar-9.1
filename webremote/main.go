@@ -60,6 +60,7 @@ type state struct {
 	MediaControls []string         `json:"media_controls,omitempty"`
 	Revision      uint64           `json:"revision"`
 	Sound         *soundState      `json:"sound,omitempty"`
+	Setup         *setupState      `json:"setup,omitempty"`
 	Streaming     *streamState     `json:"streaming,omitempty"`
 	SourceState   *uint32          `json:"source_state,omitempty"`
 	WiFi          wifiState        `json:"wifi"`
@@ -184,6 +185,18 @@ func (d *device) read(address int64, width int) (uint32, error) {
 		return binary.LittleEndian.Uint32(b), nil
 	}
 	return 0, errors.New("invalid read width")
+}
+func (d *device) readBytes(address int64, n int) ([]byte, error) {
+	f, e := os.Open(fmt.Sprintf("/proc/%d/mem", d.pid))
+	if e != nil {
+		return nil, e
+	}
+	defer f.Close()
+	b := make([]byte, n)
+	if _, e = f.ReadAt(b, address); e != nil {
+		return nil, e
+	}
+	return b, nil
 }
 func (d *device) write(address int64, width int, value uint32) error {
 	if !d.same() {
@@ -368,6 +381,7 @@ func (d *device) snapshotCurrent() state {
 	s.Bluetooth = d.bluetooth()
 	sound := d.sound()
 	s.Sound = &sound
+	s.Setup = d.setup()
 	if v, e := d.configByte(365); e == nil {
 		s.SourceState = &v
 		if s.Bluetooth != nil {
@@ -403,6 +417,9 @@ func (d *device) snapshotCurrent() state {
 	if !d.same() {
 		s.Available = false
 		s.Error = "Soundbar restarted; refreshing"
+	}
+	if s.Power == "On" {
+		s.Sound.AudioFormat = d.audioFormat()
 	}
 	s.MediaControls = mediaCommands(s)
 	s.EQ = d.frontEQStatus(s)
@@ -825,12 +842,22 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 		timeout := 15 * time.Second
 		if request.Action == "av_sync_set" {
 			timeout = avSyncTimeout
+		} else if request.Action == "calibrate" || request.Action == "sub_pair" {
+			timeout = setupTimeout
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		var s state
 		var e error
-		if request.Action == "eq_apply" || request.Action == "eq_reset" {
+		if r.device.calibrating() {
+			s, e = r.device.snapshot(), errors.New("calibration is running; wait for it to finish")
+		} else if (request.Action == "calibrate" || request.Action == "sub_pair") && (request.Value != nil || request.GainsDB != nil) {
+			e = errors.New("this control takes no value")
+		} else if request.Action == "calibrate" {
+			s, e = r.device.calibrateAction(ctx)
+		} else if request.Action == "sub_pair" {
+			s, e = r.device.subPairAction(ctx)
+		} else if request.Action == "eq_apply" || request.Action == "eq_reset" {
 			s, e = r.device.eqAction(ctx, request.Action, request.GainsDB)
 		} else if request.GainsDB != nil {
 			e = errors.New("band values require an EQ control")
