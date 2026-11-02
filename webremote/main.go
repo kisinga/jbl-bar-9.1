@@ -86,6 +86,7 @@ type device struct {
 	start             string
 	revision          uint64
 	cliChecked        bool
+	center            centerController
 }
 type remote struct {
 	cfg      config
@@ -826,6 +827,8 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 			s, e = r.device.eqAction(ctx, request.Action, request.GainsDB)
 		} else if request.GainsDB != nil {
 			e = errors.New("band values require an EQ control")
+		} else if request.Action == "center_next" {
+			s, e = r.device.centerAction(ctx, request.Action)
 		} else {
 			s, e = r.device.action(ctx, request.Action)
 		}
@@ -912,6 +915,7 @@ func main() {
 	go monitorCast(ctx)
 	go monitorDiscovery(ctx, r.network)
 	go r.monitorFrontEQ(ctx)
+	go r.monitorCenter(ctx)
 	stopped := make(chan struct{})
 	go func() {
 		<-ctx.Done()

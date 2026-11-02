@@ -171,6 +171,7 @@ function success(action, s) {
   if (action === 'mute') return s.muted ? 'Sound muted.' : 'Sound unmuted.';
   if (action === 'power') return s.power === 'On' ? 'Your soundbar is on.' : 'Soundbar is in standby.';
   if (action === 'bass_next') return 'Bass level ' + (s.sound.bass+1) + ' selected.';
+  if (action === 'center_next') return 'Center level ' + s.sound.center + ' selected.';
   if (action === 'atmos_next') return 'Atmos height: ' + ['Low','Mid','High'][s.sound.atmos] + '.';
   if (action === 'rear_next') return 'Rear speakers: ' + ['Low','Mid','High','Muted'][s.sound.rear] + '.';
   if (action === 'standard') return 'Standard selected. Smart Mode is off.';
@@ -372,10 +373,11 @@ function renderExtras(s, ready, awake) {
   $('night').setAttribute('aria-pressed', String(sound.night === true));
   $('night').disabled = !ready || !awake || !!active || sound.night == null;
   $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5';
+  $('center-value').textContent=sound.center == null ? 'Unavailable' : 'Level ' + sound.center + ' · +' + ['0','2.4','4.8','7.2','9.6','12'][sound.center] + ' dB' + (sound.center_error ? ' · ' + sound.center_error : '');
   $('atmos-value').textContent=['Low','Mid','High'][sound.atmos] || 'Unavailable';
   const rear=['Low','Mid','High','Muted'][sound.rear] || 'Unavailable';
   $('rear-value').textContent=sound.rear_docked ? rear + ' · speakers docked' : rear;
-  for (const [id,value] of [['bass-next',sound.bass],['atmos-next',sound.atmos],['rear-next',sound.rear]]) {
+  for (const [id,value] of [['bass-next',sound.bass],['center-next',sound.center],['atmos-next',sound.atmos],['rear-next',sound.rear]]) {
     $(id).disabled = !ready || !awake || !!active || value == null || (id==='rear-next' && sound.rear_docked !== false);
   }
   const wifi=s.wifi || {};
