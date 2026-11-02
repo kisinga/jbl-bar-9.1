@@ -388,8 +388,8 @@ function renderExtras(s, ready, awake) {
   $('night').disabled = !ready || !awake || !!active || sound.night == null;
   $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5';
   $('center-value').textContent=sound.center == null ? 'Unavailable' : 'Level ' + sound.center + ' · +' + ['0','2.4','4.8','7.2','9.6','12'][sound.center] + ' dB' + (sound.center_error ? ' · ' + sound.center_error : '');
-  const sync = sound.av_sync_ms, tvInput = s.source_state === 0;
-  $('av-sync-value').textContent = sync == null ? 'Unavailable' : sync + ' ms' + (tvInput ? '' : ' · select TV to adjust');
+  const sync = sound.av_sync_ms, tvInput = s.source_state === 0 || s.source_state === 3;
+  $('av-sync-value').textContent = sync == null ? 'Unavailable' : sync + ' ms' + (tvInput ? '' : ' · select TV or HDMI to adjust');
   $('av-sync-down').disabled = !ready || !awake || !!active || sync == null || !tvInput || sync <= 0;
   $('av-sync-up').disabled = !ready || !awake || !!active || sync == null || !tvInput || sync >= AV_SYNC_MAX;
   $('atmos-value').textContent=['Low','Mid','High'][sound.atmos] || 'Unavailable';

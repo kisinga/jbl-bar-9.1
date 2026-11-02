@@ -25,6 +25,18 @@ func TestAVSyncPlan(t *testing.T) {
 	}
 }
 
+func TestAVSyncSources(t *testing.T) {
+	for source, want := range map[uint32]bool{0: true, 3: true, 2: false, 6: false, 7: false} {
+		s := source
+		if avSyncSource(&s) != want {
+			t.Fatalf("source %d allowed = %v", source, !want)
+		}
+	}
+	if avSyncSource(nil) {
+		t.Fatal("unknown source must be refused")
+	}
+}
+
 func TestSmartObserved(t *testing.T) {
 	before := state{Available: true, Mode: "Standard"}
 	after := state{Available: true, Mode: "Smart"}

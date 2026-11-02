@@ -397,6 +397,11 @@ try {
   await page.locator('#av-sync-down').click();
   await page.waitForFunction(()=>document.querySelector('#av-sync-value').textContent==='20 ms');
   check(lastPayload?.value===20,'audio sync - sends the previous 10 ms step');
+  state.source_state=3; await page.locator('#refresh').click(); await pause(200);
+  check(!(await page.locator('#av-sync-up').isDisabled()),'audio sync stays available on HDMI');
+  state.source_state=2; await page.locator('#refresh').click(); await pause(200);
+  check(await page.locator('#av-sync-up').isDisabled() && (await page.locator('#av-sync-value').textContent()).includes('select TV or HDMI'),'audio sync is disabled on Bluetooth');
+  state.source_state=0; await page.locator('#refresh').click(); await pause(200);
   check(await page.locator('#standard-label').textContent()==='Use Smart','Standard mode offers Smart');
   await page.locator('#standard').click();
   await page.waitForFunction(()=>document.querySelector('#standard-label').textContent==='Use Standard');

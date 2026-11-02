@@ -30,6 +30,10 @@ const (
 	avSyncWindowClosed = 5500 * time.Millisecond
 )
 
+func avSyncSource(source *uint32) bool {
+	return source != nil && (*source == 0 || *source == 3)
+}
+
 // avSyncPlan validates a target and returns the key and number of presses
 // (excluding the first, display-only press) needed from current.
 func avSyncPlan(current, target int) (string, int, error) {
@@ -98,9 +102,10 @@ func (d *device) avSyncAction(ctx context.Context, target int) (state, error) {
 	if before.Power != "On" {
 		return before, errors.New("turn the bar on first")
 	}
-	// Qualified on the TV input only: the TV key could switch other inputs.
-	if before.SourceState == nil || *before.SourceState != 0 {
-		return before, errors.New("select the TV input to adjust audio sync")
+	// Qualified on TV/ARC (0) and HDMI (3), where holding the TV key opens sync
+	// mode without changing the input. Bluetooth and streaming are untested.
+	if !avSyncSource(before.SourceState) {
+		return before, errors.New("select the TV or HDMI input to adjust audio sync")
 	}
 	if before.Volume == nil || before.Muted == nil {
 		return before, errors.New("volume state unavailable")
@@ -168,6 +173,9 @@ func (d *device) avSyncAction(ctx context.Context, target int) (state, error) {
 	}
 	if !standardSettingsPreserved(before, after) {
 		return after, errors.New("audio sync changed but volume or mute changed; check sound before retrying")
+	}
+	if after.SourceState == nil || *after.SourceState != *before.SourceState {
+		return after, errors.New("audio sync changed but the input changed; check the source")
 	}
 	return after, nil
 }
