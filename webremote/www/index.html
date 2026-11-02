@@ -70,11 +70,12 @@
         <div class="sound-mode"><div><h3 id="mode">Checking mode</h3><p id="mode-description">Reading your sound settings.</p></div><button id="standard" data-action="standard" disabled><svg><use href="#i-check"/></svg><span id="standard-label">Use Standard</span></button></div>
         <div class="sound-settings">
           <div class="sound-row"><div><span>Bass</span><small id="bass-value">—</small></div><button data-action="bass_next" id="bass-next" disabled aria-label="Change bass level">Change <span aria-hidden="true">↗</span></button></div>
+          <div class="sound-row"><div><span>Center</span><small id="center-value">—</small></div><button data-action="center_next" id="center-next" disabled aria-label="Change center channel level">Change <span aria-hidden="true">↗</span></button></div>
           <div class="sound-row"><div><span>Atmos height</span><small id="atmos-value">—</small></div><button data-action="atmos_next" id="atmos-next" disabled aria-label="Change Atmos height level">Change <span aria-hidden="true">↗</span></button></div>
           <div class="sound-row"><div><span>Rear speakers</span><small id="rear-value">—</small></div><button data-action="rear_next" id="rear-next" disabled aria-label="Change rear speaker level">Change <span aria-hidden="true">↗</span></button></div>
           <div class="sound-row night-row"><div><span>Night mode</span><small id="night-value">—</small></div><button data-action="night_toggle" id="night" disabled aria-pressed="false"><span id="night-label">Turn on</span></button></div>
         </div>
-        <p class="sound-note">Change cycles through levels. Atmos height applies to Atmos audio.</p>
+        <p class="sound-note">Change cycles through levels. Center boosts the dialogue channel from 0 (original) to +12 dB; high levels can distort at loud volume. Atmos height applies to Atmos audio.</p>
       </section>
       <section id="eq-panel" class="eq-panel panel" aria-labelledby="eq-heading" data-state="unavailable">
         <div class="section-heading"><div><p class="section-kicker">SHAPE YOUR SOUND</p><h2 id="eq-heading">Front EQ</h2></div><span class="development-tag">Experimental</span></div>

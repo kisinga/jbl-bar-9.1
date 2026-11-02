@@ -8,7 +8,7 @@ const root = new URL('../', import.meta.url);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const systemFixture = () => ({sample:1,cpu_percent:18.2,cpu_cores:2,load_average:[0.21,0.14,0.09],memory:{total_bytes:268435456,available_bytes:146800640,used_bytes:121634816},storage:{total_bytes:134217728,available_bytes:100663296,used_bytes:33554432},network:{receive_bytes_per_second:16384,transmit_bytes_per_second:1536},uptime_seconds:90300,processes:64,temperature_c:46.5});
 const eqFixture = () => ({available:true,enabled:false,gains_db:[0,0,0,0,0],frequencies_hz:[125,500,2000,4000,8000],status:'original'});
-const initial = () => ({eq:eqFixture(),system:systemFixture(),available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, source_state:0, hostname:'jbl.local', csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,atmos:1,rear:2,rear_docked:true,night:false}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,media_ready:true,audio:'Disconnected',name:'My speaker'}});
+const initial = () => ({eq:eqFixture(),system:systemFixture(),available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, source_state:0, hostname:'jbl.local', csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,center:0,atmos:1,rear:2,rear_docked:true,night:false}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,media_ready:true,audio:'Disconnected',name:'My speaker'}});
 let state = initial(), calls = [], lastPayload = null, delay = 300, failure = '', offline = false, getDelay = 0, advertisedControls = null;
 const streams=new Set(); let stateGets=0, streamGets=0, revision=0, lastSnapshot='';
 function snapshot() {
@@ -61,6 +61,7 @@ const server = createServer(async (req, res) => {
       if (action === 'volume_down') state.volume--;
       if (action === 'bluetooth_pair') {state.bluetooth.discoverable=true;state.bluetooth.connectable=true;}
       if (action === 'bass_next') state.sound.bass=(state.sound.bass+1)%5;
+      if (action === 'center_next') state.sound.center=(state.sound.center+1)%6;
       if (action === 'atmos_next') state.sound.atmos=(state.sound.atmos+1)%3;
       if (action === 'rear_next') state.sound.rear=(state.sound.rear+1)%4;
       if (action === 'mute') state.muted = !state.muted;
@@ -381,6 +382,10 @@ try {
   await page.locator('#bass-next').click();
   await page.waitForFunction(()=>document.querySelector('#bass-value').textContent==='Level 2 of 5');
   check(state.sound.bass===1,'bass cycle confirms readback');
+  check(await page.locator('#center-value').textContent()==='Level 0 · +0 dB','center starts at original level');
+  await page.locator('#center-next').click();
+  await page.waitForFunction(()=>document.querySelector('#center-value').textContent==='Level 1 · +2.4 dB');
+  check(state.sound.center===1 && lastPayload?.action==='center_next','center cycle sends center_next and shows the level');
   await page.locator('#atmos-next').click();
   await page.waitForFunction(()=>document.querySelector('#atmos-value').textContent==='High');
   check(state.sound.atmos===2,'Atmos height cycle confirms readback');
