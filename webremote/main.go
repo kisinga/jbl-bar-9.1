@@ -842,6 +842,9 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 		timeout := 15 * time.Second
 		if request.Action == "av_sync_set" {
 			timeout = avSyncTimeout
+			// One sync session for the whole change takes longer than the
+			// server's default write timeout; extend it for this reply only.
+			_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(avSyncTimeout + 10*time.Second))
 		} else if request.Action == "calibrate" || request.Action == "sub_pair" {
 			timeout = setupTimeout
 		}

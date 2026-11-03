@@ -178,7 +178,7 @@ function success(action, s) {
   if (action === 'rear_next') return 'Rear speakers: ' + ['Low','Mid','High','Muted'][s.sound.rear] + '.';
   if (action === 'standard') return 'Standard selected. Smart Mode is off.';
   if (action === 'smart') return 'Smart Mode selected.';
-  if (action === 'av_sync_up' || action === 'av_sync_down') return 'Audio sync ' + s.sound?.av_sync_ms + ' ms.';
+  if (action === 'av_sync_set') return 'Audio sync ' + s.sound?.av_sync_ms + ' ms.';
   if (action === 'calibrate') return 'Calibration started. Keep the room quiet.';
   if (action === 'sub_pair') return 'Subwoofer pairing is open. Hold the button on the back of the subwoofer until it flashes white quickly.';
   if (action === 'input_bluetooth') return s.bluetooth?.connected ? 'Bluetooth selected. A device is connected.' : 'Bluetooth selected. Choose ' + (s.bluetooth?.name || 'JBL Bar 9.1') + ' on your phone.';
@@ -193,7 +193,7 @@ function pendingMessage() {
   if (isVolume(active)) return 'Adjusting volume' + (queue.length ? ' · ' + queue.length + ' queued' : '') + '…';
   if (active === 'standard') return 'Selecting Standard… audio may briefly mute.';
   if (active === 'smart') return 'Selecting Smart Mode… audio may briefly mute.';
-  if (active === 'av_sync_up' || active === 'av_sync_down') return 'Adjusting audio sync… other controls wait a few seconds.';
+  if (active === 'av_sync_set') return 'Adjusting audio sync to ' + syncDraft + ' ms… other controls wait a few seconds.';
   if (active === 'calibrate') return 'Starting calibration…';
   if (active === 'sub_pair') return 'Opening subwoofer pairing…';
   if (active === 'input_bluetooth') return 'Switching to Bluetooth…';
@@ -201,16 +201,29 @@ function pendingMessage() {
   return active === 'power' ? 'Changing power state…' : 'Applying your change…';
 }
 const AV_SYNC_MAX = 250;
-// Client-side +/- buttons map to one server av_sync_set request of 10 ms.
-function avSyncTarget(action, s) {
-  if (action !== 'av_sync_up' && action !== 'av_sync_down') return null;
-  const ms = s?.sound?.av_sync_ms;
-  return Number.isInteger(ms) ? ms + (action === 'av_sync_up' ? 10 : -10) : null;
+// Client-side +/- taps build a draft target; one av_sync_set request follows
+// once the taps stop, so the bar stays in one sync session for the whole change.
+const AV_SYNC_SETTLE_MS = 900;
+let syncDraft = null, syncTimer = null;
+function avSyncTap(action) {
+  const base = syncDraft ?? current?.sound?.av_sync_ms;
+  if (!Number.isInteger(base)) return;
+  syncDraft = Math.max(0, Math.min(AV_SYNC_MAX, base + (action === 'av_sync_up' ? 10 : -10)));
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    syncTimer = null;
+    if (syncDraft === current?.sound?.av_sync_ms) { syncDraft = null; render(); return; }
+    queue.push('av_sync_set');
+    void pump();
+  }, AV_SYNC_SETTLE_MS);
+  render();
+  feedback('Audio sync ' + syncDraft + ' ms · sending when you stop tapping…', 'pending');
 }
 function enqueue(action) {
   const button = buttons.find(b => b.dataset.action === action);
   if (!button || button.disabled || !csrf) return;
   if (action === 'eq_apply' && !validEQGains(eqDraft)) return;
+  if (action === 'av_sync_up' || action === 'av_sync_down') { avSyncTap(action); return; }
   if (isVolume(action) && queue.length && delta(queue[queue.length - 1]) === -delta(action)) queue.pop();
   else if (queue.length < 8) queue.push(action);
   else { feedback('Let the pending volume changes finish first.', 'pending'); return; }
@@ -221,7 +234,7 @@ async function pump() {
   if (active || !queue.length || !online) return;
   active = queue.shift();
   const gains = active === 'eq_apply' ? eqDraft?.slice() : null;
-  const syncTarget = avSyncTarget(active, current);
+  const syncTarget = active === 'av_sync_set' ? syncDraft : null;
   epoch++;
   render();
   feedback(pendingMessage(), 'pending');
@@ -250,6 +263,7 @@ async function pump() {
       feedback('Connection interrupted. The last change may have applied; pending taps were cleared.', 'error');
     } else feedback(error.message, 'error');
   } finally {
+    if (action === 'av_sync_set') syncDraft = null;
     active = null;
     render();
     if (latestState) {const next=latestState;latestState=null;receiveState(next);}
@@ -393,9 +407,10 @@ function renderExtras(s, ready, awake) {
   $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5';
   $('center-value').textContent=sound.center == null ? 'Unavailable' : 'Level ' + sound.center + ' · +' + ['0','2.4','4.8','7.2','9.6','12'][sound.center] + ' dB' + (sound.center_error ? ' · ' + sound.center_error : '');
   const sync = sound.av_sync_ms, tvInput = s.source_state === 0 || s.source_state === 3;
-  $('av-sync-value').textContent = sync == null ? 'Unavailable' : sync + ' ms' + (tvInput ? '' : ' · select TV or HDMI to adjust');
-  $('av-sync-down').disabled = !ready || !awake || !!active || sync == null || !tvInput || sync <= 0;
-  $('av-sync-up').disabled = !ready || !awake || !!active || sync == null || !tvInput || sync >= AV_SYNC_MAX;
+  const shown = syncDraft ?? sync;
+  $('av-sync-value').textContent = sync == null ? 'Unavailable' : shown + ' ms' + (syncDraft != null && syncDraft !== sync ? ' (now ' + sync + ' ms)' : '') + (tvInput ? '' : ' · select TV or HDMI to adjust');
+  $('av-sync-down').disabled = !ready || !awake || !!active || sync == null || !tvInput || shown <= 0;
+  $('av-sync-up').disabled = !ready || !awake || !!active || sync == null || !tvInput || shown >= AV_SYNC_MAX;
   $('audio-format-row').hidden = !awake || !sound.audio_format;
   $('audio-format').textContent = sound.audio_format || '—';
   const setup = s.setup, calibration = setup?.calibration || '';

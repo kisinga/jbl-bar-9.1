@@ -18,7 +18,8 @@ func TestAVSyncPlan(t *testing.T) {
 		{20, 0, 2, "0x6f001", true},
 		{30, 30, 0, "0x6f000", true},
 		{0, 50, 5, "0x6f000", true},
-		{0, 60, 0, "", false},  // more than avSyncMaxSteps per request
+		{0, 250, 25, "0x6f000", true}, // the whole range in one request
+		{250, 0, 25, "0x6f001", true},
 		{0, 15, 0, "", false},  // not a 10 ms step
 		{0, -10, 0, "", false}, // negative
 		{0, 260, 0, "", false}, // above the one-byte maximum

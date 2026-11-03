@@ -399,6 +399,14 @@ try {
   await page.locator('#av-sync-down').click();
   await page.waitForFunction(()=>document.querySelector('#av-sync-value').textContent==='20 ms');
   check(lastPayload?.value===20,'audio sync - sends the previous 10 ms step');
+  const syncCalls = calls.length;
+  await page.locator('#av-sync-up').click(); await page.locator('#av-sync-up').click(); await page.locator('#av-sync-up').click();
+  check((await page.locator('#av-sync-value').textContent()).startsWith('50 ms (now 20 ms)'),'audio sync taps build a draft target');
+  await page.waitForFunction(()=>document.querySelector('#av-sync-value').textContent==='50 ms');
+  check(calls.length===syncCalls+1 && lastPayload?.action==='av_sync_set' && lastPayload?.value===50,'several audio sync taps send one request');
+  await page.locator('#av-sync-down').click(); await page.locator('#av-sync-down').click(); await page.locator('#av-sync-down').click();
+  await page.waitForFunction(()=>document.querySelector('#av-sync-value').textContent==='20 ms');
+  check(calls.length===syncCalls+2 && lastPayload?.value===20,'taps back down send one request');
   state.source_state=3; await page.locator('#refresh').click(); await pause(200);
   check(!(await page.locator('#av-sync-up').isDisabled()),'audio sync stays available on HDMI');
   state.source_state=2; await page.locator('#refresh').click(); await pause(200);

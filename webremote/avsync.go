@@ -27,8 +27,8 @@ const (
 	avSyncMaxMS        = 250 // hardware maximum: + stops at 250 ms (qualified 2 Nov 2026)
 	avSyncKey          = "0x1f02c"
 	avSyncHold         = "3500"
-	avSyncMaxSteps     = 5 // per request: each step can wait for read-back, and the reply must fit the server write timeout
-	avSyncTimeout      = 30 * time.Second
+	avSyncMaxSteps     = avSyncMaxMS / avSyncStepMS // the whole range in one sync session: no gap between steps
+	avSyncTimeout      = 60 * time.Second           // 25 steps take about 30 s including the hold and the close
 	avSyncPressGap     = 400 * time.Millisecond
 	avSyncWindowClosed = 5500 * time.Millisecond
 	avSyncSettle       = 1500 * time.Millisecond
