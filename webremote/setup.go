@@ -163,6 +163,10 @@ func (d *device) setupPrepare(ctx context.Context) (state, error) {
 	if e := d.identify(); e != nil {
 		return d.snapshotCurrent(), e
 	}
+	// The EQ restore needs the bar on; report standby instead of its failure.
+	if !d.powerOn() {
+		return d.snapshotCurrent(), errors.New("turn the bar on first")
+	}
 	if d.eq.active {
 		if e := d.resetFrontEQ(ctx); e != nil {
 			return d.snapshotCurrent(), e
