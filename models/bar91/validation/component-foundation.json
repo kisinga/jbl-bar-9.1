@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "version": "0.3.0-dev.6",
+  "model": "bar91",
+  "scope": "Shared HTTP/SSE, compiled extensions and component foundation. All listed tests are host/browser fixtures; no new physical installation, native control, update or recovery result is claimed.",
+  "upstream_fixes": [
+    {
+      "pr": 7,
+      "merge_commit": "dc7dc2ca77aca3fb0bbc9059582790117bd71d3b",
+      "scope": "center wake timing; native implementation and original regression tests ported"
+    },
+    {
+      "pr": 8,
+      "merge_commit": "7db212932f5ce8a8d74c9032b8073381446ae4d0",
+      "scope": "EQ reset versus standby power; native implementation and original regression tests ported"
+    }
+  ],
+  "boundaries": {
+    "server": "Model-independent generic backend, HTTP protection, one operation gate, public assets and SSE",
+    "native": "Bar 9.1 adapter and joined model lifecycle; native files retain their contributor layout",
+    "extensions": "Compiled registration; typed actions, pure projections, optional joined workers and bundled UI component identifiers",
+    "ui": "Scoped components; shared shell owns the state stream and action queue",
+    "research": "Loopback-only preview and read-only normalized fixtures; model installation fences remain enforced"
+  },
+  "checks": {
+    "host_cases": 264,
+    "usb_cases": 111,
+    "project_cases": 8,
+    "existing_browser_checks": 179,
+    "component_browser_checks": 13,
+    "offline_setup_browser": "passed",
+    "go_race": "passed",
+    "go_vet": "passed",
+    "research_workspace_cases": 6,
+    "workflow": "YAML parsed; all 9 shell blocks pass bash -n; GitHub execution pending"
+  },
+  "artifact": {
+    "package": "dist/release-v0.3.0-dev.6/jbl-bar91-v0.3.0-dev.6-usb.zip",
+    "package_sha256": "93c97e321287716199c5dfaf10d9cb5a44178ccbcf6ef5ca6cf565cbf278af92",
+    "remote_sha256": "894283f0b16d549282de724c29841ff526c1d91d4a6ab97eec1c7ca914e5e8a6",
+    "files_validated": 31,
+    "qualification": "hardware-test-pending"
+  },
+  "limitations": [
+    "No Bar 1000/1300 runtime backend or installer is qualified",
+    "Shared USB/SSH release update transaction is a separate implementation milestone; package mismatch guard remains",
+    "The prepared dev.5 USB is a previous hardware-test artifact; this source/package is dev.6",
+    "Current native state, authentication, playback, boot and recovery require physical qualification"
+  ]
+}

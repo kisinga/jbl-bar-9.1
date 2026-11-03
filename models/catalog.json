@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "id": "bar91",
+      "name": "JBL Bar 9.1 True Wireless Surround",
+      "family": "bar91",
+      "status": "development",
+      "installation": "single-usb; complete installation/recovery qualification pending",
+      "control": "on-bar web remote and guarded native controls",
+      "install_features": ["web", "ssh", "auto-standard"],
+      "guide": "docs/models/bar91/USB-TOOLKIT.md"
+    },
+    {
+      "id": "bar800",
+      "name": "JBL Bar 800 (original)",
+      "family": "jbl-one",
+      "status": "research",
+      "installation": "unqualified; no project jailbreak or persistence route",
+      "control": "historical firmware analysis and offline replay; no runtime backend",
+      "install_features": [],
+      "guide": "research/bar-family/README.md"
+    },
+    {
+      "id": "bar1000",
+      "name": "JBL Bar 1000 (original)",
+      "family": "jbl-one",
+      "status": "research",
+      "installation": "unqualified; no project jailbreak or persistence route",
+      "control": "community network-control references and offline replay; no runtime backend",
+      "install_features": [],
+      "guide": "research/bar-family/README.md"
+    },
+    {
+      "id": "bar1300",
+      "name": "JBL Bar 1300 (original)",
+      "family": "jbl-one",
+      "status": "research",
+      "installation": "unqualified; no project jailbreak or persistence route",
+      "control": "next hardware target; original generation inferred from reported 2023 ownership; 1300/1300X and firmware pending; read-only research collector, no runtime backend",
+      "install_features": [],
+      "guide": "research/bar-family/bar1300/README.md"
+    }
+  ]
+}

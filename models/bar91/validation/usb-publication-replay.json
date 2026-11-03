@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "model": "bar91",
+  "version": "0.3.0-dev.3",
+  "scope": "Controlled runtime replay under qemu-arm on host Linux filesystem; physical UBIFS capability remains pending",
+  "vendor_busybox_sha256": "d9bc219c48a5d422b37b35bf64b09a9f191ce61d30c2718ff1fce136b23efa06",
+  "vendor_version": "BusyBox v1.32.0.git (2019-12-13 15:23:23 PST)",
+  "remote_sha256": "607d1dc72a405d6c3928a948548338aae23f0af23a2c4399c618457940091d22",
+  "observations": {
+    "required_applets": "present",
+    "cp": "passed",
+    "mv_file": "passed",
+    "ln_T": "passed",
+    "mv_T": "unsupported",
+    "arm_renameat2_publish": "passed",
+    "arm_renameat2_refuses_existing_directory": "passed; both stage and destination contents preserved"
+  },
+  "syscall_identity_sources": [
+    "ARM GNU toolchain sysroot usr/include/asm/unistd-common.h: __NR_renameat2 = __NR_SYSCALL_BASE + 382",
+    "Linux x86_64 header /usr/include/x86_64-linux-gnu/asm/unistd_64.h: __NR_renameat2 = 316"
+  ],
+  "hardware_qualified": false
+}

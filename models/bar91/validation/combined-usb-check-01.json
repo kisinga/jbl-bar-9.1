@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "model": "bar91",
+  "version": "0.3.0-dev.2",
+  "action": "check",
+  "status": "CHECK_BLOCKED_READ_CHECKS",
+  "usb_autoscript": "observed-executed",
+  "package_integrity": "all-immutable-entries-passed-on-device",
+  "preflight": "UNSUPPORTED_BUSYBOX_APPLETS_OR_ATOMIC_FILE_OPERATIONS",
+  "native_probe": "not-reached",
+  "existing_stores": [
+    "/var/JBLLocalSSH",
+    "/var/JBLRemote",
+    "/var/JBLStandard"
+  ],
+  "hook": "existing-component-hook-preserved",
+  "services_changed": false,
+  "hardware_qualified": false,
+  "next": "Replace unsupported mv -T without weakening atomic no-replace publication; collect independent diagnostics and native/filesystem report.",
+  "package_sha256": "c494d1dfe10f5707f27801cdca9898cfd4cd77729f308ba82a156a68c4a1855c"
+}

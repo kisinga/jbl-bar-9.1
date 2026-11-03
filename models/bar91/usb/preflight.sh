@@ -1,0 +1,168 @@
+#!/bin/sh
+# Run before creating stores, changing networking, stopping services or gestures.
+preflight_root() {
+    PREFLIGHT_REASON=ROOT_REQUIRED
+    [ "$("$BB" id -u)" = 0 ] || return 1
+}
+
+preflight_busybox() {
+    PREFLIGHT_REASON=UNSUPPORTED_BUSYBOX_APPLETS_OR_ATOMIC_FILE_OPERATIONS
+    applets=$("$BB" --list) || return 1
+    for app in awk sha256sum cp chmod mkdir rm rmdir readlink cmp sync tr pidof grep timeout sleep cat stat mv ln mktemp du df wc find; do
+        PREFLIGHT_REASON=MISSING_BUSYBOX_APPLET_$app
+        printf '%s\n' "$applets" | "$BB" grep -qx "$app" || return 1
+    done
+    PREFLIGHT_REASON=BUSYBOX_LN_NO_TARGET_DIRECTORY_UNAVAILABLE
+    "$BB" ln --help 2>&1 | "$BB" grep -q -- '-T' || return 1
+}
+
+preflight_usb() {
+    PREFLIGHT_REASON=USB_NOT_FIRST_PARTITION_WRITABLE_FAT32
+    "$BB" awk '
+      $2=="/mnt/sda1" && ($1=="/dev/sda1" || $1=="/dev/block/sda1") && $3=="vfat" && index("," $4 ",",",rw,") {ok=1}
+      END {exit !ok}
+    ' /proc/mounts || return 1
+}
+
+preflight_persistent() {
+    PREFLIGHT_REASON=VAR_NOT_EXPECTED_PERSISTENT_PATH
+    resolved=$("$BB" readlink -f /var) || return 1
+    [ "$resolved" = /mnt/ubi_boot/var ] || return 1
+    PREFLIGHT_REASON=VAR_NOT_WRITABLE_UBIFS
+    "$BB" awk -v target="$resolved" '
+      ($2=="/" || target==$2 || index(target,$2 "/")==1) && length($2)>best {
+        best=length($2); point=$2; type=$3; options="," $4 ","
+      }
+      END {exit !(point=="/mnt/ubi_boot" && type=="ubifs" && index(options,",rw,"))}
+    ' /proc/mounts || return 1
+}
+
+preflight_firmware() {
+    PREFLIGHT_REASON=NO_SINGLE_RUNNING_BDPPROG
+    pids=$("$BB" pidof bdpprog) || return 1
+    case "$pids" in ''|*[!0-9]*) return 1;; esac
+    PREFLIGHT_REASON=BDPPROG_IDENTITY_MISMATCH_OR_UNREADABLE
+    hash=$("$BB" sha256sum "/proc/$pids/exe") || return 1
+    [ "${hash%% *}" = 86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441c90b63 ] || return 1
+    PREFLIGHT_REASON=CLI_IDENTITY_MISMATCH_OR_UNREADABLE
+    hash=$("$BB" sha256sum /bin/cli) || return 1
+    [ "${hash%% *}" = 8910fb852d2f994a519615fede404fbb036e3a8f5264cc69cdff57038af3c78f ] || return 1
+}
+
+preflight_ssh() {
+    if [ "$SSH" = true ]; then
+        PREFLIGHT_REASON=UNSUPPORTED_NATIVE_SSH_TOOLS_OR_RUNTIME
+        # Isolate SSH helper names/STORE from the manager's own namespace.
+        (JBL_SSH_STORE="$SSH_STORE"; export JBL_SSH_STORE; . "$USB/files/ssh/common.sh" && verify_tools) || return 1
+        PREFLIGHT_REASON=SSH_CREDENTIALS_REQUIRED
+        [ -n "${SSH_PASSWORD_HASH-}" ] || regular "$USB/files/ssh/password.hash" || return 1
+    fi
+}
+
+preflight_space() {
+    # One new persistent payload copy plus 2 MiB for manager/SSH staging, keys
+    # and runtime state. Existing files are already counted as used by df;
+    # publication/inspection executables run from the private /tmp lock in RAM.
+    PREFLIGHT_REASON=FREE_SPACE_UNREADABLE_OR_INSUFFICIENT
+    need=$("$BB" du -sk "$USB/files") || return 1
+    set -- $need
+    case "$1" in ''|*[!0-9]*) return 1;; esac
+    payload_kib=$1
+    required_kib=$((payload_kib+2048))
+    reuse_remote=false
+    if { [ "${WEB_REMOTE:-true}" != true ] && [ "${AUTO_STANDARD:-true}" != true ]; } ||
+       { regular "$REMOTE_STORE/TOOLKIT" && [ "$("$BB" cat "$REMOTE_STORE/TOOLKIT")" = JBL_TOOLKIT_REV1 ] &&
+         regular "$REMOTE_STORE/remote" && regular "$USB/files/remote" && "$BB" cmp -s "$REMOTE_STORE/remote" "$USB/files/remote"; }; then
+        remote_size=$("$BB" du -sk "$USB/files/remote") || return 1
+        set -- $remote_size
+        case "$1" in ''|*[!0-9]*) return 1;; esac
+        [ "$1" -le "$payload_kib" ] || return 1
+        required_kib=$((payload_kib-$1+2048))
+        reuse_remote=true
+    fi
+    available=$("$BB" df -Pk /var | "$BB" awk 'NR==2 {print $4}') || return 1
+    case "$available" in ''|*[!0-9]*) return 1;; esac
+    printf 'SPACE_PAYLOAD_KIB=%s SPACE_REQUIRED_KIB=%s SPACE_AVAILABLE_KIB=%s REUSE_REMOTE=%s\n' "$payload_kib" "$required_kib" "$available" "$reuse_remote"
+    [ "$available" -ge "$required_kib" ] || return 1
+}
+
+preflight_boot_id() {
+    PREFLIGHT_REASON=BOOT_ID_UNREADABLE
+    [ -n "$(boot_id)" ] || return 1
+}
+
+preflight_atomic_io() {
+    PREFLIGHT_REASON=USB_OR_PERSISTENT_STORAGE_ATOMIC_IO_FAILED
+    for target in "$USB" /var; do
+        probe=$("$BB" mktemp -d "$target/.jbl-toolkit-check.XXXXXX") || return 1
+        if ! printf 'JBL_TOOLKIT_STORAGE_CHECK\n' > "$probe/first" ||
+           ! "$BB" cp "$probe/first" "$probe/second" ||
+           ! "$BB" cmp -s "$probe/first" "$probe/second" ||
+           ! "$BB" mv "$probe/second" "$probe/renamed" ||
+           ! "$BB" cmp -s "$probe/first" "$probe/renamed"; then
+            "$BB" rm -rf "$probe"
+            return 1
+        fi
+        if [ "$target" = /var ]; then
+            PREFLIGHT_REASON=PERSISTENT_STORAGE_ATOMIC_NO_REPLACE_UNAVAILABLE
+            "$BB" mkdir "$probe/published.stage.probe" || return 1
+            if ! publish_directory "$probe/published.stage.probe" "$probe/published"; then
+                "$BB" rm -rf "$probe"
+                return 1
+            fi
+            # A second publication must fail and preserve both directories.
+            "$BB" mkdir "$probe/published.stage.conflict" || return 1
+            if publish_directory "$probe/published.stage.conflict" "$probe/published" ||
+               [ ! -d "$probe/published.stage.conflict" ] || [ ! -d "$probe/published" ]; then
+                "$BB" rm -rf "$probe"
+                return 1
+            fi
+        fi
+        "$BB" rm -rf "$probe" || return 1
+    done
+}
+
+preflight_native() {
+    PREFLIGHT_REASON=NATIVE_EXECUTION_STATE_OR_HELPER_LIBRARIES_NOT_QUALIFIED
+    probe_native awake || return 1
+}
+
+# Installation stops at the first failed prerequisite. Check-only mode uses the
+# same guards but reports every independent result without changing services.
+preflight_steps() { printf 'root busybox usb persistent firmware ssh space boot_id atomic_io native\n'; }
+preflight() {
+    for step in $(preflight_steps); do
+        "preflight_$step" || return 1
+    done
+    PREFLIGHT_REASON=PASSED
+}
+preflight_all() {
+    all_result=0
+    first_failure=
+    root_ok=0; busybox_ok=0; usb_ok=0; persistent_ok=0
+    PREFLIGHT_NATIVE_RESULT=skipped
+    : > "$USB/PREFLIGHT.txt" || return 1
+    for step in $(preflight_steps); do
+        if { [ "$step" = atomic_io ] && [ "$root_ok:$busybox_ok:$usb_ok:$persistent_ok" != 1:1:1:1 ]; } ||
+           { [ "$step" = native ] && [ "$root_ok:$busybox_ok" != 1:1 ]; }; then
+            printf 'SKIP=%s:PREREQUISITES_FAILED\n' "$step" >> "$USB/PREFLIGHT.txt"
+            all_result=1
+            continue
+        fi
+        PREFLIGHT_REASON=UNKNOWN
+        if "preflight_$step"; then
+            printf 'PASS=%s\n' "$step" >> "$USB/PREFLIGHT.txt"
+            case "$step" in
+                root) root_ok=1;; busybox) busybox_ok=1;; usb) usb_ok=1;;
+                persistent) persistent_ok=1;; native) PREFLIGHT_NATIVE_RESULT=passed;;
+            esac
+        else
+            printf 'FAIL=%s:%s\n' "$step" "$PREFLIGHT_REASON" >> "$USB/PREFLIGHT.txt"
+            [ -n "$first_failure" ] || first_failure=$PREFLIGHT_REASON
+            [ "$step" != native ] || PREFLIGHT_NATIVE_RESULT=failed
+            all_result=1
+        fi
+    done
+    PREFLIGHT_REASON=${first_failure:-PASSED}
+    return "$all_result"
+}

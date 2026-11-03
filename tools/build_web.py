@@ -10,16 +10,20 @@ import os
 import shutil
 import subprocess
 
-ROOT = Path(__file__).resolve().parents[1]
+from repo_layout import ROOT, REMOTE, REMOTE_DEVICE, bar91_profile
+from check_profiles import check as check_profiles
 
 
 def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None, auto_standard=False):
+    check_profiles()
+    profile = bar91_profile()
     network = ipaddress.ip_network(allowed_cidr, strict=False)
     if network.version != 4 or not network.is_private or network.prefixlen < 16:
         raise ValueError("Choose your private IPv4 LAN subnet, /16 or narrower")
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True, mode=0o700)
-    env = dict(os.environ, CGO_ENABLED="0", GOOS="linux", GOARCH="arm", GOARM="7")
+    env = dict(os.environ, CGO_ENABLED="0", GOOS=profile["architecture"]["goos"],
+               GOARCH=profile["architecture"]["goarch"], GOARM=profile["architecture"]["goarm"])
     ldflags = "-s -w -buildid="
     if bluetooth_helper:
         helper = Path(bluetooth_helper).read_bytes()
@@ -32,14 +36,14 @@ def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None, auto_stan
             raise ValueError("EQ parser must be the owner-built 32-bit ARM ELF")
         ldflags += " -X main.eqParserPayload=" + base64.b64encode(helper).decode("ascii")
     subprocess.run(["go", "build", "-buildvcs=false", "-trimpath", "-ldflags=" + ldflags, "-o", str(output / "remote"), "."],
-                   cwd=ROOT / "webremote", env=env, check=True)
+                   cwd=REMOTE, env=env, check=True)
     (output / "config.json").write_text(json.dumps({
         "listen": ":80", "allowed_cidr": str(network), "auto_standard": bool(auto_standard),
     }, indent=2) + "\n")
     (output / "config.json").chmod(0o600)
     (output / "OWNER.txt").write_text("JBL_WEB_REMOTE_REV1\n")
     for name in ("start.sh", "install.sh", "uninstall.sh"):
-        shutil.copyfile(ROOT / "webremote" / name, output / name)
+        shutil.copyfile(REMOTE_DEVICE / name, output / name)
     (output / "SHA256SUMS").write_text("".join(
         hashlib.sha256((output / name).read_bytes()).hexdigest() + "  " + name + "\n"
         for name in ("remote", "config.json", "OWNER.txt", "start.sh", "install.sh", "uninstall.sh")

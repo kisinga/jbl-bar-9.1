@@ -29,7 +29,7 @@ I have also confirmed root SSH, an interactive shell, SFTP and automatic SSH sta
 
 I built on [touch MAX's AutoScript article](https://touch-max.ru/vzlom/zapusk-ssh-na-proshivke-jbl-9-1) and [almirus/jbl9.1](https://github.com/almirus/jbl9.1). Credit for the USB entry point belongs to that earlier work.
 
-Source, install/uninstall ZIPs and instructions: https://github.com/kisinga/jbl-bar-9.1
+Source, install/uninstall ZIPs and instructions: https://github.com/kisinga/jbl-bar-toolkit
 
 This is experimental and checks one exact Bar 9.1 firmware build. It installs a persistent helper and temporarily changes console fields in RAM; it does not flash firmware. My first install needed a retry, and an earlier development version stalled startup, so keep the uninstall ZIP. Repeated standby/CEC wakes remain unverified. USB removal alone does not uninstall it.
 
@@ -37,4 +37,4 @@ If you try it, I would appreciate your firmware label, the exact package/commit 
 
 ## What I would link
 
-I would link the repository or [confirmed v0.1.0 release](https://github.com/kisinga/jbl-bar-9.1/releases/tag/v0.1.0), not the untested working branch as a finished fix. I would distinguish my confirmed SSH installation from an independently reproduced generic installation. I would describe it as automatic Standard Mode after startup, not a universal firmware patch or instant permanent change to JBL's own setting.
+I would link the repository or [confirmed v0.1.0 release](https://github.com/kisinga/jbl-bar-toolkit/releases/tag/v0.1.0), not the untested working branch as a finished fix. I would distinguish my confirmed SSH installation from an independently reproduced generic installation. I would describe it as automatic Standard Mode after startup, not a universal firmware patch or instant permanent change to JBL's own setting.

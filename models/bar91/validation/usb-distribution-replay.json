@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "version": "0.3.0-dev.5",
+  "scope": "Controlled replay: actual vendor ARM BusyBox parser and current public project ARM executable under qemu-arm on host filesystem. No native device state or hardware installation is exercised.",
+  "vendor_busybox_sha256": "d9bc219c48a5d422b37b35bf64b09a9f191ce61d30c2718ff1fce136b23efa06",
+  "remote_sha256": "a2527da7becb965f01fcf4de4ed6d374984692378426f91cbd8df066cacf8495",
+  "checks": {
+    "config_credential_fields": "passed; agrees with host parser",
+    "unsafe_config_refusal": "passed",
+    "current_arm_atomic_publication": "passed",
+    "conflict_no_replace": "passed; both directory contents retained"
+  },
+  "hardware_qualified": false,
+  "public_package_sha256": "9c6e8796b184842b08b780254afd92eda46cdfa3cd7472839766fdf1b3176cfd"
+}

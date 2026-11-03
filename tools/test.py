@@ -23,11 +23,17 @@ if __name__ == '__main__':
     out.mkdir(parents=True, exist_ok=True)
     for p in out.glob('*-tests.json'):
         p.unlink()
+    subprocess.run([sys.executable, str(ROOT / 'tools/check_profiles.py')], check=True)
     subprocess.run([sys.executable, str(ROOT / 'tools/build_release.py')], check=True)
     with ThreadPoolExecutor(max_workers=4) as pool:
-        list(pool.map(run, sorted((ROOT / 'tests').glob('check_*.py'))))
+        list(pool.map(run, sorted((ROOT / 'tests').rglob('check_*.py'))))
     counts = {p.name: len(json.loads(p.read_text())['cases']) for p in sorted(out.glob('*-tests.json'))}
-    assert counts.get('ssh-tests.json') == 19, counts
-    assert sum(n for name, n in counts.items() if name != 'cli-tests.json') == 121, counts
-    assert counts.get('cli-tests.json') == 20, counts
+    # Keep suite coverage explicit without forcing contributors to edit the
+    # runner every time they add a regression case. Immutable payload hashes
+    # remain checked independently by build_release.py.
+    required = {name + '-tests.json' for name in (
+        'controller', 'descriptor', 'drain', 'once', 'setup', 'ssh',
+        'supervisor', 'update', 'cli', 'profile', 'usb', 'project', 'hardware')}
+    assert required.issubset(counts), {'missing_reports': sorted(required - counts.keys())}
+    assert all(count > 0 for count in counts.values()), counts
     print(json.dumps({'cases': counts, 'total': sum(counts.values())}, indent=2))

@@ -1,0 +1,15 @@
+{
+  "available": false,
+  "error": "Illustrative normalized fixture; replace with verified observations.",
+  "power": "Unknown",
+  "mode": "Unknown",
+  "input": "Unknown",
+  "volume": null,
+  "muted": null,
+  "extensions": {
+    "jbl-one.smart-mode": {
+      "value": null,
+      "verification": "unqualified"
+    }
+  }
+}

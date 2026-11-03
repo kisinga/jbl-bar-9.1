@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "recorded_on": "2026-11-03",
+  "scope": "Target context from the project owner's recollection; not a hardware capture",
+  "reported": {
+    "tester_has_device": true,
+    "owned_by_year": 2023,
+    "subwoofer_capsule_shaped": false
+  },
+  "inferred_generation": "original",
+  "exact_variant": null,
+  "installed_firmware": null,
+  "network_address": null,
+  "hardware_session_run": false,
+  "next_evidence": [
+    "Model/model code from the product label",
+    "Installed software version from JBL One Product Information",
+    "Read-only getter observations compared with stock app/display state"
+  ]
+}

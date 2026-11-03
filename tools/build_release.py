@@ -7,7 +7,7 @@ import re
 import subprocess
 import zipfile
 
-ROOT = Path(__file__).resolve().parents[1]
+from repo_layout import ROOT, SMART_MODE, FIXTURES
 VERSION = '0.2.0-dev.1'
 
 
@@ -16,10 +16,10 @@ def sha(data):
 
 
 def validate():
-    source = ROOT / 'smart-mode'
+    source = SMART_MODE
     files = {str(p.relative_to(source)): p.read_bytes()
              for p in sorted(source.rglob('*')) if p.is_file()}
-    baseline = json.loads((ROOT / 'tests/fixtures/revision6-sha256.json').read_text())
+    baseline = json.loads((FIXTURES / 'revision6-sha256.json').read_text())
     assert {n: sha(v) for n, v in files.items()} == baseline, 'Pinned candidate device bytes changed'
     payload = source / 'JBLInstall/payload'
     checks = (payload / 'checksums.txt').read_bytes()
@@ -36,7 +36,7 @@ def validate():
         assert re.search(r'^EXPECTED_HOOK=(\w+)$', text, re.M).group(1) == sha(hook)
     controller = (payload / 'controller.sh').read_text()
     assert sha((payload / 'helper.sh').read_bytes()) in controller
-    confirmed = json.loads((ROOT / 'tests/fixtures/revision5-sha256.json').read_text())
+    confirmed = json.loads((FIXTURES / 'revision5-sha256.json').read_text())
     dispatcher = (source / 'JBLInstall/install.sh').read_text()
     assert re.search(r'^OLD_MANIFEST=(\w+)$', dispatcher, re.M).group(1) == confirmed['JBLInstall/payload/checksums.txt']
     for name in ('JBLInstall/payload/controller.sh', 'JBLInstall/payload/helper.sh',
@@ -52,8 +52,8 @@ def validate():
 
 def build():
     files = validate()
-    files['README.txt'] = (ROOT / 'USB-README.txt').read_bytes()
-    files['ROLLBACK.txt'] = (ROOT / 'ROLLBACK.txt').read_bytes()
+    files['README.txt'] = (ROOT / 'models/bar91/packaging/USB-README.txt').read_bytes()
+    files['ROLLBACK.txt'] = (ROOT / 'models/bar91/packaging/ROLLBACK.txt').read_bytes()
     files['LICENSE.txt'] = (ROOT / 'LICENSE').read_bytes()
     out = ROOT / 'dist'
     out.mkdir(exist_ok=True)

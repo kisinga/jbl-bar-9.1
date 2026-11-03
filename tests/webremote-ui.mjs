@@ -34,6 +34,7 @@ const pushTimer=setInterval(()=>{
  for(const res of streams){if(offline){res.destroy();streams.delete(res);continue;}const text=JSON.stringify(snapshot());if(text!==res.lastSnapshot){res.lastSnapshot=text;res.write('data: '+text+'\n\n');}}
 },50);
 const server = createServer(async (req, res) => {
+  if(req.url==='/api/features'){res.writeHead(404);res.end();return;}
   if(req.url==='/api/events') {
     streamGets++;
     if(offline){req.socket.destroy();return;}
@@ -76,10 +77,10 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET') {stateGets++;await pause(getDelay);}
     res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify(result)); return;
   }
-  const name = {'/':'index.html','/style.css':'style.css','/app.js':'app.js'}[req.url];
+  const name = {'/':'index.html','/style.css':'style.css','/app.js':'app.js'}[req.url] || (/^\/components\/[a-z][a-z0-9-]*\.js$/.test(req.url)?req.url.slice(1):null);
   if (!name) {res.writeHead(404);res.end();return;}
   res.setHeader('Content-Type', name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');
-  res.end(await readFile(new URL('webremote/www/'+name,root)));
+  res.end(await readFile(new URL('apps/remote/www/'+name,root)));
 });
 await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
 const browser = await chromium.launch({headless:true});
@@ -184,7 +185,7 @@ try {
   check(await page.locator('#system-load').textContent()==='0.21 / 0.14 / 0.09' && await page.locator('#system-uptime').textContent()==='1d 1h 5m','load intervals and uptime readable');
   check(await page.locator('#system-temperature').textContent()==='46.5 °C' && await page.locator('#system-processes').textContent()==='64','optional temperature and process count shown');
   check(await page.locator('#cpu-chart').getAttribute('data-samples')==='1','first server sample starts real history');
-  await page.evaluate(()=>{render();render();});
+  for(let n=0;n<2;n++){for(const res of streams)res.write('data: '+JSON.stringify(snapshot())+'\n\n');await pause(50);}
   check(await page.locator('#cpu-chart').getAttribute('data-samples')==='1','renders and duplicate action snapshots never fabricate history');
   for(let n=2;n<=4;n++){state.system={...state.system,sample:n,cpu_percent:n*10};await page.waitForFunction(count=>document.querySelector('#cpu-chart').dataset.samples===String(count),n);}
   check(await page.locator('#cpu-line').getAttribute('d')!=='' && (await page.locator('#cpu-chart').getAttribute('aria-label')).includes('4 real samples'),'bounded SVG graph has accessible real sample history');
@@ -197,19 +198,25 @@ try {
   await page.waitForFunction(()=>document.querySelector('#cpu-value').textContent==='0%');
   check((await page.locator('#memory-available').textContent()).includes('estimated'),'fallback available-memory estimate is labelled');
   check((await page.locator('#cpu-line').getAttribute('d')).split('M').length===3,'missing CPU sample breaks graph into separate segments');
-  await page.evaluate(()=>{const real=Date.now;try{Date.now=()=>real()+7000;render();}finally{Date.now=real;}});
+  await page.evaluate(()=>{window.fixtureNow=Date.now;Date.now=()=>window.fixtureNow()+7000;});
+  await page.waitForFunction(()=>document.querySelector('#system-panel').dataset.state==='stale');
   check(await page.locator('#system-panel').getAttribute('data-state')==='stale' && (await page.locator('#system-note').textContent()).includes('stopped updating'),'stalled samples are marked stale');
-  await page.evaluate(()=>renderSystem({...current,available:false,system:{...current.system,sample:7}},true));
+  state.available=false;state.system={...state.system,sample:7};
+  await page.waitForFunction(()=>document.querySelector('#system-panel').dataset.state==='live');
   check(await page.locator('#system-panel').getAttribute('data-state')==='live' && await page.locator('#cpu-value').textContent()==='0%','system monitor remains usable while native controls are starting');
-  await page.evaluate(()=>{const real=Date.now;try{Date.now=()=>real()+7000;renderSystem({...current,system:{...current.system,sample:8}},true);}finally{Date.now=real;}});
+  await page.evaluate(()=>{Date.now=()=>window.fixtureNow()+14000;});
+  state.available=true;state.system={...state.system,sample:8};
+  await page.waitForFunction(()=>document.querySelector('#cpu-chart').dataset.samples==='1');
+  await page.evaluate(()=>{Date.now=window.fixtureNow;delete window.fixtureNow;});
   check(await page.locator('#cpu-chart').getAttribute('data-samples')==='1','fresh sample after a long gap starts honest history');
   delete state.system;await page.waitForFunction(()=>document.querySelector('#system-panel').dataset.state==='waiting');
   check(await page.locator('#cpu-chart').getAttribute('data-samples')==='0' && await page.locator('#cpu-value').textContent()==='—','missing backend clears values and historical chart');
   state.system=systemFixture();await page.waitForFunction(()=>document.querySelector('#cpu-chart').dataset.samples==='1');
   // Feed distinct backend samples without waiting for a two-minute real-device capture.
-  await page.evaluate(()=>{for(let sample=2;sample<=70;sample++)renderSystem({...current,system:{...current.system,sample,cpu_percent:sample%100}},true);});
+  for(let sample=2;sample<=70;sample++){state.system={...state.system,sample,cpu_percent:sample%100};for(const res of streams)res.write('data: '+JSON.stringify(snapshot())+'\n\n');await page.waitForFunction(value=>document.querySelector('#cpu-value').textContent===value+'%',sample%100);}
   check(await page.locator('#cpu-chart').getAttribute('data-samples')==='60','history retains at most 60 unique samples');
-  await page.evaluate(()=>renderSystem({...current,system:{...current.system,sample:1}},true));
+  state.system={...state.system,sample:1};
+  await page.waitForFunction(()=>document.querySelector('#cpu-chart').dataset.samples==='1');
   check(await page.locator('#cpu-chart').getAttribute('data-samples')==='1','backend sample reset starts a new history');
 
   const stale={...snapshot(),revision:revision-1,volume:200};
@@ -536,7 +543,10 @@ try {
   await mkdir(new URL('build/',root),{recursive:true});
   check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Bluetooth transport fits at 320px');
   // Public screenshots contain explicit sample fixtures, never live device captures.
-  await page.evaluate(()=>{
+  await page.evaluate(async current=>{
+    const {createSystem}=await import('/components/system.js');
+    const monitor=createSystem(document.querySelector('#system-panel'));
+    const renderSystem=(state,online)=>monitor.render({state,online});
     const realNow=Date.now, end=realNow();
     renderSystem({...current,system:null},true);
     try {
@@ -545,7 +555,7 @@ try {
         renderSystem({...current,system:{...current.system,sample,cpu_percent:18+Math.sin(sample*.34)*8+(sample%13===0?19:0),memory:{...current.system.memory,used_bytes:118000000+Math.sin(sample*.12)*4000000,available_bytes:150435456-Math.sin(sample*.12)*4000000}}},true);
       }
     } finally {Date.now=realNow;}
-  });
+  },state);
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-320.png',root)),fullPage:true});
   await page.setViewportSize({width:390,height:920});
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-new.png',root)),fullPage:true});

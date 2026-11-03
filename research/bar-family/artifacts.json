@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "inspected_on": "2026-11-03",
+  "scope": "Historical original-generation JBL One bars; MK2 is a separate target",
+  "artifacts": [
+    {
+      "models": ["800", "1000", "1300"],
+      "version": "23.16.21.80.00",
+      "filename": "JBL_Bar_800_1000_1300_OTA1_ver_23.16.21.80.00.zip",
+      "bytes": 252276929,
+      "sha256": "14a748acae0ac08d036d682fa7a93827a521a2a31b2e87b71e3d70741fa02e8c",
+      "official_pointer": "https://support.jbl.com/on/demandware.static/-/Sites-masterCatalog_Harman/default/dw87a7b949/pdfs/Firmware_update_OTA1_JBL_Bar_800-1000-1300_version_23.16.21.80.00.pdf",
+      "historical_payload_reference": "https://fj016.fr/blog/exploring-iot-jbl-wifi-speakers/",
+      "acquisition": "Archived vendor CDN, capture 20230711210640; exact response URL retained privately",
+      "update_zip_sha256": "c807d71e30d92fe29e5d3068660ec0d065cda9aa0366203cf8a5cb6f11af1e31",
+      "vendor_update_md5": "cf295c2ab0a22612af9427feaf8770a4",
+      "status": "downloaded-extracted-analyzed",
+      "signature_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "models": ["800", "1000"],
+      "version": "22.34.55.80.00",
+      "filename": "JBL_Bar_800_1000_ver_22.34.55.80.00.zip",
+      "bytes": 251972468,
+      "sha256": "a37f21105d3668ed9d8376ad76ade2de6a7d1d78631f20f8ff0876e83f11ab2b",
+      "official_pointer": "https://support.jbl.com/on/demandware.static/-/Sites-masterCatalog_Harman/default/dw5ab8aaf0/pdfs/Firmware_update_JBL_Bar_800_and_Bar_1000_version_22.34.55.80.00.pdf",
+      "historical_payload_reference": "https://web.archive.org/web/20240000000000id_/https://harman.widen.net/s/pbvwd7ksdq/jbl_bar_800_1000_ver_22.34.55.80.00",
+      "vendor_update_md5": "d995156837ee869444ea07afb43a1489",
+      "status": "downloaded-extracted-compared",
+      "signature_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "models": ["1300"],
+      "version": "22.48.53.80.00",
+      "official_pointer": "https://support.jbl.com/on/demandware.static/-/Sites-masterCatalog_Harman/default/dw7427a971/pdfs/Firmware_update_JBL_Bar_1300_RTS_version_22.48.53.80.00_v02.pdf",
+      "status": "pointer-downloaded-payload-unavailable",
+      "limitation": "Live download returns 404; archived redirect survives but its ZIP was not recovered"
+    }
+  ]
+}

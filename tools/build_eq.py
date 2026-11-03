@@ -13,18 +13,10 @@ import shutil
 import subprocess
 import tempfile
 
-ROOT = Path(__file__).resolve().parents[1]
+from repo_layout import REMOTE_DEVICE, bar91_profile
 # Runtime dependencies, verified against the supported Bar 9.1 firmware.
 # Kept absolute so the server can use the same list for runtime guards.
-DEPENDENCIES = {
-    "/usr/lib/libhdsp.so": "1dcb71b2cd28df3fd8d36a16cd8cf71e47344ecb063cfab9efc55fcd94104258",
-    "/system/bdplib/ld-linux.so.3": "49343df4311cb08d47dce9705eebcd06b666509d797ea018ef7c3142cb1f8af9",
-    "/system/bdplib/libc.so.6": "2f3952341c498325cc9423acadcf7c2ad94ee9196af071c661ffd16057552dc0",
-    "/system/bdplib/libdl.so.2": "a90018084bd508ce2a1a8d4a581cb3caebb0dfcd357f60b9e16a137850a064c6",
-    "/system/bdplib/libgcc_s.so.1": "8cefc5883637998effb2b60cf89115692fcfea32845892e4e3b3570b036190d1",
-    "/system/bdplib/libm.so.6": "8a5316e5d611f775819f77509014278d06335b03d8569cf2ff9dafd2e1e104c5",
-    "/system/bdplib/libstdc++.so.6": "59a59e75b7ad46d45b239411ada16818b56f48803c6e25195cdcd266ed86a67d",
-}
+DEPENDENCIES = bar91_profile()["native_helpers"]["eq_parser"]
 
 
 def validate_rootfs(rootfs):
@@ -63,7 +55,7 @@ def build(cc, rootfs, output):
         obj = Path(folder) / "eq_parser.o"
         subprocess.run([
             compiler, "-Os", "-Wall", "-Wextra", "-Werror", "-fno-pie", "-fno-stack-protector",
-            "-D_FORTIFY_SOURCE=0", "-c", str(ROOT / "webremote/native/eq_parser.c"), "-o", str(obj),
+            "-D_FORTIFY_SOURCE=0", "-c", str(REMOTE_DEVICE / "native/eq_parser.c"), "-o", str(obj),
         ], check=True)
         # Use modern toolchain CRT objects with the pinned old libc. The result
         # imports __libc_start_main@GLIBC_2.4, without bundling a replacement libc.

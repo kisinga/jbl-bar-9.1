@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "version": "0.3.0-dev.8",
+  "scope": "Host validation of automatic USB selection and release packaging; physical bootstrap/install/recovery qualification remains pending.",
+  "repository": "https://github.com/kisinga/jbl-bar-toolkit",
+  "installers_included": [
+    "bar91"
+  ],
+  "checks": {
+    "host_cases": 279,
+    "hardware_selection_cases": 10,
+    "project_cases": 13,
+    "go_race": "passed",
+    "go_vet": "passed",
+    "offline_setup_browser": "passed",
+    "workflow": "YAML parsed; all 11 shell blocks pass bash -n; GitHub execution pending"
+  },
+  "artifacts": [
+    {
+      "target": "auto",
+      "package": "dist/release-v0.3.0-dev.8/auto/jbl-bar-toolkit-v0.3.0-dev.8-usb.zip",
+      "sha256": "c35011dea037629eedecc9816ca52762ed8acba7d802a2794a47b0e3ca80de2b",
+      "payload_files": 33
+    },
+    {
+      "target": "bar91",
+      "package": "dist/release-v0.3.0-dev.8/bar91/jbl-bar91-v0.3.0-dev.8-usb.zip",
+      "sha256": "c35011dea037629eedecc9816ca52762ed8acba7d802a2794a47b0e3ca80de2b",
+      "payload_files": 33
+    }
+  ],
+  "limits": [
+    "AutoScript startup is established only on Bar 9.1.",
+    "No Bar 1300 or MK2 installation/USB execution route has been qualified.",
+    "Shared cross-version USB/SSH updates remain unimplemented.",
+    "Adding a second installer requires explicit combined-bundle composition review.",
+    "Prepared hardware-test USB and historical standalone payloads were not changed."
+  ]
+}
