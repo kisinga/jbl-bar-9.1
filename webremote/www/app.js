@@ -382,7 +382,8 @@ function renderExtras(s, ready, awake) {
   $('night').setAttribute('aria-pressed', String(sound.night === true));
   $('night').disabled = !ready || !awake || !!active || sound.night == null;
   $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5';
-  $('center-value').textContent=sound.center == null ? 'Unavailable' : 'Level ' + sound.center + ' · +' + ['0','2.4','4.8','7.2','9.6','12'][sound.center] + ' dB' + (sound.center_error ? ' · ' + sound.center_error : '');
+  // Same form as Bass ("Level N of 5"); the gain follows as secondary detail.
+  $('center-value').textContent=sound.center == null ? 'Unavailable' : 'Level ' + sound.center + ' of 5 · ' + (sound.center ? '+' + ['0','2.4','4.8','7.2','9.6','12'][sound.center] + ' dB' : 'original') + (sound.center_error ? ' · ' + sound.center_error : '');
   $('atmos-value').textContent=['Low','Mid','High'][sound.atmos] || 'Unavailable';
   const rear=['Low','Mid','High','Muted'][sound.rear] || 'Unavailable';
   $('rear-value').textContent=sound.rear_docked ? rear + ' · speakers docked' : rear;
