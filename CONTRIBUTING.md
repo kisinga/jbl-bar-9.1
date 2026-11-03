@@ -123,7 +123,7 @@ Turn on Standard Mode and start audio. Select a preset or adjust the five slider
 
 Application uses native custom DSP mode 5. It is not proven equivalent to stock processing plus EQ. Each request validates a complete 3,840-byte tuning reconstruction with the native parser before applying it; unknown calibration differences fail closed. Reset uses the native 1 → 0 preset transition and checks exact original bytes. Keep the bar’s normal mute state across both operations.
 
-EQ is temporary: restart returns to original tuning, and web power/source/sound changes reset it first. The monitor also attempts a reset when the native route changes. Other native controls, standby/CEC and HDMI/eARC/Cast layouts still need qualification; Bluetooth has audible confirmation. Recovery files belong in `/var/JBLRemote`; preserve them after an error and try **Reset**. Do not edit another program’s `/mnt/ubi_boot/temp.json` or remove recovery files to force an unsupported route.
+EQ is temporary: restart returns to original tuning, and web power/source/sound changes reset it first. Power from standby is the exception: the reset needs the bar on with an audio route, so waking is sent without it and the monitor restores the tuning once the bar is on (otherwise a pending recovery after a restart would block every control, including power). The monitor also attempts a reset when the native route changes. Other native controls, standby/CEC and HDMI/eARC/Cast layouts still need qualification; Bluetooth has audible confirmation. Recovery files belong in `/var/JBLRemote`; preserve them after an error and try **Reset**. Do not edit another program’s `/mnt/ubi_boot/temp.json` or remove recovery files to force an unsupported route.
 
 ### Install and remove
 
