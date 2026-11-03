@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -31,6 +32,9 @@ const (
 	avSyncPressGap     = 400 * time.Millisecond
 	avSyncWindowClosed = 5500 * time.Millisecond
 	avSyncSettle       = 1500 * time.Millisecond
+	avSyncSaveWait     = 3 * time.Second
+	avSyncText         = vfdContext + 0xee // display text of the delay, e.g. "  20MS"
+	avSyncTextLength   = 28
 )
 
 func avSyncSource(source *uint32) bool {
@@ -125,16 +129,19 @@ func (d *device) avSyncPress(ctx context.Context, key, duration string) error {
 type avSyncSteps struct {
 	press    func(ctx context.Context, key, duration string) error
 	shown    func(ctx context.Context) bool // audio sync message on the display
-	delay    func() (uint32, error)         // saved delay, config 375
+	delay    func() (uint32, error)         // delay shown on the display while sync mode is open
 	volume   func() (uint32, error)
 	cooldown func(last time.Time) // keeps the lock until sync mode has closed
-	settle   time.Duration        // how long a step may take to show in config 375
+	settle   time.Duration        // how long a step may take to show on the display
 }
 
 // run enters sync mode and steps the delay. Once the hold has been sent, every
 // exit, including errors and an expired request, waits for the bar to leave
 // sync mode: until then + and - change the delay instead of the volume.
-func (a avSyncSteps) run(ctx context.Context, key string, steps, target int, volume uint32) (err error) {
+//
+// Config 375 is only saved when sync mode closes, so steps are confirmed with
+// the delay the display shows; the caller checks config 375 afterwards.
+func (a avSyncSteps) run(ctx context.Context, key string, steps, current, target int, volume uint32) (err error) {
 	last := time.Now()
 	press := func(k, duration string) error {
 		e := a.press(ctx, k, duration)
@@ -149,6 +156,9 @@ func (a avSyncSteps) run(ctx context.Context, key string, steps, target int, vol
 	// before any + so that a missed hold never reaches the volume.
 	if !a.shown(ctx) {
 		return errors.New("audio sync mode did not open; nothing else was sent")
+	}
+	if shown, e := a.delay(); e != nil || int(shown) != current {
+		return errors.New("the displayed audio sync delay does not match the saved one; nothing else was sent")
 	}
 	settle := a.settle
 	if settle <= 0 {
@@ -261,17 +271,23 @@ func (d *device) avSyncAction(ctx context.Context, target int) (state, error) {
 		shown: func(ctx context.Context) bool {
 			return d.waitDisplay(ctx, time.Second, func(m, _ uint32) bool { return m == msgAudioSync })
 		},
-		delay:    func() (uint32, error) { return d.configByte(avSyncConfig) },
+		delay:    d.shownSyncDelay,
 		volume:   func() (uint32, error) { return d.configByte(50) },
 		cooldown: avSyncCooldown,
 	}
-	e = d.withEQConsole(ctx, func(ctx context.Context) error { return sync.run(ctx, key, steps, target, volume) })
+	e = d.withEQConsole(ctx, func(ctx context.Context) error { return sync.run(ctx, key, steps, current, target, volume) })
 	after := d.snapshotCurrent()
 	if e != nil {
 		return after, e
 	}
-	if v, err := d.configByte(avSyncConfig); err != nil || int(v) != target {
-		return after, errors.New("audio sync change was not confirmed")
+	// Sync mode has closed (cooldown); the bar saves the delay at that point.
+	saved := func() bool { v, err := d.configByte(avSyncConfig); return err == nil && int(v) == target }
+	deadline := time.Now().Add(avSyncSaveWait)
+	for !saved() && time.Now().Before(deadline) {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !saved() {
+		return d.snapshotCurrent(), errors.New("audio sync change was not saved by the bar")
 	}
 	if !standardSettingsPreserved(before, after) {
 		return after, errors.New("audio sync changed but volume or mute changed; check sound before retrying")
@@ -280,4 +296,30 @@ func (d *device) avSyncAction(ctx context.Context, target int) (state, error) {
 		return after, errors.New("audio sync changed but the input changed; check the source")
 	}
 	return after, nil
+}
+
+// syncTextMS parses the audio sync display text ("  0MS", "120MS").
+func syncTextMS(b []byte) (uint32, bool) {
+	text := strings.TrimSpace(audioFormatText(b))
+	digits, ok := strings.CutSuffix(text, "MS")
+	if !ok {
+		return 0, false
+	}
+	v, e := strconv.Atoi(strings.TrimSpace(digits))
+	if e != nil || v < 0 || v > avSyncMaxMS || v%avSyncStepMS != 0 {
+		return 0, false
+	}
+	return uint32(v), true
+}
+
+func (d *device) shownSyncDelay() (uint32, error) {
+	b, e := d.readBytes(avSyncText, avSyncTextLength)
+	if e != nil {
+		return 0, e
+	}
+	v, ok := syncTextMS(b)
+	if !ok {
+		return 0, errors.New("audio sync display unreadable")
+	}
+	return v, nil
 }

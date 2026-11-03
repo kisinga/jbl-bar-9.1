@@ -142,21 +142,21 @@ func TestAVSyncCooldownOnEveryExit(t *testing.T) {
 		ok      bool
 		presses int
 	}{
-		{"success", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0, 10, 10, 20}}, true, 3},
+		{"success", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0, 0, 10, 10, 20}}, true, 3},
 		{"hold failed", context.Background(), fakeSync{pressErr: map[int]error{0: errors.New("cli failed")}}, false, 1},
 		{"sync mode not shown", context.Background(), fakeSync{volume: 8}, false, 1},
-		{"volume moved", context.Background(), fakeSync{shown: true, volume: 9, delays: []uint32{0}}, false, 3},
-		{"delay read failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0}}, false, 2},
-		{"limit reached", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{250, 250}}, false, 2},
-		{"step press failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0}, pressErr: map[int]error{1: errors.New("cli failed")}}, false, 2},
+		{"volume moved", context.Background(), fakeSync{shown: true, volume: 9, delays: []uint32{0, 0}}, false, 3},
+		{"delay read failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0, 0}}, false, 2},
+		{"limit reached", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{250, 250, 250}}, false, 2},
+		{"step press failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0, 0}, pressErr: map[int]error{1: errors.New("cli failed")}}, false, 2},
 		{"request expired", expired, fakeSync{shown: true, volume: 8}, false, 1},
 	} {
 		f := c.f
-		target := 20
+		current, target := 0, 20
 		if c.name == "limit reached" {
-			target = 260
+			current, target = 250, 260
 		}
-		e := f.steps().run(c.ctx, "0x6f000", 2, target, 8)
+		e := f.steps().run(c.ctx, "0x6f000", 2, current, target, 8)
 		if (e == nil) != c.ok || f.cooled != 1 || len(f.presses) != c.presses {
 			t.Fatalf("%s: err=%v cooldowns=%d presses=%v", c.name, e, f.cooled, f.presses)
 		}
@@ -178,16 +178,16 @@ func TestAVSyncCooldownIgnoresExpiredRequests(t *testing.T) {
 
 func TestAVSyncFirstPressChangesTheDelay(t *testing.T) {
 	// The hold already shows the delay: one step down from 20 ms is one press.
-	f := fakeSync{shown: true, volume: 8, delays: []uint32{20, 10}}
-	if e := f.steps().run(context.Background(), "0x6f001", 1, 10, 8); e != nil {
+	f := fakeSync{shown: true, volume: 8, delays: []uint32{20, 20, 10}}
+	if e := f.steps().run(context.Background(), "0x6f001", 1, 20, 10, 8); e != nil {
 		t.Fatal(e)
 	}
 	if !reflect.DeepEqual(f.presses, []string{avSyncKey, "0x6f001"}) {
 		t.Fatalf("presses %v", f.presses)
 	}
 	// A step that reached the volume instead is undone with the opposite key.
-	f = fakeSync{shown: true, volume: 7, delays: []uint32{20}}
-	if f.steps().run(context.Background(), "0x6f001", 1, 10, 8) == nil || !reflect.DeepEqual(f.presses, []string{avSyncKey, "0x6f001", "0x6f000"}) {
+	f = fakeSync{shown: true, volume: 7, delays: []uint32{20, 20}}
+	if f.steps().run(context.Background(), "0x6f001", 1, 20, 10, 8) == nil || !reflect.DeepEqual(f.presses, []string{avSyncKey, "0x6f001", "0x6f000"}) {
 		t.Fatalf("volume step not undone: %v", f.presses)
 	}
 }
@@ -229,22 +229,47 @@ func (b *barSync) steps() avSyncSteps {
 
 func TestAVSyncMultiStepRetriesAnIgnoredPress(t *testing.T) {
 	b := barSync{delay: 10, ignored: map[int]bool{2: true}}
-	if e := b.steps().run(context.Background(), "0x6f000", 4, 50, 8); e != nil {
+	if e := b.steps().run(context.Background(), "0x6f000", 4, 10, 50, 8); e != nil {
 		t.Fatal(e)
 	}
 	if b.delay != 50 || b.presses != 5 {
 		t.Fatalf("delay %d after %d presses", b.delay, b.presses)
 	}
 	b = barSync{delay: 10, ignored: map[int]bool{2: true, 3: true}}
-	if e := b.steps().run(context.Background(), "0x6f000", 4, 50, 8); e == nil || b.delay != 20 || b.presses != 3 {
+	if e := b.steps().run(context.Background(), "0x6f000", 4, 10, 50, 8); e == nil || b.delay != 20 || b.presses != 3 {
 		t.Fatalf("two ignored presses must stop: %v delay %d presses %d", e, b.delay, b.presses)
 	}
 	b = barSync{delay: 230}
-	if e := b.steps().run(context.Background(), "0x6f000", 4, 270, 8); e == nil || b.delay != avSyncMaxMS || b.presses != 3 {
+	if e := b.steps().run(context.Background(), "0x6f000", 4, 230, 270, 8); e == nil || b.delay != avSyncMaxMS || b.presses != 3 {
 		t.Fatalf("limit must stop without a retry: %v delay %d presses %d", e, b.delay, b.presses)
 	}
 	b = barSync{delay: 50}
-	if e := b.steps().run(context.Background(), "0x6f001", 5, 0, 8); e != nil || b.delay != 0 || b.presses != 5 {
+	if e := b.steps().run(context.Background(), "0x6f001", 5, 50, 0, 8); e != nil || b.delay != 0 || b.presses != 5 {
 		t.Fatalf("5 steps down: %v delay %d presses %d", e, b.delay, b.presses)
+	}
+}
+
+func TestAVSyncDisplayMustMatchSavedDelay(t *testing.T) {
+	// The display shows 30 ms while config 375 still says 10: do not step.
+	b := barSync{delay: 30}
+	if e := b.steps().run(context.Background(), "0x6f000", 2, 10, 30, 8); e == nil || b.presses != 0 {
+		t.Fatalf("mismatch must stop before any step: %v presses %d", e, b.presses)
+	}
+}
+
+func TestSyncTextMS(t *testing.T) {
+	for text, want := range map[string]int{"  0MS": 0, " 20MS": 20, "250MS": 250, "120MS\x00junk": 120} {
+		b := make([]byte, avSyncTextLength)
+		copy(b, text)
+		if v, ok := syncTextMS(b); !ok || int(v) != want {
+			t.Fatalf("%q: %d %v", text, v, ok)
+		}
+	}
+	for _, text := range []string{"", "VOL 8", "15MS", "260MS", "MS", "-10MS"} {
+		b := make([]byte, avSyncTextLength)
+		copy(b, text)
+		if _, ok := syncTextMS(b); ok {
+			t.Fatalf("%q accepted", text)
+		}
 	}
 }
