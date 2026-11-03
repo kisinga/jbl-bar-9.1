@@ -61,7 +61,7 @@ The model's composition registers an `extension.Module[S]` containing:
 - An optional pure projection of an already captured snapshot.
 - An optional `Run(context.Context)` worker for monitoring/reapplication.
 
-`extensions_bar91.go` contains the working Front EQ and center-level examples.
+`extensions_bar91.go` contains the working Front EQ, center-level and bass-offset examples.
 HTTP and extension actions use the same LAN, origin/CSRF, timeout and operation
 gate. Registry workers run only for included modules. They must honor cancellation
 after completing bounded native restoration; shutdown joins them before closing
@@ -83,6 +83,11 @@ Playback owns sender intent; EQ owns its unapplied draft; System owns its bounde
 history of real samples. Components do not open connections, retry controls,
 create independent action queues or read another component's private variables.
 The shell supplies the shared timer to components that need one.
+
+`bass-offset.js` owns its selector draft and typed save parameters. It requires
+an advertised `bass-offset` component and projects namespaced extension state;
+older servers keep the control hidden. Its monitor shares the model action gate
+and is joined by the extension lifecycle before native helper cleanup.
 
 `advanced.js` owns the contributed audio-sync draft and calibration/subwoofer
 display. The shell debounces taps into one legacy `av_sync_set` request with

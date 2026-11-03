@@ -1,0 +1,34 @@
+import {byId} from './dom.js';
+const valid = db => Number.isFinite(db) && db >= -3 && db <= 3 && Number.isInteger(db * 2);
+const format = db => (db > 0 ? '+' : '') + db.toFixed(1) + ' dB';
+export function createBassOffset(root) {
+  const $ = id => byId(root,id);
+  const select = $('bass-offset');
+  let committed = '', draft = 0, latest;
+  for (let db = 3; db >= -3; db -= 0.5) {
+    const option = select.ownerDocument.createElement('option');
+    option.value = String(db); option.textContent = format(db); select.append(option);
+  }
+  function render(context) {
+    latest = context;
+    const {state:s,ready,active,queued,csrf} = context;
+    const b = s.bass_offset, db = b?.offset_db;
+    const known = valid(db);
+    const key = JSON.stringify([s.csrf || csrf,known ? db : null]);
+    if (key !== committed) { committed = key; draft = known ? db : 0; }
+    select.value = String(draft);
+    const pending = !!active || queued > 0;
+    const calibrating = /starting|Starting in|Measuring/.test(s.setup?.calibration || '');
+    select.disabled = !ready || !known || pending || calibrating;
+    $('bass-offset-save').disabled = select.disabled;
+    $('bass-offset-save').textContent = active === 'bass_offset_set' ? 'Saving…' : 'Save offset';
+    const changed = known && draft !== db;
+    $('bass-offset-state').textContent = !known ? 'Unavailable' : !ready ? 'Last saved: ' + format(db) + '. Connection unavailable.' : changed ? format(draft) + ' selected. Select Save offset to keep it.' : format(db) + ' set. Offsets all five bass levels. ' + (b.status === 'original' ? 'Original tuning.' : 'Saved for startup.') + (b.status === 'waiting' ? ' Waiting for supported Standard playback.' : b.status === 'paused' ? ' Automatic adjustment paused.' : '') + (b.error ? ' ' + b.error : '');
+  }
+  select.addEventListener('change', () => {
+    const value = Number(select.value);
+    if (select.disabled || !valid(value)) return;
+    draft = value; if (latest) render(latest);
+  });
+  return {render, parameters: () => valid(draft) ? {offset_db:draft} : null};
+}

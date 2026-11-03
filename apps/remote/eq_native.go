@@ -20,8 +20,9 @@ const eqHPPHash = "e9f525a1771b4376921402d016ff54d6c6b3dc2d0d5f29ec0e6e352d40b0f
 const eqHDSPHash = "1dcb71b2cd28df3fd8d36a16cd8cf71e47344ecb063cfab9efc55fcd94104258"
 const eqPPCHash = "98d5b8fdee338842a2355867af1af6159214584b9dd1b9ac876db73d68279378"
 
-// This adapter only reads the pinned active front-speaker chain and restores
-// its native preset. It never writes DSP memory or accepts arbitrary commands.
+// This adapter reads the pinned audio chain and restores its native preset.
+// The bass-only reader additionally permits the qualified movie pipeline page.
+// DSP memory writes are isolated in bass_native.go; EQ keeps its original guard.
 // Callers hold d.mu across any EQ transaction, including watched-file changes.
 type eqNativeState struct {
 	Block                            []byte
@@ -95,6 +96,10 @@ func eqLibraryBase(maps []eqMemoryMap, path string) (uint32, error) {
 type eqNativeRead func(uint32, int) ([]byte, error)
 
 func eqReadState(read eqNativeRead, hppBase, hdspBase uint32) (eqNativeState, error) {
+	return eqReadStateFor(read, hppBase, hdspBase, false)
+}
+
+func eqReadStateFor(read eqNativeRead, hppBase, hdspBase uint32, bass bool) (eqNativeState, error) {
 	var out eqNativeState
 	word := func(a uint32) (uint32, error) {
 		b, e := read(a, 4)
@@ -141,9 +146,10 @@ func eqReadState(read eqNativeRead, hppBase, hdspBase uint32) (eqNativeState, er
 		id := binary.LittleEndian.Uint32(entry)
 		if id>>16 == 0x84 {
 			// Other firmware pipeline pages are not part of this first implementation.
-			if id != eqHPPElement {
+			if id != eqHPPElement && !(bass && id == 0x840002) {
 				return fail()
 			}
+			out.Element = id
 			found++
 			module := binary.LittleEndian.Uint32(entry[0x14:])
 			if module == 0 {
@@ -158,7 +164,6 @@ func eqReadState(read eqNativeRead, hppBase, hdspBase uint32) (eqNativeState, er
 	if found != 1 {
 		return fail()
 	}
-	out.Element = eqHPPElement
 	out.outer, e = word(hppBase + 0xa45c)
 	if e != nil || out.outer == 0 {
 		return fail()
@@ -223,6 +228,10 @@ func (d *device) eqCheckNativeLibraries(key string, force bool) error {
 	return nil
 }
 func (d *device) readEQNative() (eqNativeState, error) {
+	return d.readAudioNative(false)
+}
+
+func (d *device) readAudioNative(bass bool) (eqNativeState, error) {
 	var empty eqNativeState
 	if d.pid == 0 {
 		return empty, errors.New("soundbar is starting")
@@ -267,7 +276,7 @@ func (d *device) readEQNative() (eqNativeState, error) {
 		_, e := mem.ReadAt(b, int64(a))
 		return b, e
 	}
-	state, e := eqReadState(read, hb, db)
+	state, e := eqReadStateFor(read, hb, db, bass)
 	if e != nil {
 		return empty, e
 	}

@@ -45,6 +45,33 @@ func (r *remote) registerBar91Extensions() error {
 	}); err != nil {
 		return err
 	}
+	if err := r.extensions.Register(extension.Module[state]{
+		Descriptor: extension.Descriptor{ID: "bar91.bass-offset", Component: "bass-offset", Name: "Bass offset", Model: "bar91", Included: true, Experimental: true},
+		Actions: map[string]extension.Handler[state]{"bar91.bass-offset.set": func(ctx context.Context, data json.RawMessage) (state, error) {
+			var parameters struct {
+				OffsetDB *float64 `json:"offset_db"`
+			}
+			if err := extensionParameters(data, &parameters); err != nil {
+				return state{}, err
+			}
+			if parameters.OffsetDB == nil || !validBassOffset(*parameters.OffsetDB) {
+				return state{}, errors.New("provide offset_db from -3 to +3 dB in 0.5 dB steps")
+			}
+			if err := ctx.Err(); err != nil {
+				return state{}, err
+			}
+			return r.device.bassOffsetAction(*parameters.OffsetDB)
+		}},
+		Run: r.monitorBass,
+		Project: func(s state) any {
+			if s.BassOffset == nil {
+				return nil
+			}
+			return s.BassOffset
+		},
+	}); err != nil {
+		return err
+	}
 	return r.extensions.Register(extension.Module[state]{
 		Descriptor: extension.Descriptor{ID: "bar91.center-level", Component: "center-level", Name: "Center level", Model: "bar91", Included: true, Experimental: true},
 		Run:        r.monitorCenter,

@@ -31,3 +31,5 @@ header{display:flex;align-items:center;justify-content:space-between;padding-bot
 
 @media(max-width:759px){.rear-batteries{gap:23px}}
 @media(max-width:359px){.rear-batteries{grid-template-columns:1fr;gap:20px}}
+
+.bass-offset-row{flex-wrap:wrap;gap:12px}.bass-offset-row>div:first-child{flex:1 1 190px}.sound-row>.bass-offset-controls{flex-direction:row;gap:8px}.bass-offset-controls select,.bass-offset-controls button{box-sizing:border-box;width:112px;min-height:44px;font-variant-numeric:tabular-nums}.bass-offset-controls select{color:var(--text);background:var(--panel-raised);border:1px solid var(--line);border-radius:10px;padding:8px;font:inherit;font-size:10px}.bass-offset-controls select:disabled{opacity:.38}.bass-offset-controls select:focus-visible{outline:3px solid var(--orange);outline-offset:4px}
