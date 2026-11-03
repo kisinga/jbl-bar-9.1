@@ -32,6 +32,7 @@ const (
 	msgSubNotConnected = 2
 	msgSubConnected    = 3
 	msgAudioSync       = 26
+	msgAudioStream     = 94
 	msgCalibration1    = 58
 	msgCalibration2    = 59
 	msgCountdownLast   = 64 // 60..64 = countdown 1..5
@@ -126,12 +127,38 @@ func (d *device) setup() *setupState {
 	return &setupState{running: calibrationRunning(message), Calibration: calibrationPhase(message), SubPairing: overlay == vfdOverlaySubPair, Subwoofer: subwooferMessage(message)}
 }
 
-func (d *device) audioFormat() string {
+// formatTracker ties the last audio stream text to the source it was shown
+// on. The bar only shows a stream format on TV/ARC and HDMI; the text stays
+// in memory afterwards, so a Bluetooth or streaming source would otherwise
+// keep reporting the previous TV format.
+type formatTracker struct {
+	text   string
+	source uint32
+	known  bool
+}
+
+func (f *formatTracker) observe(text string, shown bool, source *uint32) string {
+	if source == nil {
+		return ""
+	}
+	// A new text, or the stream message on the display (the same format can
+	// be shown again after a source change), ties the format to this source.
+	if !f.known || text != f.text || shown {
+		f.text, f.source, f.known = text, *source, true
+	}
+	if (*source != 0 && *source != 3) || f.source != *source {
+		return ""
+	}
+	return f.text
+}
+
+func (d *device) audioFormat(source *uint32) string {
 	b, e := d.readBytes(vfdAudioStream, vfdAudioLength)
 	if e != nil {
 		return ""
 	}
-	return audioFormatText(b)
+	message, _, _ := d.displayMessages()
+	return d.format.observe(audioFormatText(b), message == msgAudioStream, source)
 }
 
 // calibrating is used to refuse every other control while the bar measures.

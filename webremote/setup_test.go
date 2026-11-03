@@ -42,3 +42,26 @@ func TestAudioFormatText(t *testing.T) {
 		t.Fatal("non-text accepted")
 	}
 }
+
+func TestAudioFormatFollowsTheSource(t *testing.T) {
+	tv, hdmi, bt := uint32(0), uint32(3), uint32(2)
+	var f formatTracker
+	if f.observe("DOLBY ATMOS DD+", false, &hdmi) != "DOLBY ATMOS DD+" {
+		t.Fatal("format on HDMI")
+	}
+	if f.observe("DOLBY ATMOS DD+", false, &bt) != "" {
+		t.Fatal("Bluetooth must not report the previous HDMI format")
+	}
+	if f.observe("DOLBY ATMOS DD+", false, &tv) != "" {
+		t.Fatal("TV must not report a format shown on HDMI")
+	}
+	if f.observe("DOLBY ATMOS DD+", true, &tv) != "DOLBY ATMOS DD+" {
+		t.Fatal("same format shown again on TV")
+	}
+	if f.observe("PCM", false, &tv) != "PCM" {
+		t.Fatal("new format shown on TV")
+	}
+	if f.observe("PCM", false, &hdmi) != "" || f.observe("PCM", false, nil) != "" {
+		t.Fatal("stale or unknown source")
+	}
+}

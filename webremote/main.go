@@ -88,6 +88,7 @@ type device struct {
 	revision          uint64
 	cliChecked        bool
 	center            centerController
+	format            formatTracker
 }
 type remote struct {
 	cfg      config
@@ -419,7 +420,7 @@ func (d *device) snapshotCurrent() state {
 		s.Error = "Soundbar restarted; refreshing"
 	}
 	if s.Power == "On" {
-		s.Sound.AudioFormat = d.audioFormat()
+		s.Sound.AudioFormat = d.audioFormat(s.SourceState)
 	}
 	s.MediaControls = mediaCommands(s)
 	s.EQ = d.frontEQStatus(s)
