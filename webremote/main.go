@@ -60,6 +60,7 @@ type state struct {
 	MediaControls []string         `json:"media_controls,omitempty"`
 	Revision      uint64           `json:"revision"`
 	Sound         *soundState      `json:"sound,omitempty"`
+	Setup         *setupState      `json:"setup,omitempty"`
 	Streaming     *streamState     `json:"streaming,omitempty"`
 	SourceState   *uint32          `json:"source_state,omitempty"`
 	WiFi          wifiState        `json:"wifi"`
@@ -87,6 +88,7 @@ type device struct {
 	revision          uint64
 	cliChecked        bool
 	center            centerController
+	format            formatTracker
 }
 type remote struct {
 	cfg      config
@@ -185,6 +187,18 @@ func (d *device) read(address int64, width int) (uint32, error) {
 	}
 	return 0, errors.New("invalid read width")
 }
+func (d *device) readBytes(address int64, n int) ([]byte, error) {
+	f, e := os.Open(fmt.Sprintf("/proc/%d/mem", d.pid))
+	if e != nil {
+		return nil, e
+	}
+	defer f.Close()
+	b := make([]byte, n)
+	if _, e = f.ReadAt(b, address); e != nil {
+		return nil, e
+	}
+	return b, nil
+}
 func (d *device) write(address int64, width int, value uint32) error {
 	if !d.same() {
 		return errors.New("soundbar restarted")
@@ -213,7 +227,7 @@ func (d *device) write(address int64, width int, value uint32) error {
 }
 func (d *device) configByte(id uint32) (uint32, error) {
 	switch id {
-	case 50, 51, 155, 365, 238, 201, 202:
+	case 50, 51, 155, 365, 238, 201, 202, avSyncConfig:
 	default:
 		return 0, errors.New("unknown setting")
 	}
@@ -368,6 +382,7 @@ func (d *device) snapshotCurrent() state {
 	s.Bluetooth = d.bluetooth()
 	sound := d.sound()
 	s.Sound = &sound
+	s.Setup = d.setup()
 	if v, e := d.configByte(365); e == nil {
 		s.SourceState = &v
 		if s.Bluetooth != nil {
@@ -403,6 +418,9 @@ func (d *device) snapshotCurrent() state {
 	if !d.same() {
 		s.Available = false
 		s.Error = "Soundbar restarted; refreshing"
+	}
+	if s.Power == "On" {
+		s.Sound.AudioFormat = d.audioFormat(s.SourceState)
 	}
 	s.MediaControls = mediaCommands(s)
 	s.EQ = d.frontEQStatus(s)
@@ -496,6 +514,8 @@ func actionObserved(action string, before, after state) bool {
 		return before.Input == after.Input
 	case "standard":
 		return after.Mode == "Standard"
+	case "smart":
+		return after.Mode == "Smart"
 	}
 	return false
 }
@@ -526,7 +546,7 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	defer d.mu.Unlock()
 	keys := map[string]string{"volume_up": "0x6f000", "volume_down": "0x6f001", "mute": "0x6f002", "power": "0x8f000", "input_tv": "0x1f00c", "input_hdmi": "0x5f03e", "input_bluetooth": "0x6f027", "bluetooth_pair": "0x6f027", "bass_next": "0x1f030", "atmos_next": "0x1f02f", "rear_next": "0x1f031", "media_play": "0x9f000", "media_pause": "0x9f001", "media_stop": "0x9f002", "media_next": "0x9f005", "media_previous": "0x9f006"}
 	_, simple := keys[action]
-	if !simple && action != "standard" && action != "night_toggle" {
+	if !simple && action != "standard" && action != "smart" && action != "night_toggle" {
 		return out, errors.New("unknown control")
 	}
 	if d.eq.active && eqResetBefore(action, d.powerOn()) {
@@ -560,7 +580,7 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 			return before, nil
 		}
 	}
-	if action == "standard" && before.Mode == "Standard" {
+	if action == "standard" && before.Mode == "Standard" || action == "smart" && before.Mode == "Smart" {
 		return before, nil
 	}
 	if action != "power" && before.Power != "On" {
@@ -615,7 +635,7 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	airplay := strings.HasPrefix(action, "media_") && airplayReady(before)
 	// Restore both fields even if a command fails or the request disconnects.
 	defer func() {
-		if keySent && (action == "standard" || action == "night_toggle") {
+		if keySent && (action == "standard" || action == "smart" || action == "night_toggle") {
 			deadline := time.Now().Add(5 * time.Second)
 			for d.same() && !d.idleKeys() && time.Now().Before(deadline) {
 				time.Sleep(50 * time.Millisecond)
@@ -628,7 +648,7 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 		b := d.write(15427780, 1, input)
 		if a != nil || b != nil {
 			err = errors.New("console restoration failed; stop controls and collect logs")
-		} else if err != nil && action == "standard" && keySent && before.Muted != nil && d.same() && d.idleKeys() {
+		} else if err != nil && (action == "standard" || action == "smart") && keySent && before.Muted != nil && d.same() && d.idleKeys() {
 			c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if e := d.eqMute(c, *before.Muted); e != nil {
@@ -651,8 +671,8 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	if strings.HasPrefix(action, "media_") && !mediaAllowed(action, d.snapshotCurrent()) {
 		return d.snapshotCurrent(), errors.New("playback source or capability changed; refresh before retrying")
 	}
-	if action == "standard" || action == "night_toggle" {
-		if action == "standard" && before.Mode != "Smart" {
+	if action == "standard" || action == "smart" || action == "night_toggle" {
+		if action == "standard" && before.Mode != "Smart" || action == "smart" && before.Mode != "Standard" {
 			return before, errors.New("unknown sound mode")
 		}
 		if !d.awakeForGesture(action, before.SourceState) {
@@ -745,8 +765,8 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 				return out, nil
 			}
 			if actionObserved(action, before, out) {
-				if action == "standard" && !standardSettingsPreserved(before, out) {
-					return out, errors.New("Standard selected but volume or mute changed; automatic retry stopped")
+				if (action == "standard" || action == "smart") && !standardSettingsPreserved(before, out) {
+					return out, errors.New("Sound mode changed but volume or mute changed; automatic retry stopped")
 				}
 				return out, nil
 			}
@@ -821,6 +841,7 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 		var request struct {
 			Action  string    `json:"action"`
 			GainsDB []float64 `json:"gains_db,omitempty"`
+			Value   *int      `json:"value,omitempty"`
 		}
 		dec := json.NewDecoder(http.MaxBytesReader(w, q.Body, 256))
 		dec.DisallowUnknownFields()
@@ -834,16 +855,41 @@ func (r *remote) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 		}
 		defer r.actionMu.Unlock()
 		// Finish key-release/restore even if a phone closes the page mid-command.
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		timeout := 15 * time.Second
+		if request.Action == "av_sync_set" {
+			timeout = avSyncTimeout
+			// One sync session for the whole change takes longer than the
+			// server's default write timeout; extend it for this reply only.
+			_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(avSyncTimeout + 10*time.Second))
+		} else if request.Action == "calibrate" || request.Action == "sub_pair" {
+			timeout = setupTimeout
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		var s state
 		var e error
-		if request.Action == "eq_apply" || request.Action == "eq_reset" {
+		if r.device.calibrating() {
+			s, e = r.device.snapshot(), errors.New("calibration is running; wait for it to finish")
+		} else if (request.Action == "calibrate" || request.Action == "sub_pair") && (request.Value != nil || request.GainsDB != nil) {
+			e = errors.New("this control takes no value")
+		} else if request.Action == "calibrate" {
+			s, e = r.device.calibrateAction(ctx)
+		} else if request.Action == "sub_pair" {
+			s, e = r.device.subPairAction(ctx)
+		} else if request.Action == "eq_apply" || request.Action == "eq_reset" {
 			s, e = r.device.eqAction(ctx, request.Action, request.GainsDB)
 		} else if request.GainsDB != nil {
 			e = errors.New("band values require an EQ control")
 		} else if request.Action == "center_next" {
 			s, e = r.device.centerAction(ctx, request.Action)
+		} else if request.Action == "av_sync_set" {
+			if request.Value == nil {
+				e = errors.New("provide the audio sync value in ms")
+			} else {
+				s, e = r.device.avSyncAction(ctx, *request.Value)
+			}
+		} else if request.Value != nil {
+			e = errors.New("a value requires a value control")
 		} else {
 			s, e = r.device.action(ctx, request.Action)
 		}

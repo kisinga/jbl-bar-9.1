@@ -64,13 +64,15 @@ function render() {
     b.setAttribute('aria-pressed', String(selected));
   });
   $('mode').textContent = s.mode === 'Standard' ? 'Standard' : s.mode === 'Smart' ? 'Smart Mode' : 'Checking mode';
-  $('mode-description').textContent = !awake ? 'Turn on to adjust your sound.' : s.mode === 'Standard' ? 'Smart Mode is off.' : 'Use Standard to turn Smart Mode off.';
-  $('standard-label').textContent = active === 'standard' ? 'Selecting…' : s.mode === 'Standard' ? 'Selected' : 'Use Standard';
-  $('standard').classList.toggle('confirmed', s.mode === 'Standard');
+  $('mode-description').textContent = !awake ? 'Turn on to adjust your sound.' : s.mode === 'Standard' ? 'Smart Mode is off. Use Smart to turn it back on.' : 'Use Standard to turn Smart Mode off.';
+  // One button toggles between the two native modes.
+  $('standard').dataset.action = s.mode === 'Standard' ? 'smart' : 'standard';
+  $('standard-label').textContent = active === 'standard' || active === 'smart' ? 'Selecting…' : s.mode === 'Standard' ? 'Use Smart' : 'Use Standard';
+  $('standard').classList.toggle('confirmed', false);
   $('volume-hint').textContent = !awake ? 'Turn the bar on to adjust volume.' : s.muted ? 'Sound is muted. Tap above to unmute.' : 'Tap to adjust. Hold to keep going.';
   buttons.forEach(b => {
     const action = b.dataset.action;
-    b.disabled = !ready || !['On', 'Standby'].includes(s.power) || (action !== 'power' && !awake) || (pending && !(isVolume(action) && isVolume(active))) || (action === 'standard' && s.mode === 'Standard');
+    b.disabled = !ready || !['On', 'Standby'].includes(s.power) || (action !== 'power' && !awake) || (pending && !(isVolume(action) && isVolume(active))) || ((action === 'standard' || action === 'smart') && !['Standard', 'Smart'].includes(s.mode));
     b.classList.toggle('pending-control', action === active && !isVolume(action));
     b.setAttribute('aria-busy', String(action === active));
   });
@@ -175,6 +177,10 @@ function success(action, s) {
   if (action === 'atmos_next') return 'Atmos height: ' + ['Low','Mid','High'][s.sound.atmos] + '.';
   if (action === 'rear_next') return 'Rear speakers: ' + ['Low','Mid','High','Muted'][s.sound.rear] + '.';
   if (action === 'standard') return 'Standard selected. Smart Mode is off.';
+  if (action === 'smart') return 'Smart Mode selected.';
+  if (action === 'av_sync_set') return 'Audio sync ' + s.sound?.av_sync_ms + ' ms.';
+  if (action === 'calibrate') return 'Calibration started. Keep the room quiet.';
+  if (action === 'sub_pair') return 'Subwoofer pairing is open. Hold the button on the back of the subwoofer until it flashes white quickly.';
   if (action === 'input_bluetooth') return s.bluetooth?.connected ? 'Bluetooth selected. A device is connected.' : 'Bluetooth selected. Choose ' + (s.bluetooth?.name || 'JBL Bar 9.1') + ' on your phone.';
   if (action === 'bluetooth_pair') return 'Pairing is open. Choose ' + (s.bluetooth?.name || 'JBL Bar 9.1') + ' in your phone’s Bluetooth settings.';
   return sourceName(s) + ' selected.';
@@ -186,14 +192,38 @@ function pendingMessage() {
 	if (active?.startsWith('media_')) return 'Sending playback control…';
   if (isVolume(active)) return 'Adjusting volume' + (queue.length ? ' · ' + queue.length + ' queued' : '') + '…';
   if (active === 'standard') return 'Selecting Standard… audio may briefly mute.';
+  if (active === 'smart') return 'Selecting Smart Mode… audio may briefly mute.';
+  if (active === 'av_sync_set') return 'Adjusting audio sync to ' + syncDraft + ' ms… other controls wait a few seconds.';
+  if (active === 'calibrate') return 'Starting calibration…';
+  if (active === 'sub_pair') return 'Opening subwoofer pairing…';
   if (active === 'input_bluetooth') return 'Switching to Bluetooth…';
   if (active === 'bluetooth_pair') return 'Starting Bluetooth pairing…';
   return active === 'power' ? 'Changing power state…' : 'Applying your change…';
+}
+const AV_SYNC_MAX = 250;
+// Client-side +/- taps build a draft target; one av_sync_set request follows
+// once the taps stop, so the bar stays in one sync session for the whole change.
+const AV_SYNC_SETTLE_MS = 900;
+let syncDraft = null, syncTimer = null;
+function avSyncTap(action) {
+  const base = syncDraft ?? current?.sound?.av_sync_ms;
+  if (!Number.isInteger(base)) return;
+  syncDraft = Math.max(0, Math.min(AV_SYNC_MAX, base + (action === 'av_sync_up' ? 10 : -10)));
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    syncTimer = null;
+    if (syncDraft === current?.sound?.av_sync_ms) { syncDraft = null; render(); return; }
+    queue.push('av_sync_set');
+    void pump();
+  }, AV_SYNC_SETTLE_MS);
+  render();
+  feedback('Audio sync ' + syncDraft + ' ms · sending when you stop tapping…', 'pending');
 }
 function enqueue(action) {
   const button = buttons.find(b => b.dataset.action === action);
   if (!button || button.disabled || !csrf) return;
   if (action === 'eq_apply' && !validEQGains(eqDraft)) return;
+  if (action === 'av_sync_up' || action === 'av_sync_down') { avSyncTap(action); return; }
   if (isVolume(action) && queue.length && delta(queue[queue.length - 1]) === -delta(action)) queue.pop();
   else if (queue.length < 8) queue.push(action);
   else { feedback('Let the pending volume changes finish first.', 'pending'); return; }
@@ -204,13 +234,14 @@ async function pump() {
   if (active || !queue.length || !online) return;
   active = queue.shift();
   const gains = active === 'eq_apply' ? eqDraft?.slice() : null;
+  const syncTarget = active === 'av_sync_set' ? syncDraft : null;
   epoch++;
   render();
   feedback(pendingMessage(), 'pending');
   const action = active;
   const requestPeer = mediaIdentity(current);
   try {
-    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(action === 'eq_apply' ? {action, gains_db: gains} : {action}), signal: AbortSignal.timeout(20000)});
+    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(action === 'eq_apply' ? {action, gains_db: gains} : syncTarget !== null ? {action: 'av_sync_set', value: syncTarget} : {action}), signal: AbortSignal.timeout(20000)});
     const text = await response.text();
     let data;
     try { data = JSON.parse(text); } catch { throw new Error(text.trim() || 'Control unavailable. Refresh and try again.'); }
@@ -232,6 +263,7 @@ async function pump() {
       feedback('Connection interrupted. The last change may have applied; pending taps were cleared.', 'error');
     } else feedback(error.message, 'error');
   } finally {
+    if (action === 'av_sync_set') syncDraft = null;
     active = null;
     render();
     if (latestState) {const next=latestState;latestState=null;receiveState(next);}
@@ -384,6 +416,20 @@ function renderExtras(s, ready, awake) {
   $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5';
   // Same form as Bass ("Level N of 5"); the gain follows as secondary detail.
   $('center-value').textContent=sound.center == null ? 'Unavailable' : 'Level ' + sound.center + ' of 5 · ' + (sound.center ? '+' + ['0','2.4','4.8','7.2','9.6','12'][sound.center] + ' dB' : 'original') + (sound.center_error ? ' · ' + sound.center_error : '');
+  const sync = sound.av_sync_ms, tvInput = s.source_state === 0 || s.source_state === 3;
+  const shown = syncDraft ?? sync;
+  $('av-sync-value').textContent = sync == null ? 'Unavailable' : shown + ' ms' + (syncDraft != null && syncDraft !== sync ? ' (now ' + sync + ' ms)' : '') + (tvInput ? '' : ' · select TV or HDMI to adjust');
+  $('av-sync-down').disabled = !ready || !awake || !!active || sync == null || !tvInput || shown <= 0;
+  $('av-sync-up').disabled = !ready || !awake || !!active || sync == null || !tvInput || shown >= AV_SYNC_MAX;
+  $('audio-format-row').hidden = !awake || !sound.audio_format;
+  $('audio-format').textContent = sound.audio_format || '—';
+  const setup = s.setup, calibration = setup?.calibration || '';
+  const measuring = /starting|Starting in|Measuring/.test(calibration);
+  for (const row of document.querySelectorAll('.setup-row')) row.hidden = !setup;
+  $('calibration-value').textContent = calibration || (sound.rear_docked === false ? 'Ready' : 'Undock both rear speakers first');
+  $('calibrate').disabled = !ready || !awake || !!active || !setup || measuring || setup.sub_pairing || sound.rear_docked !== false;
+  $('sub-value').textContent = setup?.sub_pairing ? 'Pairing… hold the subwoofer button' : setup?.subwoofer || '—';
+  $('sub-pair').disabled = !ready || !awake || !!active || !setup || measuring || setup.sub_pairing;
   $('atmos-value').textContent=['Low','Mid','High'][sound.atmos] || 'Unavailable';
   const rear=['Low','Mid','High','Muted'][sound.rear] || 'Unavailable';
   $('rear-value').textContent=sound.rear_docked ? rear + ' · speakers docked' : rear;

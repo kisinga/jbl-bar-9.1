@@ -74,8 +74,18 @@
           <div class="sound-row"><div><span>Atmos height</span><small id="atmos-value">—</small></div><button data-action="atmos_next" id="atmos-next" disabled aria-label="Change Atmos height level">Change <span aria-hidden="true">↗</span></button></div>
           <div class="sound-row"><div><span>Rear speakers</span><small id="rear-value">—</small></div><button data-action="rear_next" id="rear-next" disabled aria-label="Change rear speaker level">Change <span aria-hidden="true">↗</span></button></div>
           <div class="sound-row night-row"><div><span>Night mode</span><small id="night-value">—</small></div><button data-action="night_toggle" id="night" disabled aria-pressed="false"><span id="night-label">Turn on</span></button></div>
+          <div class="sound-row" id="audio-format-row" hidden><div><span>Audio format</span><small id="audio-format">—</small></div></div>
         </div>
         <p class="sound-note">Change cycles through levels. Center boosts the dialogue channel from 0 (original) to +12 dB; high levels can distort at loud volume. Atmos height applies to Atmos audio.</p>
+        <details class="advanced" id="advanced"><summary>Advanced <span aria-hidden="true">+</span></summary>
+          <div class="sound-settings">
+            <div class="sound-row"><div><span>Audio sync</span><small id="av-sync-value">—</small></div><div class="stepper"><button data-action="av_sync_down" id="av-sync-down" disabled aria-label="Decrease audio delay by 10 ms">−</button><button data-action="av_sync_up" id="av-sync-up" disabled aria-label="Increase audio delay by 10 ms">+</button></div></div>
+            <div class="sound-row setup-row" hidden><div><span>Surround calibration</span><small id="calibration-value">—</small></div><button data-action="calibrate" id="calibrate" disabled>Calibrate</button></div>
+            <div class="sound-row setup-row" hidden><div><span>Subwoofer</span><small id="sub-value">—</small></div><button data-action="sub_pair" id="sub-pair" disabled>Pair</button></div>
+          </div>
+          <p class="sound-note">Audio sync delays sound to match the picture, in 10 ms steps, on the TV and HDMI inputs. Tap + or − as many times as needed: the change is sent once you stop and takes a few seconds plus about one second per step; the bar keeps other controls for five seconds afterwards.</p>
+          <p class="sound-note setup-row" hidden>Calibration runs in two steps of about 35 seconds with both rear speakers undocked: step 1 with them at your listening position, step 2 at their final places. Keep the room quiet; other controls wait until it finishes. Subwoofer pairing waits up to three minutes: hold the button on the back of the subwoofer until it flashes white quickly.</p>
+        </details>
       </section>
       <section id="eq-panel" class="eq-panel panel" aria-labelledby="eq-heading" data-state="unavailable">
         <div class="section-heading"><div><p class="section-kicker">SHAPE YOUR SOUND</p><h2 id="eq-heading">Front EQ</h2></div><span class="development-tag">Experimental</span></div>
