@@ -63,10 +63,42 @@ acoustic channel-isolation claim.
 
 The underlying amplitude adjustment was listening-tested on one pinned bar
 with TV/Standard playback at 48 kHz and the movie pipeline. The listener heard
-less bass without an apparent change to voices or the other speakers. These
-were subjective checks of the precursor worker. The integrated monitor in
-this contribution still needs on-device startup/wake/level-change validation;
-other firmware, inputs and formats are not qualified by those listening tests.
+less bass without an apparent change to voices or the other speakers. Those
+subjective checks used the precursor worker and are not an acoustic isolation
+measurement.
+
+## On-device validation (3 November 2026)
+
+The integrated monitor was exercised on one Bar 9.1 with the pinned firmware,
+using TV/ARC at 48 kHz. It ran in a private remote build whose `bass_native.go`,
+`bass_offset.go`, `bass_policy.go` and `eq_native.go` were byte-for-byte identical
+to this contribution's sources. Private UI/authentication changes were separate;
+this was not a hardware installation trial of the public USB distribution.
+
+- With a saved -3 dB offset, native bass level 3 read back as -8 dB, level 4 as
+  -4 dB, and restored level 3 as -8 dB. The parameter blocks before and after the
+  level change differed only at the four-byte bass-amplitude word `0xdac`.
+- Active routes were observed with HPP pages `0x840000` and `0x840002`. Native
+  mode/cache stayed at zero, and the native cached bass value matched its level.
+  The Front EQ page restriction was not widened.
+- Inactive Optical playback was left waiting. After a full Linux reboot, the
+  controller stayed waiting in standby with stock DSP gain. A subsequent wake
+  selected Standard through the existing helper, then the monitor loaded the
+  persistent offset and read back -8 dB during active TV/ARC playback.
+- A changed kernel boot ID confirmed the reboot. SSH and both web ports returned;
+  persistent payload/configuration hashes and installed manifests were unchanged.
+  One web process and one existing Standard helper were running; the previous
+  standalone bass worker remained disabled and absent.
+- Repeated readback retained the -8 dB target without compounding. Native console
+  fields were restored and key/combo/repeat fields were idle. The trial ended at
+  native bass level 3 with the saved -3 dB offset.
+
+The root reboot trial used BusyBox's direct reboot option after flushing storage;
+the firmware's init did not act on the normal BusyBox reboot request. This tests
+a complete operating-system restart, not removal of mains power. Other firmware,
+inputs, rates and formats remain unqualified by this trial. DSP readback is not
+an acoustic measurement. The owner reported normal playback after the reboot
+with the restored setting.
 
 ## API
 
