@@ -50,6 +50,9 @@ Bar 9.1 also has audio sync, surround calibration, subwoofer pairing and audio
 format reporting. Optional features compile into one application and appear
 according to its capabilities.
 
+Experimental [bass offset](docs/BASS_OFFSET.md) adjusts all five native bass levels
+from -3 to +3 dB in half-decibel steps, with an explicit Save offset control.
+
 Single USB is the canonical path for new installations. **Keep an existing
 installation's original USB and recovery package.** Cross-version USB/SSH
 updates are not implemented yet; packages refuse incompatible replacements.

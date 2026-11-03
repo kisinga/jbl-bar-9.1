@@ -5,6 +5,7 @@ import {createSound} from './components/sound.js';
 import {createBluetooth} from './components/bluetooth.js';
 import {createDetails} from './components/details.js';
 import {createCapabilities} from './components/capabilities.js';
+import {createBassOffset} from './components/bass-offset.js';
 import {createAdvanced} from './components/advanced.js';
 
 const $ = id => document.getElementById(id);
@@ -20,8 +21,9 @@ const sound=createSound(document.querySelector('.mode-panel'));
 const bluetooth=createBluetooth($('bluetooth-panel'));
 const details=createDetails(document.querySelector('.more-details'));
 const capabilities=createCapabilities(document);
+const bassOffset=createBassOffset(document.querySelector('.mode-panel'));
 const advanced=createAdvanced($('advanced'));
-const components=[bluetooth,sound,playback,system,equalizer,details,advanced];
+const components=[bluetooth,sound,playback,system,equalizer,details,advanced,bassOffset];
 let syncTimer=null;
 const context=()=>({state:capabilities.state(current),deviceName:capabilities.name(),online,ready:online && !!current?.available,awake:current?.power==='On',active,queued:queue.length,csrf});
 function feedback(text, kind = '') {
@@ -168,6 +170,7 @@ function success(action, s) {
   if (action === 'mute') return s.muted ? 'Sound muted.' : 'Sound unmuted.';
   if (action === 'power') return s.power === 'On' ? 'Your soundbar is on.' : 'Soundbar is in standby.';
   if (action === 'bass_next') return 'Bass level ' + (s.sound.bass+1) + ' selected.';
+  if (action === 'bass_offset_set') return 'Bass offset saved for startup.';
   if (action === 'center_next') return 'Center level ' + s.sound.center + ' selected.';
   if (action === 'atmos_next') return 'Atmos height: ' + ['Low','Mid','High'][s.sound.atmos] + '.';
   if (action === 'rear_next') return 'Rear speakers: ' + ['Low','Mid','High','Muted'][s.sound.rear] + '.';
@@ -222,6 +225,7 @@ async function pump() {
   if (active || !queue.length || !online) return;
   active = queue.shift();
   const gains = active === 'eq_apply' ? equalizer.gains() : null;
+  const parameters=active==='bass_offset_set'?bassOffset.parameters():null;
   const syncTarget=active==='av_sync_set'?advanced.target():null;
   epoch++;
   render();
@@ -229,7 +233,7 @@ async function pump() {
   const action = active;
   const requestPeer = playback.identity(current);
   try {
-    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(capabilities.command(action,gains,syncTarget)), signal: AbortSignal.timeout(action==='av_sync_set'?70000:30000)});
+    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(capabilities.command(action,gains,syncTarget,parameters)), signal: AbortSignal.timeout(action==='av_sync_set'?70000:30000)});
     const text = await response.text();
     let data;
     try { data = JSON.parse(text); } catch { throw new Error(text.trim() || 'Control unavailable. Refresh and try again.'); }

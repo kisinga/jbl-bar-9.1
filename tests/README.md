@@ -8,6 +8,7 @@ python3 tools/test.py
 node tests/webremote-ui.mjs
 node tests/setup-ui.mjs
 node tests/component-ui.mjs
+node tests/bass-offset-ui.mjs
 python3 research/bar-family/test_workspace.py
 ```
 
@@ -53,3 +54,7 @@ implementation. Browser checks cover setup/audio-sync behavior and center labels
 Shared-server tests cover composition-defined action budgets, bounded reply
 deadlines and legacy numeric values. Component browser checks also cover
 capability discovery, unknown state and cancelling an unsent sync draft.
+
+`bass-offset-ui.mjs` checks typed extension requests, explicit saves, draft
+preservation, standby, calibration, failures, capability inclusion and mobile
+layout using synthetic state. It never contacts a soundbar.

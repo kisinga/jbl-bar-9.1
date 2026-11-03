@@ -49,6 +49,7 @@ type bluetoothState struct {
 	Audio        string `json:"audio,omitempty"`
 }
 type state struct {
+	BassOffset    *bassOffsetState `json:"-"`
 	Extensions    map[string]any   `json:"extensions,omitempty"`
 	Automation    *automationState `json:"automation,omitempty"`
 	EQ            *frontEQState    `json:"eq,omitempty"`
@@ -86,6 +87,7 @@ type device struct {
 	cliChecked        bool
 	center            centerController
 	format            formatTracker
+	bass              bassController
 }
 type remote struct {
 	http          *server.Server[state]
@@ -367,7 +369,7 @@ func (d *device) bluetooth() *bluetoothState {
 func (d *device) snapshotLocked() state {
 	if e := d.identify(); e != nil {
 		d.revision++
-		s := state{System: d.monitor.sample(time.Now()), Revision: d.revision, WiFi: readWiFi(), Power: "Starting", Mode: "Unknown", Input: "Unknown", Error: e.Error()}
+		s := state{BassOffset: d.bassStatus(), System: d.monitor.sample(time.Now()), Revision: d.revision, WiFi: readWiFi(), Power: "Starting", Mode: "Unknown", Input: "Unknown", Error: e.Error()}
 		if d.automation != nil {
 			a := *d.automation
 			s.Automation = &a
@@ -382,7 +384,7 @@ func (d *device) snapshotLocked() state {
 // console fields into a replacement firmware process.
 func (d *device) snapshotCurrent() state {
 	d.revision++
-	s := state{System: d.monitor.sample(time.Now()), Revision: d.revision, Power: "Starting", Mode: "Unknown", Input: "Unknown", Hostname: discoveryHostname()}
+	s := state{BassOffset: d.bassStatus(), System: d.monitor.sample(time.Now()), Revision: d.revision, Power: "Starting", Mode: "Unknown", Input: "Unknown", Hostname: discoveryHostname()}
 	if b, e := os.ReadFile("/proc/uptime"); e == nil {
 		v, _ := strconv.ParseFloat(strings.Fields(string(b))[0], 64)
 		s.Uptime = int64(v)

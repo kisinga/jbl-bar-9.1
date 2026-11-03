@@ -2,15 +2,15 @@
 // their existing state-based behavior when feature discovery is unavailable.
 export function createCapabilities(root) {
   let features=null;
-  const known=new Set(['front-eq','center-level']);
-  const bindings={'eq_apply':['front-eq','apply'],'eq_reset':['front-eq','reset'],'center_next':['center-level','next']};
-  function command(action,gains,value) {
+  const known=new Set(['front-eq','center-level','bass-offset']);
+  const bindings={'bass_offset_set':['bass-offset','set'],'eq_apply':['front-eq','apply'],'eq_reset':['front-eq','reset'],'center_next':['center-level','next']};
+  function command(action,gains,value,parameters) {
     if(action==='av_sync_up' || action==='av_sync_down') return {action:'av_sync_set'};
     if(action==='av_sync_set') return {action,value};
     const binding=bindings[action];
     const feature=binding && features?.extensions.find(item=>item.component===binding[0] && item.included);
     const target=feature && feature.id+'.'+binding[1];
-    if(target && feature.actions.includes(target)) return action==='eq_apply' ? {action:target,parameters:{gains_db:gains}} : {action:target};
+    if(target && feature.actions.includes(target)) return parameters ? {action:target,parameters} : action==='eq_apply' ? {action:target,parameters:{gains_db:gains}} : {action:target};
     return action==='eq_apply' ? {action,gains_db:gains} : {action};
   }
   function state(snapshot) {
@@ -21,6 +21,7 @@ export function createCapabilities(root) {
       const projected=snapshot.extensions?.[feature.id];
       if(projected==null) continue;
       if(value===snapshot) value={...snapshot};
+      if(feature.component==='bass-offset') value.bass_offset=projected;
       if(feature.component==='front-eq') value.eq=projected;
       if(feature.component==='center-level') value.sound={...value.sound,center:projected.level,center_error:projected.error};
     }
