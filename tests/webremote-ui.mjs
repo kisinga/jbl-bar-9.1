@@ -394,9 +394,9 @@ try {
   await page.locator('#bass-next').click();
   await page.waitForFunction(()=>document.querySelector('#bass-value').textContent==='Level 2 of 5');
   check(state.sound.bass===1,'bass cycle confirms readback');
-  check(await page.locator('#center-value').textContent()==='Level 0 · +0 dB','center starts at original level');
+  check(await page.locator('#center-value').textContent()==='Level 0 of 5 · original','center starts at original level');
   await page.locator('#center-next').click();
-  await page.waitForFunction(()=>document.querySelector('#center-value').textContent==='Level 1 · +2.4 dB');
+  await page.waitForFunction(()=>document.querySelector('#center-value').textContent==='Level 1 of 5 · +2.4 dB');
   check(state.sound.center===1 && lastPayload?.action==='center_next','center cycle sends center_next and shows the level');
   await page.locator('#atmos-next').click();
   await page.waitForFunction(()=>document.querySelector('#atmos-value').textContent==='High');
