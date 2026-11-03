@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 type eqMemoryFixture struct {
@@ -128,5 +130,78 @@ func TestEQResetCommandSequenceHasNoVariableNativeEndpoint(t *testing.T) {
 	}
 	if _, e := eqPresetCommands(5); e == nil {
 		t.Fatal("custom mode allowed through reset endpoint")
+	}
+}
+
+type fakeMute struct {
+	muted    bool
+	refusals int // set() calls refused before one succeeds
+	revert   int // reads that report the old state after a successful set
+	sets     int
+	slept    []time.Duration
+}
+
+func (f *fakeMute) restore() muteRestore {
+	return muteRestore{
+		set: func(ctx context.Context, want bool) error {
+			f.sets++
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if f.refusals > 0 {
+				f.refusals--
+				return errors.New("audio controls are busy; retry shortly")
+			}
+			f.muted = want
+			return nil
+		},
+		read: func() (bool, error) {
+			if f.revert > 0 {
+				f.revert--
+				f.muted = !f.muted
+			}
+			return f.muted, nil
+		},
+		sleep: func(d time.Duration) { f.slept = append(f.slept, d) },
+	}
+}
+
+func TestMuteRestoreSettlesBeforeUnmuting(t *testing.T) {
+	f := fakeMute{muted: true}
+	if e := f.restore().run(context.Background(), false); e != nil || f.muted || f.sets != 1 {
+		t.Fatalf("err=%v muted=%v sets=%d", e, f.muted, f.sets)
+	}
+	if len(f.slept) == 0 || f.slept[0] != eqMuteSettle {
+		t.Fatalf("no settle before the restore: %v", f.slept)
+	}
+}
+
+func TestMuteRestoreRetriesARefusedUnmute(t *testing.T) {
+	f := fakeMute{muted: true, refusals: 2}
+	if e := f.restore().run(context.Background(), false); e != nil || f.muted || f.sets != 3 {
+		t.Fatalf("err=%v muted=%v sets=%d", e, f.muted, f.sets)
+	}
+	f = fakeMute{muted: true, refusals: eqMuteAttempts}
+	if e := f.restore().run(context.Background(), false); e == nil || !f.muted || !strings.Contains(e.Error(), "press Mute") {
+		t.Fatalf("a restore that never succeeds must say so: %v", e)
+	}
+}
+
+func TestMuteRestoreRechecksTheFlag(t *testing.T) {
+	// The flag reads back muted after the first unmute: unmute again.
+	f := fakeMute{muted: true, revert: 1}
+	if e := f.restore().run(context.Background(), false); e != nil || f.muted || f.sets != 2 {
+		t.Fatalf("err=%v muted=%v sets=%d", e, f.muted, f.sets)
+	}
+}
+
+func TestMuteRestoreStopsAtItsBudget(t *testing.T) {
+	budget, stop := context.WithCancel(context.Background())
+	f := fakeMute{muted: true, refusals: eqMuteAttempts}
+	r := f.restore()
+	set := r.set
+	r.set = func(ctx context.Context, want bool) error { stop(); return set(ctx, want) }
+	if e := r.run(budget, false); e == nil || f.sets != 1 || !strings.Contains(e.Error(), "press Mute") {
+		t.Fatalf("err=%v sets=%d", e, f.sets)
 	}
 }

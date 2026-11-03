@@ -276,9 +276,7 @@ func (d *device) resetFrontEQ(ctx context.Context) (err error) {
 		return e
 	}
 	defer func() {
-		c, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-		defer cancel()
-		if e := d.eqMute(c, muted != 0); e != nil {
+		if e := d.eqRestoreMute(muted != 0); e != nil {
 			err = e
 		}
 	}()
@@ -393,9 +391,7 @@ func (d *device) applyFrontEQ(ctx context.Context, gains [5]float64) (err error)
 		return e
 	}
 	defer func() {
-		c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if restore := d.eqMute(c, muted != 0); restore != nil {
+		if restore := d.eqRestoreMute(muted != 0); restore != nil {
 			err = restore
 		}
 	}()

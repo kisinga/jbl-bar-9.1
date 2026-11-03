@@ -392,6 +392,79 @@ func (d *device) resetEQNative(ctx context.Context) error {
 	})
 }
 
+// Restoring the mute state after a tuning change:
+//   - the native DSP rebuilds its filters after the new mode/block reads back,
+//     and an unmute sent during that rebuild can be lost while the mute flag
+//     already reads unmuted, so the restore waits for the DSP to settle;
+//   - a restore can be refused transiently (keys or automation busy), so it is
+//     retried, and the flag is read again afterwards in case it changed back.
+//
+// The restore has its own budget and never uses the request context: an
+// expired or cancelled request must still leave the bar's mute state as it
+// found it. It runs before the action returns, so the action gate stays held
+// until the restore has finished.
+const (
+	eqMuteSettle   = 800 * time.Millisecond
+	eqMuteAttempts = 3
+	eqMuteAttempt  = 3 * time.Second
+	eqMuteRetryGap = 700 * time.Millisecond
+	eqMuteRecheck  = 500 * time.Millisecond
+	// eqMuteBudget bounds the whole restore. bar91ActionTimeout leaves this
+	// much room after an EQ action's own deadline.
+	eqMuteBudget = 9 * time.Second
+)
+
+type muteRestore struct {
+	set   func(ctx context.Context, want bool) error
+	read  func() (bool, error)
+	sleep func(time.Duration)
+}
+
+// run restores want within budget, which must not derive from a request.
+func (r muteRestore) run(budget context.Context, want bool) error {
+	r.sleep(eqMuteSettle)
+	last := errors.New("no restore attempt fitted in the restore budget")
+	for attempt := 0; attempt < eqMuteAttempts && budget.Err() == nil; attempt++ {
+		if attempt > 0 {
+			r.sleep(eqMuteRetryGap)
+		}
+		c, cancel := context.WithTimeout(budget, eqMuteAttempt)
+		e := r.set(c, want)
+		cancel()
+		if e != nil {
+			last = e
+			continue
+		}
+		r.sleep(eqMuteRecheck)
+		if muted, e := r.read(); e == nil && muted == want {
+			return nil
+		}
+		last = errors.New("mute state changed back after restoration")
+	}
+	if want {
+		return fmt.Errorf("mute could not be restored: %w", last)
+	}
+	return fmt.Errorf("sound could not be unmuted after the EQ change; press Mute: %w", last)
+}
+
+// eqRestoreMute restores the mute state saved before a tuning transaction. It
+// takes no request context on purpose (see muteRestore).
+func (d *device) eqRestoreMute(want bool) error {
+	budget, cancel := context.WithTimeout(context.Background(), eqMuteBudget)
+	defer cancel()
+	return muteRestore{
+		set: d.eqMute,
+		read: func() (bool, error) {
+			v, e := d.configByte(155)
+			if e != nil || v > 1 {
+				return false, errors.New("mute state unavailable")
+			}
+			return v != 0, nil
+		},
+		sleep: time.Sleep,
+	}.run(budget, want)
+}
+
 // eqMute is idempotent and verifies the persistent mute flag. The manager holds
 // d.mu and restores the original mute state after each tuning transaction.
 func (d *device) eqMute(ctx context.Context, want bool) error {

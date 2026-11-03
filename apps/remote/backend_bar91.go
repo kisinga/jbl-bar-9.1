@@ -36,12 +36,26 @@ func (b bar91Backend) Execute(ctx context.Context, request server.Command) (stat
 	return b.remote.execute(ctx, request)
 }
 
+// eqActionTimeout bounds an EQ tuning change. The mute restore that follows
+// has its own budget (eqMuteBudget) and must fit in the extra 10 s the server
+// keeps the reply open, so a slow or expired change still reports its result.
+const eqActionTimeout = 20 * time.Second
+
+// bar91ActionTimeout is the Bar 9.1 reply-timeout policy. The shared server
+// only applies it; native action names stay in this composition. Legacy v1
+// names resolve through the same aliases as Execute.
 func bar91ActionTimeout(request server.Command) time.Duration {
-	switch request.Action {
+	action := request.Action
+	if target, ok := bar91ActionAliases[action]; ok {
+		action = target
+	}
+	switch action {
 	case "av_sync_set":
 		return avSyncTimeout
 	case "calibrate", "sub_pair":
 		return setupTimeout
+	case "bar91.front-eq.apply", "bar91.front-eq.reset":
+		return eqActionTimeout
 	}
 	return 15 * time.Second
 }

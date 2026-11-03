@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"jbl-bar-toolkit/remote/internal/extension"
+	"jbl-bar-toolkit/remote/internal/server"
 	"strings"
 	"testing"
+	"time"
 )
 
 type fixtureBackend struct{ calls int }
@@ -85,5 +87,70 @@ func TestExtensionParametersAreTyped(t *testing.T) {
 	w := request(r, "POST", "/api/action", `{"action":"mute","parameters":{}}`, "192.168.50.2", true, "")
 	if w.Code != 409 || !strings.Contains(w.Body.String(), "included extension") {
 		t.Fatal("core action accepted extension parameters")
+	}
+}
+
+func TestBar91ReplyTimeoutCoversEQNamesAndAliases(t *testing.T) {
+	for _, action := range []string{"eq_apply", "eq_reset", "bar91.front-eq.apply", "bar91.front-eq.reset"} {
+		timeout := bar91ActionTimeout(server.Command{Action: action})
+		if timeout != eqActionTimeout {
+			t.Fatalf("%s: %v", action, timeout)
+		}
+		// The server keeps the reply open for the timeout plus 10 s; the mute
+		// restore after an expired change must fit in that margin.
+		if timeout <= 15*time.Second || eqMuteBudget >= 10*time.Second {
+			t.Fatalf("%s: restore budget %v does not fit after %v", action, eqMuteBudget, timeout)
+		}
+	}
+	for alias, target := range bar91ActionAliases {
+		if bar91ActionTimeout(server.Command{Action: alias}) != bar91ActionTimeout(server.Command{Action: target}) {
+			t.Fatalf("alias %s and %s have different timeouts", alias, target)
+		}
+	}
+	if bar91ActionTimeout(server.Command{Action: "center_next"}) != 15*time.Second || bar91ActionTimeout(server.Command{Action: "mute"}) != 15*time.Second {
+		t.Fatal("ordinary controls keep the default timeout")
+	}
+}
+
+func TestEQMuteRestoreHoldsTheActionGate(t *testing.T) {
+	// The mute restore runs before the action returns, with its own budget, so
+	// no other control runs until it has finished.
+	r := testRemote(t)
+	r.backend = &fixtureBackend{}
+	restoring, release := make(chan struct{}), make(chan struct{})
+	muted := true
+	if err := r.extensions.Register(extension.Module[state]{
+		Descriptor: extension.Descriptor{ID: "test.eq", Included: true},
+		Actions: map[string]extension.Handler[state]{"test.eq.apply": func(context.Context, json.RawMessage) (state, error) {
+			budget, stop := context.WithTimeout(context.Background(), eqMuteBudget)
+			defer stop()
+			first := true
+			e := muteRestore{
+				set:  func(c context.Context, want bool) error { muted = want; return c.Err() },
+				read: func() (bool, error) { return muted, nil },
+				sleep: func(time.Duration) {
+					if first {
+						first = false
+						close(restoring)
+						<-release
+					}
+				},
+			}.run(budget, false)
+			return state{Available: true, Power: "On"}, e
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan int)
+	go func() {
+		done <- request(r, "POST", "/api/action", `{"action":"test.eq.apply"}`, "192.168.50.2", true, "").Code
+	}()
+	<-restoring
+	if w := request(r, "POST", "/api/action", `{"action":"mute"}`, "192.168.50.2", true, ""); w.Code != 409 || !strings.Contains(w.Body.String(), "Another control") {
+		t.Fatal("a control ran during the mute restore", w.Code, w.Body.String())
+	}
+	close(release)
+	if code := <-done; code != 200 || muted {
+		t.Fatal("restore did not finish", code, muted)
 	}
 }
