@@ -26,10 +26,11 @@ const (
 	avSyncMaxMS        = 250 // hardware maximum: + stops at 250 ms (qualified 2 Nov 2026)
 	avSyncKey          = "0x1f02c"
 	avSyncHold         = "3500"
-	avSyncMaxSteps     = 8 // per request, to stay well inside the request timeout
+	avSyncMaxSteps     = 5 // per request: each step can wait for read-back, and the reply must fit the server write timeout
 	avSyncTimeout      = 30 * time.Second
 	avSyncPressGap     = 400 * time.Millisecond
 	avSyncWindowClosed = 5500 * time.Millisecond
+	avSyncSettle       = 1500 * time.Millisecond
 )
 
 func avSyncSource(source *uint32) bool {
@@ -127,6 +128,7 @@ type avSyncSteps struct {
 	delay    func() (uint32, error)         // saved delay, config 375
 	volume   func() (uint32, error)
 	cooldown func(last time.Time) // keeps the lock until sync mode has closed
+	settle   time.Duration        // how long a step may take to show in config 375
 }
 
 // run enters sync mode and steps the delay. Once the hold has been sent, every
@@ -148,7 +150,12 @@ func (a avSyncSteps) run(ctx context.Context, key string, steps, target int, vol
 	if !a.shown(ctx) {
 		return errors.New("audio sync mode did not open; nothing else was sent")
 	}
-	for i := 0; i < steps; i++ {
+	settle := a.settle
+	if settle <= 0 {
+		settle = avSyncSettle
+	}
+	retried := false
+	for done := 0; done < steps; {
 		previous, e := a.delay()
 		if e != nil {
 			return errors.New("audio sync value unavailable")
@@ -159,27 +166,41 @@ func (a avSyncSteps) run(ctx context.Context, key string, steps, target int, vol
 		if e := press(key, "60"); e != nil {
 			return e
 		}
-		// Second safeguard after the display check: the first step must not
-		// have reached the volume.
-		if i == 0 {
-			if v, e := a.volume(); e != nil || v != volume {
-				if e == nil && (v == volume+1 || v+1 == volume) {
-					undo := "0x6f001"
-					if v < volume {
-						undo = "0x6f000"
-					}
-					_ = press(undo, "60")
+		// Second safeguard after the display check: no step may reach the
+		// volume (the bar leaves sync mode five seconds after a press).
+		if v, e := a.volume(); e != nil || v != volume {
+			if e == nil && (v == volume+1 || v+1 == volume) {
+				undo := "0x6f001"
+				if v < volume {
+					undo = "0x6f000"
 				}
-				return errors.New("audio sync mode did not open; volume was restored, nothing changed")
+				_ = press(undo, "60")
 			}
+			return errors.New("a step reached the volume instead of audio sync; volume was restored")
 		}
 		now, e := a.delay()
+		deadline := time.Now().Add(settle)
+		for e == nil && now == previous && time.Now().Before(deadline) {
+			time.Sleep(100 * time.Millisecond)
+			now, e = a.delay()
+		}
 		if e != nil {
 			return errors.New("audio sync value unavailable")
 		}
-		if now == previous {
-			return fmt.Errorf("audio sync stopped at %d ms (limit reached)", now)
+		if now != previous {
+			done, retried = done+1, false
+			continue
 		}
+		atLimit := key == "0x6f000" && int(previous) >= avSyncMaxMS || key == "0x6f001" && previous == 0
+		if atLimit || retried {
+			if atLimit {
+				return fmt.Errorf("audio sync stopped at %d ms (limit reached)", now)
+			}
+			return fmt.Errorf("audio sync stopped at %d ms: the bar ignored two presses in a row", now)
+		}
+		// One press was not taken (the bar can drop a press that follows the
+		// previous one closely): try it once more.
+		retried = true
 	}
 	return nil
 }

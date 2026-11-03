@@ -17,8 +17,8 @@ func TestAVSyncPlan(t *testing.T) {
 		{0, 20, 2, "0x6f000", true},
 		{20, 0, 2, "0x6f001", true},
 		{30, 30, 0, "0x6f000", true},
-		{0, 80, 8, "0x6f000", true},
-		{0, 90, 0, "", false},  // more than avSyncMaxSteps per request
+		{0, 50, 5, "0x6f000", true},
+		{0, 60, 0, "", false},  // more than avSyncMaxSteps per request
 		{0, 15, 0, "", false},  // not a 10 ms step
 		{0, -10, 0, "", false}, // negative
 		{0, 260, 0, "", false}, // above the one-byte maximum
@@ -128,6 +128,7 @@ func (f *fakeSync) steps() avSyncSteps {
 				panic("cooldown measured before the last press")
 			}
 		},
+		settle: 10 * time.Millisecond,
 	}
 }
 
@@ -188,5 +189,62 @@ func TestAVSyncFirstPressChangesTheDelay(t *testing.T) {
 	f = fakeSync{shown: true, volume: 7, delays: []uint32{20}}
 	if f.steps().run(context.Background(), "0x6f001", 1, 10, 8) == nil || !reflect.DeepEqual(f.presses, []string{avSyncKey, "0x6f001", "0x6f000"}) {
 		t.Fatalf("volume step not undone: %v", f.presses)
+	}
+}
+
+// barSync simulates the bar: + and - change the delay unless the press is in
+// the ignored set (numbered from 1 = first step press after the hold).
+type barSync struct {
+	delay   uint32
+	presses int
+	ignored map[int]bool
+	keys    []string
+}
+
+func (b *barSync) steps() avSyncSteps {
+	return avSyncSteps{
+		press: func(_ context.Context, key, _ string) error {
+			b.keys = append(b.keys, key)
+			if key == avSyncKey {
+				return nil
+			}
+			b.presses++
+			if b.ignored[b.presses] {
+				return nil
+			}
+			if key == "0x6f000" && b.delay < avSyncMaxMS {
+				b.delay += avSyncStepMS
+			} else if key == "0x6f001" && b.delay > 0 {
+				b.delay -= avSyncStepMS
+			}
+			return nil
+		},
+		shown:    func(context.Context) bool { return true },
+		delay:    func() (uint32, error) { return b.delay, nil },
+		volume:   func() (uint32, error) { return 8, nil },
+		cooldown: func(time.Time) {},
+		settle:   10 * time.Millisecond,
+	}
+}
+
+func TestAVSyncMultiStepRetriesAnIgnoredPress(t *testing.T) {
+	b := barSync{delay: 10, ignored: map[int]bool{2: true}}
+	if e := b.steps().run(context.Background(), "0x6f000", 4, 50, 8); e != nil {
+		t.Fatal(e)
+	}
+	if b.delay != 50 || b.presses != 5 {
+		t.Fatalf("delay %d after %d presses", b.delay, b.presses)
+	}
+	b = barSync{delay: 10, ignored: map[int]bool{2: true, 3: true}}
+	if e := b.steps().run(context.Background(), "0x6f000", 4, 50, 8); e == nil || b.delay != 20 || b.presses != 3 {
+		t.Fatalf("two ignored presses must stop: %v delay %d presses %d", e, b.delay, b.presses)
+	}
+	b = barSync{delay: 230}
+	if e := b.steps().run(context.Background(), "0x6f000", 4, 270, 8); e == nil || b.delay != avSyncMaxMS || b.presses != 3 {
+		t.Fatalf("limit must stop without a retry: %v delay %d presses %d", e, b.delay, b.presses)
+	}
+	b = barSync{delay: 50}
+	if e := b.steps().run(context.Background(), "0x6f001", 5, 0, 8); e != nil || b.delay != 0 || b.presses != 5 {
+		t.Fatalf("5 steps down: %v delay %d presses %d", e, b.delay, b.presses)
 	}
 }
