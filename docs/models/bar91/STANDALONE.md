@@ -47,6 +47,16 @@ python3 tools/jbl.py smart off
 
 Also available: `volume up|down`, `mute`, `power`, `source tv|hdmi|bluetooth` and supported playback commands. Use `--host <private-ipv4[:port]>` for an IP address or `--json` for token-free state. Night and Smart Mode commands check state before changing it; manual `smart off` preserves the automatic watcher.
 
+### Home Assistant
+
+[naonak/jbl-bar-9.1-ha](https://github.com/naonak/jbl-bar-9.1-ha) is a separate integration, installable through HACS, for the Bar 9.1 browser remote. It uses the remote's local API (`/api/state`, `/api/events`, `/api/action`) over the LAN, with no cloud or extra hardware, and has not been tested with other bars. It provides a media player (power, volume, mute, source, playback and now playing), bass, center, Atmos and rear levels, Night and Smart Mode switches, Front EQ, audio sync, surround calibration and subwoofer pairing buttons, the audio format and diagnostics. Entities appear only for the controls the installed remote reports.
+
+1. In HACS, add `https://github.com/naonak/jbl-bar-9.1-ha` as a custom repository (Integration) and install **JBL Bar 9.1 (web remote)**, then restart Home Assistant.
+2. Add the integration and enter the bar's IP address (port `8080` by default, as the browser remote).
+3. Home Assistant's address must be inside the remote's trusted LAN (`allowed_cidr`); otherwise the remote answers 403.
+
+Report integration issues in its repository.
+
 ## Smart Mode off
 
 Install once, then remove USB. The helper waits indefinitely in standby and selects Standard Mode after wake. It automates JBL’s normal button sequence; it does not change the saved firmware default or flash firmware.
