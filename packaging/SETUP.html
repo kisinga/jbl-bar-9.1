@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>Set up your JBL Bar</title>
+<style>
+:root{font:17px/1.55 system-ui;color:#e9eff8;background:#101827}body{max-width:740px;margin:40px auto;padding:0 22px}h1{line-height:1.15}a{color:#9cd5ff}fieldset{border:1px solid #45566f;border-radius:12px;padding:20px;margin:20px 0}label{display:block;margin:12px 0}input:not([type=checkbox]),select,button{font:inherit;padding:10px;border-radius:6px;border:1px solid #6c7f98;box-sizing:border-box}input:not([type=checkbox]),select{width:100%;background:#182438;color:inherit}input[type=checkbox]{width:19px;height:19px;vertical-align:middle}button{background:#a8ddff;color:#101827;cursor:pointer}button:disabled{opacity:.5}small{display:block;color:#c5d0e0}.notice{border-left:4px solid #ffc17d;padding-left:16px}output{display:block;white-space:pre-wrap;margin:16px 0}details{margin:16px 0}
+</style>
+<h1>Your JBL Bar, under your control.</h1>
+<p>This package automatically selects a compatible implementation. It currently includes the <strong>JBL Bar 9.1 True Wireless Surround</strong> only; Bar 800, 1000, 1300 and MK2 installation is not implemented.</p>
+<p class="notice">Development build: full combined installation, restart and recovery qualification is still pending. The USB checks refuse unrecognized firmware and existing installations.</p>
+<ol>
+<li>Extract the installation ZIP onto a clean FAT32 USB. Keep <code>AutoScript</code> and <code>JBLToolkit</code> at its root.</li>
+<li>Fill this form and download <code>config.txt</code>. Move it into the USB’s <code>JBLToolkit</code> folder, replacing the existing file.</li>
+<li>Safely eject, insert into the fully awake bar, and wait five minutes. Bring the USB back and read <code>JBLToolkit/STATUS.txt</code> and <code>JBLToolkit/HARDWARE.txt</code>.</li>
+<li>After <code>CHECK_PASSED_READY_FOR_INSTALL_OR_CONFIGURE</code>, return here, choose <b>Install</b>, replace the config and repeat. A blocked check needs attention; see <code>CHECKS.txt</code> and <code>PREFLIGHT.txt</code>.</li>
+<li>After installation, remove USB and open <a href="http://jbl.local">http://jbl.local</a> on your home network. Try the bar’s IP address or port 8080 if needed. Restart the bar without USB and verify the remote and normal audio controls.</li>
+</ol>
+<form id="setup">
+<fieldset><legend>Home network</legend>
+<label>Your computer’s IPv4 address<input id="address" placeholder="192.168.1.20" required inputmode="decimal" autocomplete="off"></label>
+<small>Find this in your computer’s Wi-Fi/network details. Use the same home network as the bar.</small>
+<label>Network size<select id="prefix"><option value="24">Typical home network (255.255.255.0)</option><option value="16">255.255.0.0</option><option value="23">255.255.254.0</option><option value="25">255.255.255.128</option><option value="26">255.255.255.192</option></select></label>
+<small id="network">Only devices on this network can use the remote.</small>
+</fieldset>
+<fieldset><legend>Choose features</legend>
+<label><input id="web" type="checkbox" checked> Browser remote</label>
+<label><input id="standard" type="checkbox"> Automatically select Standard Mode after wake</label>
+<label><input id="ssh" type="checkbox"> SSH access (advanced, port 2222)</label>
+<label>SSH password<input id="password" type="password" minlength="8" maxlength="256" autocomplete="new-password" disabled></label>
+<details><summary>Connect the bar to Wi-Fi (optional)</summary>
+<p>Leave blank if the bar is already connected. Provisioning changes its network connection.</p>
+<label>Wi-Fi name<input id="ssid" autocomplete="off"></label>
+<label>Wi-Fi password (WPA2)<input id="wifiPassword" type="password" autocomplete="new-password"></label>
+</details>
+</fieldset>
+<fieldset><legend>USB action</legend>
+<label><select id="action"><option value="check">Check compatibility first — leaves services unchanged</option><option value="install">Install selected features</option><option value="verify">Verify after a restart without USB</option><option value="configure">Apply changes to this installed version</option><option value="uninstall">Uninstall — restore the original startup hook</option><option value="migrate">Migrate the exact reviewed legacy installation (advanced)</option></select></label>
+<small>Existing standalone installs are preserved. Migration accepts only the documented, exact legacy chain; it retains inactive original files on the bar.</small>
+</fieldset>
+<button id="download" type="submit">Download config.txt</button>
+<output id="result" role="status" aria-live="polite"></output>
+</form>
+<p>Everything here runs locally. Nothing is uploaded. Credentials are derived in your browser and saved in the config; keep the configured USB private. Keep the matching recovery ZIP on your computer. Recovery uses its own USB payload and does not need credentials.</p>
+<script src="JBLToolkit/setup.js"></script>
+</html>

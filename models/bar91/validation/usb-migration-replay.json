@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "version": "0.3.0-dev.5",
+  "scope": "Actual vendor ARM BusyBox and exact staged private ARM executable under qemu-arm on host filesystem. Not a physical installation or native state test.",
+  "vendor_busybox_sha256": "d9bc219c48a5d422b37b35bf64b09a9f191ce61d30c2718ff1fce136b23efa06",
+  "remote_sha256": "7c430653437983057a05853198674f35808f8be33e087285e0f83f8802cdec6c",
+  "package_sha256": "2325043a45e3cd37340a4e556e15579dc6ed1133d02f953a864170545174402c",
+  "checks": {
+    "owner_config_parser": "passed; secrets not exported",
+    "atomic_publication": "passed",
+    "no_replace_conflict": "passed"
+  },
+  "hardware_qualified": false,
+  "note": "Final staged package includes the pre-mutation SSH credential guard. The exact ARM executable and config parser are byte-identical to the replayed ones."
+}

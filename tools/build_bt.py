@@ -12,23 +12,10 @@ import shutil
 import subprocess
 import tempfile
 
-ROOT = Path(__file__).resolve().parents[1]
+from repo_layout import REMOTE_DEVICE, bar91_profile
 # Runtime dependencies, verified against the supported Bar 9.1 firmware.
 # Kept absolute so the server can use the same list for runtime guards.
-DEPENDENCIES = {
-    "/system/bdplib/ld-linux.so.3": "49343df4311cb08d47dce9705eebcd06b666509d797ea018ef7c3142cb1f8af9",
-    "/system/bdplib/libc.so.6": "2f3952341c498325cc9423acadcf7c2ad94ee9196af071c661ffd16057552dc0",
-    "/system/bdplib/libdl.so.2": "a90018084bd508ce2a1a8d4a581cb3caebb0dfcd357f60b9e16a137850a064c6",
-    "/system/bdplib/libgcc_s.so.1": "8cefc5883637998effb2b60cf89115692fcfea32845892e4e3b3570b036190d1",
-    "/system/bdplib/libipcrpc.so": "49e4207e59115e4da6ea9e916e1a0981495c606cff331fd34bd85ad0d2b2dea9",
-    "/system/bdplib/libm.so.6": "8a5316e5d611f775819f77509014278d06335b03d8569cf2ff9dafd2e1e104c5",
-    "/system/bdplib/libmtk_bt_ipcrpc_struct.so": "3e2373e0ceba593dee8109910ad96bcc3482e15fe258c9b57090d6a01a9c6f52",
-    "/system/bdplib/libmtk_bt_service_client.so": "a54bf7a2f20b3cee2cb01d8ad33768e50d6f2b5a851d9db6515d1a0de527e414",
-    "/system/bdplib/libpthread.so.0": "a2d3c817beb9869435dec5ab14893f9073829711c1ba56d6bd83882342b0d7e1",
-    "/system/bdplib/libresolv.so.2": "78497b7d61abbccf94b75a33eb4285bfed0cbd4ab4461730fd356a33ca853e1a",
-    "/system/bdplib/librt.so.1": "7113c86d037bcbf31cad3feff582a5d53918d4ff50e984a2945e7c6124257c95",
-    "/system/bdplib/libstdc++.so.6": "59a59e75b7ad46d45b239411ada16818b56f48803c6e25195cdcd266ed86a67d",
-}
+DEPENDENCIES = bar91_profile()["native_helpers"]["bluetooth"]
 
 
 def validate_rootfs(rootfs):
@@ -67,7 +54,7 @@ def build(cc, rootfs, output):
         obj = Path(folder) / "bt_remote.o"
         subprocess.run([
             compiler, "-Os", "-Wall", "-Wextra", "-Werror", "-fno-pie", "-fno-stack-protector",
-            "-D_FORTIFY_SOURCE=0", "-c", str(ROOT / "webremote/native/bt_remote.c"), "-o", str(obj),
+            "-D_FORTIFY_SOURCE=0", "-c", str(REMOTE_DEVICE / "native/bt_remote.c"), "-o", str(obj),
         ], check=True)
         # Use modern toolchain CRT objects with the pinned old libc. The result
         # imports __libc_start_main@GLIBC_2.4, without bundling a replacement libc.

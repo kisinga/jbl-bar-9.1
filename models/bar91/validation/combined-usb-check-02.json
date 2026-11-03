@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "model": "bar91",
+  "version": "0.3.0-dev.3",
+  "action": "check",
+  "package_sha256": "24662f35ba4eaef65113b9c747d0c0f8a10e8ea0340a590b80c9b0e5a814eb65",
+  "status": "CHECK_BLOCKED_READ_CHECKS",
+  "preflight": "USB_NOT_FIRST_PARTITION_WRITABLE_FAT32",
+  "native_snapshot": {
+    "schema": 1,
+    "supported": true,
+    "boot_id": "4953961f-3ce8-4e3f-a8d4-cb810ec611c8",
+    "kernel_filesystems": [
+      "squashfs",
+      "msdos",
+      "vfat"
+    ],
+    "power": "On",
+    "mode": "Standard",
+    "volume": 10,
+    "muted": false,
+    "source": 1,
+    "bluetooth_helper": true,
+    "front_eq_helper": true
+  },
+  "actual_usb_mount": {
+    "device": "/dev/block/sda1",
+    "mount": "/mnt/sda1",
+    "filesystem": "vfat",
+    "writable": true
+  },
+  "busybox_sha256": "d9bc219c48a5d422b37b35bf64b09a9f191ce61d30c2718ff1fce136b23efa06",
+  "persistent_mount": {
+    "mount": "/mnt/ubi_boot",
+    "filesystem": "ubifs",
+    "writable": true
+  },
+  "registered_exfat": "absent in captured /proc/filesystems; no mount trial performed",
+  "existing_owners": {
+    "/var/JBLLocalSSH": "JBL_LOCAL_SSH_REV1",
+    "/var/JBLRemote": "JBL_WEB_REMOTE_REV1",
+    "/var/JBLStandard": "JBL_STANDARD_HOOK_REV6"
+  },
+  "services_changed": false,
+  "atomic_publication": "not_reached_on_hardware",
+  "hardware_qualified": false,
+  "next": "Accept the exact /dev/block/sda1 alias; run independent prerequisite matrix before migration."
+}

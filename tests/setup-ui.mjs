@@ -1,0 +1,45 @@
+// Real file:// and offline browser smoke check for the released setup flow.
+import assert from 'node:assert/strict';
+import {mkdtemp, mkdir, copyFile, readFile, rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+const {chromium} = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const folder = await mkdtemp(join(tmpdir(), 'jbl-setup-ui-'));
+const browser = await chromium.launch({headless:true});
+try {
+  await mkdir(join(folder,'JBLToolkit'));
+  await copyFile(new URL('../packaging/SETUP.html',import.meta.url),join(folder,'SETUP.html'));
+  await copyFile(new URL('../packaging/setup.js',import.meta.url),join(folder,'JBLToolkit/setup.js'));
+  const context = await browser.newContext({offline:true,acceptDownloads:true});
+  const page = await context.newPage();
+  const errors=[], network=[];
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if(m.type()==='error') errors.push(m.text()); });
+  page.on('request', req => { if(/^https?:/.test(req.url())) network.push(req.url()); });
+  await page.goto(pathToFileURL(join(folder,'SETUP.html')).href);
+  assert.equal(await page.locator('#action').inputValue(),'check');
+  assert.equal(await page.locator('#password').isDisabled(),true);
+  await page.locator('#address').fill('192.168.9.138');
+  assert.match(await page.locator('#network').textContent(),/192\.168\.9\.0\/24/);
+  await page.locator('#ssh').check();
+  await page.locator('#password').fill('fixture-browser-password');
+  await page.locator('#standard').check();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#download').click();
+  const download = await downloadPromise;
+  assert.equal(download.suggestedFilename(),'config.txt');
+  const data=await readFile(await download.path(),'utf8');
+  assert.match(data,/^action=check$/m);
+  assert.match(data,/^ssh=true$/m);
+  assert.match(data,/^auto_standard=true$/m);
+  assert.match(data,/^ssh_password_hash=\$6\$/m);
+  assert(!data.includes('fixture-browser-password'));
+  await page.waitForFunction(() => document.querySelector('#password').value==='');
+  assert.deepEqual(errors,[]);
+  assert.deepEqual(network,[]);
+  console.log('Offline setup browser: PASS (file URL, default check, LAN preview, credentials, download, no network)');
+} finally {
+  await browser.close();
+  await rm(folder,{recursive:true,force:true});
+}

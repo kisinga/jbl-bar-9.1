@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "version": "0.3.0-dev.7",
+  "scope": "Host/browser checks for upstream reconciliation and the first family inspection slice; no new physical-device qualification.",
+  "upstream": {
+    "commit": "3a52f58d540650fdab7781fa182f44bb92c7a369",
+    "merged_prs_incorporated": [
+      5,
+      7,
+      8,
+      9
+    ],
+    "native_files": [
+      {
+        "path": "apps/remote/avsync.go",
+        "sha256": "1860ee3e111e22b276947b10d5d9d416841b9080397d4c79309bc3e0c48e558e",
+        "upstream_byte_identical": true
+      },
+      {
+        "path": "apps/remote/avsync_test.go",
+        "sha256": "0c5e8057c54a6e719aa8194bcf70e0bc5244f648faa5e0ceec08a3f633a38faa",
+        "upstream_byte_identical": true
+      },
+      {
+        "path": "apps/remote/setup.go",
+        "sha256": "d4cfa855dd7758ded7111e2f0bf38dff3514009ce0c72af3dd2aad42aaf89bc9",
+        "upstream_byte_identical": true
+      },
+      {
+        "path": "apps/remote/setup_test.go",
+        "sha256": "2c04a89ea2df3f1b1cbb6845b0d50388002d4f2e84f2a15b4bed5a6b5545501c",
+        "upstream_byte_identical": true
+      }
+    ],
+    "git_history": "Changes ported into the reorganized working tree; no merge commit created."
+  },
+  "extensibility": {
+    "family_package": "apps/remote/internal/jblone",
+    "command": "./jbl inspect --host <private-bar-ip>",
+    "getters": [
+      "GetControlDeviceInfo",
+      "GetInfoEx"
+    ],
+    "synthetic_tests_only": true,
+    "live_backend_implemented": false,
+    "ui": "Existing preview and embedded UI consume normalized observations; unknown power/mute are explicit."
+  },
+  "checks": {
+    "host_cases": 267,
+    "project_cases": 11,
+    "usb_cases": 111,
+    "go_race": "passed",
+    "go_vet": "passed",
+    "browser_ux_checks": 200,
+    "component_browser_checks": 20,
+    "workflow_execution": "not run on GitHub"
+  },
+  "artifact": {
+    "package": "dist/release-v0.3.0-dev.7/jbl-bar91-v0.3.0-dev.7-usb.zip",
+    "package_sha256": "5f88f9d92eb9a8a87db9693b14aa45ad10898ba1448ecb4b3d8f27c14671d7dc",
+    "remote_sha256": "80049203b48915dfbd9e1ee8df0933665091825d2801ce50f83a929399f1c4fd",
+    "files_validated": 31,
+    "qualification": "hardware-test-pending"
+  },
+  "limitations": [
+    "No inspection request has run on the tester's original-generation Bar 1300 family device.",
+    "1300/1300X identity and installed firmware remain pending.",
+    "No family controls, jailbreak or installation route is qualified.",
+    "Shared USB/SSH release update transaction remains unimplemented.",
+    "The prepared dev.5 hardware USB was not modified; the dev.7 build is a separate local artifact."
+  ]
+}

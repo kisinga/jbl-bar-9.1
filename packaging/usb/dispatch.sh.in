@@ -1,0 +1,44 @@
+#!/bin/sh
+# Generated from a reviewed installer profile, never from owner config.
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+unset LD_LIBRARY_PATH LD_PRELOAD
+umask 077
+USB=${JBL_TOOLKIT_USB:-/mnt/sda1/JBLToolkit}
+BB=${JBL_BUSYBOX:-/bin/busybox}
+STORE=${JBL_TOOLKIT_STORE:-/var/JBLToolkit}
+[ -d "$USB" ] && [ ! -L "$USB" ] || exit 1
+regular() { [ -f "$1" ] && [ ! -L "$1" ]; }
+stop() {
+    printf '%s\n' "$1" > "$USB/STATUS.txt"
+    printf 'selection=unknown\nreason=%s\n' "$1" > "$USB/HARDWARE.txt"
+    exit 1
+}
+for name in dispatch.sh launch.sh common.sh recover.sh BOOTSTRAP.SHA256SUMS; do
+    regular "$USB/$name" || stop BOOTSTRAP_FILE_MISSING_OR_UNSAFE
+done
+(cd "$USB" && "$BB" sha256sum -c BOOTSTRAP.SHA256SUMS) >> "$USB/setup.log" 2>&1 || stop BOOTSTRAP_INTEGRITY_FAILED
+
+selected=
+evidence=
+# Recovery must still work when the running firmware/process is broken or
+# updated. The existing manager rechecks ownership and hook identity itself.
+if regular "$USB/RECOVER" && [ -d "$STORE" ] && [ ! -L "$STORE" ] &&
+   regular "$STORE/OWNER.txt" && [ "$("$BB" cat "$STORE/OWNER.txt")" = JBL_TOOLKIT_REV1 ]; then
+    selected=@MODEL@
+    evidence=managed-installation-owner
+else
+    pids=$("$BB" pidof bdpprog) || stop HARDWARE_NOT_RECOGNIZED_NO_SUPPORTED_PROCESS
+    case "$pids" in ''|*[!0-9]*) stop HARDWARE_NOT_RECOGNIZED_AMBIGUOUS_PROCESS;; esac
+    digest=$("$BB" sha256sum "/proc/$pids/exe") || stop HARDWARE_IDENTITY_UNREADABLE
+    [ "${digest%% *}" = @BDP_HASH@ ] || stop HARDWARE_OR_FIRMWARE_NOT_SUPPORTED
+    digest=$("$BB" sha256sum /bin/cli) || stop HARDWARE_IDENTITY_UNREADABLE
+    [ "${digest%% *}" = @CLI_HASH@ ] || stop HARDWARE_OR_FIRMWARE_NOT_SUPPORTED
+    selected=@MODEL@
+    evidence=exact-executable-sha256
+fi
+[ "$selected" = @MODEL@ ] || stop NO_PACKAGED_INSTALLER_FOR_HARDWARE
+printf 'selection=%s\nprofile=%s\nevidence=%s\n' "$selected" '@PROFILE@' "$evidence" > "$USB/HARDWARE.txt"
+export JBL_TOOLKIT_USB="$USB"
+# The selected implementation retains all native/storage/config checks.
+exec /bin/sh "$USB/launch.sh"

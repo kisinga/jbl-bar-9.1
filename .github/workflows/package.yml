@@ -1,0 +1,149 @@
+name: Test and package toolkit
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - name: Install host fixture dependencies
+        run: sudo apt-get update && sudo apt-get install -y busybox
+      - name: Host fixtures and immutable standalone baseline
+        run: python3 tools/test.py
+      - name: Go race checks and vet
+        working-directory: apps/remote
+        run: |
+          go test -race ./...
+          go vet ./...
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.16.0'
+      - name: Install browser fixture tools
+        run: |
+          npm install --prefix build/ui-tools --no-save --package-lock=false playwright@1.63.0
+          build/ui-tools/node_modules/.bin/playwright install --with-deps chromium
+      - name: Browser, component and offline setup regressions
+        env:
+          PLAYWRIGHT_MODULE: ${{ github.workspace }}/build/ui-tools/node_modules/playwright/index.mjs
+        run: |
+          node tests/webremote-ui.mjs
+          node tests/component-ui.mjs
+          node tests/setup-ui.mjs
+      - name: Select reviewed package implementations
+        id: targets
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          matrix = subprocess.check_output(['python3', 'tools/build_distribution.py', '--matrix'], text=True).strip()
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('matrix=' + matrix + '\n')
+          PY
+
+  package:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.test.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - run: sudo apt-get update && sudo apt-get install -y busybox
+      - name: Build public USB and independent recovery ZIPs
+        env:
+          PACKAGE_MODEL: ${{ matrix.model }}
+        run: python3 tools/build_distribution.py --model "$PACKAGE_MODEL"
+      # Explicit public files only. Never upload dist/, private configs or blobs.
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            dist/release/*-usb.zip
+            dist/release/*-recovery.zip
+            dist/release/*SHA256SUMS
+            dist/release/*release.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Explain the download
+        env:
+          ARTIFACT_NAME: ${{ matrix.artifact }}
+        run: |
+          printf 'Download **%s** from Artifacts. Extract the wrapper, then extract **-usb.zip** to FAT32 and open **SETUP.html**. Keep **-recovery.zip**.\n\nHardware selection is automatic; only included, reviewed implementations can run. Combined hardware qualification remains pending.\n' "$ARTIFACT_NAME" >> "$GITHUB_STEP_SUMMARY"
+
+  release-draft:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: jbl-*-usb-development
+          merge-multiple: true
+          path: release-assets
+      - name: Verify all model assets and the tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path('release-assets')
+          reports = list(root.glob('*release.json'))
+          assert reports, 'Missing public release metadata'
+          for report in reports:
+              data = json.loads(report.read_text())
+              assert os.environ['RELEASE_TAG'] == 'v' + data['version'], 'Tag/version mismatch'
+          for manifest in root.glob('*SHA256SUMS'):
+              for line in manifest.read_text().splitlines():
+                  digest, name = line.split('  ', 1)
+                  assert Path(name).name == name, 'Unexpected asset path'
+                  assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest
+          PY
+      - name: Create a draft prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft > existing-draft.txt; then
+            test "$(cat existing-draft.txt)" = true || { echo 'Published release exists; refusing replacement.'; exit 1; }
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+            gh release edit "$RELEASE_TAG" --draft --prerelease --notes-file packaging/RELEASE-NOTES.md
+          else
+            gh release create "$RELEASE_TAG" release-assets/* --verify-tag --draft --prerelease --title "JBL Bar Toolkit $RELEASE_TAG" --notes-file packaging/RELEASE-NOTES.md
+          fi

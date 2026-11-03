@@ -1,6 +1,14 @@
 # Research workspace
 
-Use the root [instructions](../README.md) and [build guide](../CONTRIBUTING.md) for supported workflows. Keep experimental findings separate from hardware confirmation. Preserve the confirmed release, recovery paths and firmware guards while extending sound controls.
+Use the [toolkit overview](../README.md), [model status](../models/README.md), and [Bar 9.1 build guide](../docs/models/bar91/DEVELOPMENT.md) for implemented workflows. Keep experimental findings separate from hardware confirmation. Preserve the confirmed release, recovery paths and firmware guards while extending sound controls.
+
+## Other JBL bars
+
+[Bar 800/1000/1300 research](bar-family/README.md) contains the historical firmware
+catalog, reusable extraction/REA tools, native Smart Mode replay and community
+protocol comparisons. Its private artifacts use
+`private/bar-family/firmware/<models>/<version>/`; raw evidence and downloads stay
+Git-ignored. These findings do not expand supported installer compatibility.
 
 ## Private archive
 
@@ -63,7 +71,7 @@ Preserve `analysis/eq-native/phase2/`, `offline-roundtrip/` and `phase2-state/` 
 
 ## Verified-build field map
 
-Use these decimal process addresses **only** with the exact `bdpprog` identity in [compatibility](../README.md#compatibility). Treat implementation source as authoritative for widths, guards and restoration order.
+Use these decimal process addresses **only** with the exact `bdpprog` identity in [compatibility](../models/bar91/README.md#compatibility). Treat implementation source as authoritative for widths, guards and restoration order.
 
 | Address | Bytes | Meaning |
 | --- | --- | --- |
@@ -77,7 +85,7 @@ Use these decimal process addresses **only** with the exact `bdpprog` identity i
 | 15427780 | 1 | Temporary console input setting |
 | 15427784 | 4 | Temporary console gate |
 
-The Standard sequence uses `mw.iom.se`, mute `0x6f002` and volume-up `0x6f000`. Require mode readback, released input and restored console fields; CLI acceptance alone is insufficient. Preserve the exact controller under `smart-mode/JBLInstall/payload/`.
+The Standard sequence uses `mw.iom.se`, mute `0x6f002` and volume-up `0x6f000`. Require mode readback, released input and restored console fields; CLI acceptance alone is insufficient. Preserve the exact controller under `models/bar91/smart-mode/JBLInstall/payload/`.
 
 ## Startup and SSH constraints
 
@@ -114,7 +122,7 @@ Pairing handler `0x6432f0` accepts Bluetooth key `0x6f027` at repeat 25. The 400
 
 ## Playback and metadata limits
 
-The Bluetooth IOM focus handler discards ordinary media key events. Use the project’s callback-free native MediaTek AVRCP RPC helper: one key-down/key-up pair, then close. Audible Pause was confirmed; Play restored playback, while A2DP remained streaming. The integrated API accepted Pause/Play in 0.124/0.225 seconds without changing volume, mute, power, source or sound settings. A [later Brave/YouTube test](validation/bluetooth-sender-device.json) did not pause: PC capture received both correct edges and sent AV/C Accepted replies, while direct desktop MPRIS controls also left Playing unchanged. Treat this as unresolved sender/session compatibility; do not infer app playback from middleware acceptance. Next/Previous/Stop still require audible validation. Keep callback subscribers, pairing state and service startup intact; link only against owner-supplied matching vendor libraries.
+The Bluetooth IOM focus handler discards ordinary media key events. Use the project’s callback-free native MediaTek AVRCP RPC helper: one key-down/key-up pair, then close. Audible Pause was confirmed; Play restored playback, while A2DP remained streaming. The integrated API accepted Pause/Play in 0.124/0.225 seconds without changing volume, mute, power, source or sound settings. A [later Brave/YouTube test](../models/bar91/validation/bluetooth-sender-device.json) did not pause: PC capture received both correct edges and sent AV/C Accepted replies, while direct desktop MPRIS controls also left Playing unchanged. Treat this as unresolved sender/session compatibility; do not infer app playback from middleware acceptance. Next/Previous/Stop still require audible validation. Keep callback subscribers, pairing state and service startup intact; link only against owner-supplied matching vendor libraries.
 
 Normal Cast media controls use the native C4A handler with session/capability guards; mirroring is excluded. Receiver state at `0xe30710` maps 2 Playing/3 Paused. AirPlay `0xe3169c` maps 1 active session/0 stopped, without pause distinction. YouTube through Chrome Audio Mirroring (`85CDB22F`) retains receiver/native PLAYING when sender playback pauses; label transport activity without claiming sender-state detection.
 
@@ -130,7 +138,7 @@ Register `jbl.local` with the existing Bonjour daemon using DNS-SD Any scope. In
 
 Keep the system monitor auxiliary to sound controls. Two-second cached samples provide aggregate CPU, cache-aware RAM, `/var` storage, Wi-Fi byte rates, load/uptime and process count. Display temperature only when reported; no sensor was exposed on the tested bar. Retain at most 60 unique browser-local samples, break unavailable data, and clear history across disconnect/reset/long gaps. No database or extra state polling is needed. Load average can include native tasks waiting on I/O; do not present it as CPU utilization or a standalone fault alarm.
 
-Use the current fixture suite rather than historical intermediate check totals: **141 host checks, 167 browser checks**, plus Go race tests and vet. Screenshots contain example values. Original Smart Mode ZIP bytes remain unchanged. CLI/discovery/capability ideas came from [the reviewed k1rnt revision](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309); its newer Linkplay transport and one-shot Smart Mode setter do not supply this bar’s native implementation or wake watcher.
+Use the current fixture suite rather than historical intermediate check totals: **200 host checks, 179 browser checks**, plus Go race tests and vet. Screenshots contain example values. Original Smart Mode ZIP bytes remain unchanged. CLI/discovery/capability ideas came from [the reviewed k1rnt revision](https://github.com/k1rnt/jbl-soundbar-cli/tree/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309); its newer Linkplay transport and one-shot Smart Mode setter do not supply this bar’s native implementation or wake watcher.
 
 ## Control paths
 
@@ -147,7 +155,7 @@ Use the current fixture suite rather than historical intermediate check totals: 
 
 The [reviewed CLI HTTP client](https://github.com/k1rnt/jbl-soundbar-cli/blob/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309/src/client/http_api.rs) sets an absolute volume with `setPlayerCmd:vol:N` and explicit mute with `setPlayerCmd:mute:0/1`. Its [UPnP client](https://github.com/k1rnt/jbl-soundbar-cli/blob/7d10bdb1ebe0c5a77c9a4c14ebe4580bd3735309/src/client/upnp.rs) uses RenderingControl `SetVolume`/`SetMute`. The upstream commit is unchanged on 21 October 2026. On the owned Bar 9.1, both expected ports (443/59152) refused connections and were absent from the local listening-socket table. These implementations are useful design references, not established Bar 9.1 endpoints.
 
-The [21 October control audit](validation/control-shortcuts.json) traces complete handlers and external command registration on the pinned firmware. The original audit was static. The [subsequent device qualification](validation/direct-controls-device.json) now distinguishes deployed controls, untested candidates and a rejected power shortcut. Preserve firmware/process guards, serialized controls, console restoration and native readback.
+The [21 October control audit](../models/bar91/validation/control-shortcuts.json) traces complete handlers and external command registration on the pinned firmware. The original audit was static. The [subsequent device qualification](../models/bar91/validation/direct-controls-device.json) now distinguishes deployed controls, untested candidates and a rejected power shortcut. Preserve firmware/process guards, serialized controls, console restoration and native readback.
 
 | Control | Direct route found | Remaining boundary |
 | --- | --- | --- |
@@ -173,4 +181,4 @@ The normal full toggle also temporarily mutes, resets playback, updates the disp
 
 ## Further validation
 
-Prioritize repeated application/reset and per-source audio behavior. Revision 6 measured 18.26 seconds from observed awake to Standard versus a 34.64-second revision 5 control; one-second polling alone measured 27.00 seconds. Preserve the [revision 6 device record](validation/revision6-device.json), including the unexplained pre-action power-off/reboot. Optional Go automation subsequently measured **7.77–7.82 seconds** across three controlled wakes, with keys/console restored. Stop/uninstall/reinstall handed ownership between Go and the verified shell helper; see the [Go device record](validation/go-automation-device.json). Keep CEC/cold-boot qualification, sampling overhead, the transient installation long-press failure and additional firmware identities separate. Never substitute a passing host fixture, model suggestion or parser success for a hardware result.
+Prioritize repeated application/reset and per-source audio behavior. Revision 6 measured 18.26 seconds from observed awake to Standard versus a 34.64-second revision 5 control; one-second polling alone measured 27.00 seconds. Preserve the [revision 6 device record](../models/bar91/validation/revision6-device.json), including the unexplained pre-action power-off/reboot. Optional Go automation subsequently measured **7.77–7.82 seconds** across three controlled wakes, with keys/console restored. Stop/uninstall/reinstall handed ownership between Go and the verified shell helper; see the [Go device record](../models/bar91/validation/go-automation-device.json). Keep CEC/cold-boot qualification, sampling overhead, the transient installation long-press failure and additional firmware identities separate. Never substitute a passing host fixture, model suggestion or parser success for a hardware result.

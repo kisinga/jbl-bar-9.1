@@ -1,0 +1,83 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+
+	"jbl-bar-toolkit/remote/internal/extension"
+)
+
+// Model composition is explicit. A future family backend registers only the
+// features it has qualified; it does not reuse 9.1 native actions or EQ tuning.
+func (r *remote) registerBar91Extensions() error {
+	r.actionAliases = map[string]string{
+		"eq_apply": "bar91.front-eq.apply", "eq_reset": "bar91.front-eq.reset",
+		"center_next": "bar91.center-level.next",
+	}
+	eq := func(action string) extension.Handler[state] {
+		return func(ctx context.Context, data json.RawMessage) (state, error) {
+			var parameters struct {
+				GainsDB []float64 `json:"gains_db"`
+			}
+			if err := extensionParameters(data, &parameters); err != nil {
+				return state{}, err
+			}
+			return r.device.eqAction(ctx, action, parameters.GainsDB)
+		}
+	}
+	reason := ""
+	if eqParserPayload == "" {
+		reason = "native helper not bundled"
+	}
+	if err := r.extensions.Register(extension.Module[state]{
+		Descriptor: extension.Descriptor{ID: "bar91.front-eq", Component: "front-eq", Name: "Front EQ", Model: "bar91", Included: eqParserPayload != "", Experimental: true, Reason: reason},
+		Actions:    map[string]extension.Handler[state]{"bar91.front-eq.apply": eq("eq_apply"), "bar91.front-eq.reset": eq("eq_reset")},
+		Run:        r.monitorFrontEQ,
+		Project: func(s state) any {
+			if s.EQ == nil {
+				return nil
+			}
+			return s.EQ
+		},
+	}); err != nil {
+		return err
+	}
+	return r.extensions.Register(extension.Module[state]{
+		Descriptor: extension.Descriptor{ID: "bar91.center-level", Component: "center-level", Name: "Center level", Model: "bar91", Included: true, Experimental: true},
+		Run:        r.monitorCenter,
+		Actions: map[string]extension.Handler[state]{"bar91.center-level.next": func(ctx context.Context, data json.RawMessage) (state, error) {
+			var parameters struct{}
+			if err := extensionParameters(data, &parameters); err != nil {
+				return state{}, err
+			}
+			return r.device.centerAction(ctx, "center_next")
+		}},
+		Project: func(s state) any {
+			if s.Sound == nil || s.Sound.Center == nil {
+				return nil
+			}
+			return map[string]any{"level": s.Sound.Center, "error": s.Sound.CenterError}
+		},
+	})
+}
+
+func extensionParameters(data json.RawMessage, target any) error {
+	if len(data) == 0 {
+		return nil
+	}
+	if len(data) > 256 || len(bytes.TrimSpace(data)) == 0 || bytes.TrimSpace(data)[0] != '{' {
+		return errors.New("extension parameters must be an object")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return errors.New("invalid extension parameters")
+	}
+	if decoder.Decode(new(any)) != io.EOF {
+		return errors.New("invalid extension parameters")
+	}
+	return nil
+}

@@ -13,8 +13,7 @@ import secrets
 import sys
 import zipfile
 
-ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / "ssh"
+from repo_layout import ROOT, SSH as SCRIPTS
 CRYPT64 = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 PRIVATE_LANS = tuple(ipaddress.IPv4Network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
 

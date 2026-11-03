@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "kind": "hardware-session-template",
+  "status": "not-run",
+  "session_id": null,
+  "observed_at": null,
+  "identity": {
+    "product_label": null,
+    "region": null,
+    "firmware": null,
+    "firmware_source": null,
+    "app_version": null
+  },
+  "setup": {
+    "connection": null,
+    "inputs": [],
+    "rears": null
+  },
+  "capabilities": {
+    "state_readback": "untested",
+    "volume": "untested",
+    "mute": "untested",
+    "input": "untested",
+    "standby_wake": "untested",
+    "smart_mode_readback": "untested",
+    "smart_mode_control": "untested",
+    "installation": "unqualified"
+  },
+  "observations": [],
+  "observation_fields": [
+    "feature",
+    "timestamp",
+    "conditions",
+    "manual_observation_source",
+    "before",
+    "request_capture",
+    "response_capture",
+    "readback",
+    "visible_result",
+    "outcome"
+  ],
+  "normalized_fixture": null,
+  "limitations": []
+}

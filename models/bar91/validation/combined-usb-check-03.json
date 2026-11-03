@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "model": "bar91",
+  "version": "0.3.0-dev.4",
+  "action": "check",
+  "status": "CHECK_BLOCKED_READ_CHECKS",
+  "package_sha256": "958a7e6ef526f1b821bd8c8a3f59f3cf83ba91691cc6e56844c740080da82356",
+  "prerequisites": [
+    "PASS=root",
+    "PASS=busybox",
+    "PASS=usb",
+    "PASS=persistent",
+    "PASS=firmware",
+    "PASS=ssh",
+    "FAIL=space:FREE_SPACE_UNREADABLE_OR_INSUFFICIENT",
+    "PASS=boot_id",
+    "PASS=atomic_io",
+    "PASS=native"
+  ],
+  "native_snapshot": {
+    "schema": 1,
+    "supported": true,
+    "boot_id": "4953961f-3ce8-4e3f-a8d4-cb810ec611c8",
+    "kernel_filesystems": [
+      "squashfs",
+      "msdos",
+      "vfat"
+    ],
+    "power": "On",
+    "mode": "Standard",
+    "volume": 8,
+    "muted": false,
+    "source": 2,
+    "bluetooth_helper": true,
+    "front_eq_helper": true
+  },
+  "space_kib": {
+    "available": 13224,
+    "payload": 6340,
+    "old_requirement": 14728,
+    "corrected_one_copy_plus_reserve": 8388
+  },
+  "persistent_atomic_publication": "passed-on-device-including-no-replace-conflict",
+  "legacy_hook_sha256": "5d2f06b6b73ef1ef4ae8a2363801190e768c3c4486ed81cbe88e4c267b34c15d",
+  "legacy_identity_review": "Smart Mode rev6 payload matches; remote scripts match previous repository versions; prototype SSH boot matches recorded source",
+  "services_changed": false,
+  "hardware_qualified": false,
+  "next": "Use measured one-copy storage budget and explicit exact-identity legacy migration with inactive on-device archive and SSH host-key preservation."
+}

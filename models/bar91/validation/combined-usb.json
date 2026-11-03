@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "model": "bar91",
+  "profile": "bar91-23.06.41.80",
+  "version": "0.3.0-dev.5",
+  "date": "2026-11-03",
+  "status": "host-tested-hardware-qualification-pending",
+  "canonical_process": "docs/models/bar91/USB-TOOLKIT.md",
+  "host_evidence": {
+    "command": "python3 tools/test.py",
+    "checks_passed": 262,
+    "usb_checks_passed": 111,
+    "go_race": "passed",
+    "go_vet": "passed",
+    "scope": "Host parser, real ARM public/private packaging, config credentials, independent crypt/WPA2 vectors, USB staging/readback, exact legacy migration/refusal/resume and host-key preservation, owned service lifecycle, native preflight, integrity/new-boot receipts and independent recovery. Firmware reads, SSH authentication, Wi-Fi and physical reboot remain device boundaries.",
+    "project_checks_passed": 6,
+    "browser_checks_passed": 179,
+    "offline_setup_browser": "passed; file URL, network disabled, local credential download"
+  },
+  "test_media": {
+    "partition_table": "dos",
+    "partition_number": 1,
+    "partition_bytes": 536870912,
+    "filesystem": "FAT32",
+    "remaining_space": "unallocated",
+    "first_action": "migrate",
+    "exfat": "No exFAT registered in three live kernel snapshots; actual exFAT mount/automount/AutoScript/recovery is unqualified. FAT32 remains canonical."
+  },
+  "hardware_evidence": [
+    "combined-usb-check-01.json",
+    "combined-usb-check-02.json",
+    "combined-usb-check-03.json"
+  ],
+  "required_hardware_evidence": [
+    "Check report and supported native snapshot on the intended soundbar",
+    "Clean combined installation and selected feature combinations",
+    "SSH host key, authenticated shell and SFTP",
+    "Browser controls and optional helper behavior with native readback",
+    "USB physically removed during mains boot; new boot receipt and verification",
+    "Audible playback and normal volume/mute/input controls",
+    "Standby and controlled CEC wake with automatic Standard Mode",
+    "Bounded recovery, exact original hook restoration and subsequent USB-free boot",
+    "Interrupted-install and changed-hook recovery qualification"
+  ],
+  "controlled_replay_evidence": [
+    "usb-publication-replay.json",
+    "usb-distribution-replay.json",
+    "usb-migration-replay.json"
+  ],
+  "next_hardware_step": "Run explicit exact-chain migration on the staged USB; inspect migration/installation receipts before USB-free restart, runtime verification, authentication/audio/wake tests and independent recovery.",
+  "native_probe": {
+    "status": "passed-on-one-bar",
+    "remote_sha256": "607d1dc72a405d6c3928a948548338aae23f0af23a2c4399c618457940091d22",
+    "same_binary_in_current_package": false,
+    "firmware_and_helper_library_checks": "passed",
+    "state_reads": "passed",
+    "current_remote_sha256": "7c430653437983057a05853198674f35808f8be33e087285e0f83f8802cdec6c",
+    "current_binary_scope": "Updated Go composition and config/release code; ARM publication and vendor parser replay pass. Current binary native state and full installation await this hardware run."
+  },
+  "persistent_atomic_publication": "Passed on physical UBIFS in check 03, including refusal of an existing destination.",
+  "storage_budget": "Corrected measured two-copy overestimate to one new persistent payload plus 2 MiB; byte-identical managed remote is reused. Host regression cases pass; new device installation pending.",
+  "staged_package": {
+    "sha256": "2325043a45e3cd37340a4e556e15579dc6ed1133d02f953a864170545174402c",
+    "action": "migrate",
+    "helpers": [
+      "bluetooth",
+      "front_eq"
+    ],
+    "wifi_provisioning": false,
+    "credential_source": "local config; existing owner SSH password reused",
+    "readback": "passed after final unmount/remount; build/usb-test/migration-05-readback.json",
+    "hardware_qualified": false
+  },
+  "public_distribution": {
+    "installation_zip": "jbl-bar91-v0.3.0-dev.5-usb.zip",
+    "setup": "offline SETUP.html; owner config can hold credentials",
+    "published": false,
+    "ci_workflow": ".github/workflows/package.yml",
+    "release_mode": "tagged draft prerelease",
+    "installation_sha256": "9c6e8796b184842b08b780254afd92eda46cdfa3cd7472839766fdf1b3176cfd",
+    "recovery_sha256": "56dfad8926beb9c9f45eb6261db24bcb22b6ee9f8b3a36613ca556bcb5227b8c",
+    "workflow_validation": "YAML parsed and all seven shell blocks pass bash -n; GitHub workflow has not run yet"
+  }
+}
