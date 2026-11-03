@@ -500,7 +500,11 @@ func (r *remote) monitorFrontEQ(ctx context.Context) {
 			return
 		case <-ticker.C:
 		}
-		if eqParserPayload == "" || !r.actionMu.TryLock() {
+		if eqParserPayload == "" {
+			continue
+		}
+		release, _, held := r.hold("")
+		if !held {
 			continue
 		}
 		r.device.mu.Lock()
@@ -521,7 +525,7 @@ func (r *remote) monitorFrontEQ(ctx context.Context) {
 			cancel()
 		}
 		d.mu.Unlock()
-		r.actionMu.Unlock()
+		release()
 	}
 }
 

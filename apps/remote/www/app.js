@@ -25,7 +25,15 @@ const bassOffset=createBassOffset(document.querySelector('.mode-panel'));
 const advanced=createAdvanced($('advanced'));
 const components=[bluetooth,sound,playback,system,equalizer,details,advanced,bassOffset];
 let syncTimer=null;
-const context=()=>({state:capabilities.state(current),deviceName:capabilities.name(),online,ready:online && !!current?.available,awake:current?.power==='On',active,queued:queue.length,pending:active?[active,...queue]:[...queue],csrf});
+// Readiness shared by the shell and every component. A control sent from
+// elsewhere (another page, Home Assistant, the wake automation) holds the bar:
+// wait for it like for one of ours.
+function readiness() {
+  const reachable = online && !!current?.available;
+  const elsewhere = reachable && !!current?.control?.busy && active === null;
+  return {reachable, elsewhere, ready: reachable && !elsewhere};
+}
+const context=()=>({state:capabilities.state(current),deviceName:capabilities.name(),online,ready:readiness().ready,busy:readiness().elsewhere ? current.control : null,awake:current?.power==='On',active,queued:queue.length,pending:active?[active,...queue]:[...queue],csrf});
 function feedback(text, kind = '') {
   $('message-text').textContent = text;
   $('message').dataset.kind = kind;
@@ -36,14 +44,14 @@ function pendingVolume() { return (active ? delta(active) : 0) + queue.reduce((n
 function render() {
   const s = current;
   if (!s) return;
-  const ready = online && s.available;
+  const {reachable, elsewhere, ready} = readiness();
   const awake = s.power === 'On';
   const standby = s.power === 'Standby';
   const knownPower = awake || standby;
-  const pending = active !== null || queue.length > 0;
-  $('connection').dataset.state = ready ? 'online' : online ? 'connecting' : 'offline';
-  $('connection-label').textContent = ready ? 'Connected' : online ? 'Starting' : 'Offline';
-  $('summary').textContent = !online ? 'Connection lost. Showing the last known settings.' : !s.available ? (s.error || 'Waiting for your soundbar…') : awake ? sourceName(s) + (['Smart','Standard'].includes(s.mode) ? ' · ' + s.mode + ' mode' : '') : standby ? 'In standby. Ready when you are.' : s.power === 'Starting' ? 'Your soundbar is starting…' : 'Connected. Power state is not reported.';
+  const pending = active !== null || queue.length > 0 || elsewhere;
+  $('connection').dataset.state = reachable ? 'online' : online ? 'connecting' : 'offline';
+  $('connection-label').textContent = reachable ? 'Connected' : online ? 'Starting' : 'Offline';
+  $('summary').textContent = !online ? 'Connection lost. Showing the last known settings.' : !s.available ? (s.error || 'Waiting for your soundbar…') : elsewhere ? 'Another control is running; controls return when it finishes.' : awake ? sourceName(s) + (['Smart','Standard'].includes(s.mode) ? ' · ' + s.mode + ' mode' : '') : standby ? 'In standby. Ready when you are.' : s.power === 'Starting' ? 'Your soundbar is starting…' : 'Connected. Power state is not reported.';
   const offset = pendingVolume();
   $('volume').textContent = s.volume == null ? '—' : Math.max(0, s.volume + offset);
   $('volume-caption').textContent = standby ? 'IN STANDBY' : !knownPower ? 'POWER UNKNOWN' : s.muted ? 'SOUND MUTED' : '';

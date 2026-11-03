@@ -116,7 +116,7 @@ func New[S State](backend Backend[S], options Options[S]) (*Server[S], error) {
 	return r, nil
 }
 func (r *Server[S]) Token() string           { return r.csrf }
-func (r *Server[S]) Run(ctx context.Context) { r.feed.Run(ctx, r.backend.Snapshot) }
+func (r *Server[S]) Run(ctx context.Context) { r.feed.Run(ctx, r.snapshot) }
 func (r *Server[S]) Publish(s S)             { r.feed.Publish(s) }
 
 func (r *Server[S]) ServeHTTP(w http.ResponseWriter, q *http.Request) {
@@ -157,8 +157,7 @@ func (r *Server[S]) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 		return
 	}
 	if q.URL.Path == "/api/state" && q.Method == "GET" {
-		s := r.backend.Snapshot()
-		writeJSON(w, 200, s.PublicState(r.csrf))
+		writeJSON(w, 200, r.snapshot().PublicState(r.csrf))
 		return
 	}
 	if q.URL.Path == "/api/features" && q.Method == "GET" {
@@ -187,10 +186,18 @@ func (r *Server[S]) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 			return
 		}
 		if !r.actionMu.TryLock() {
-			writeJSON(w, 409, map[string]string{"error": "Another control is running"})
+			// The state names the running control so a client can wait for it.
+			writeJSON(w, 409, map[string]any{"error": "Another control is running", "state": r.snapshot().PublicState(r.csrf)})
 			return
 		}
-		defer r.actionMu.Unlock()
+		r.feed.begin(request.Action, time.Now())
+		finished := false
+		defer func() {
+			if !finished {
+				r.feed.end(true)
+			}
+			r.actionMu.Unlock()
+		}()
 		// Finish key-release/restore even if a phone closes the page mid-command.
 		timeout := 15 * time.Second
 		if r.actionTimeout != nil {
@@ -206,11 +213,17 @@ func (r *Server[S]) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 		defer cancel()
 		s, e := r.backend.Execute(ctx, request)
 		if e != nil {
-			writeJSON(w, 409, map[string]any{"error": e.Error(), "state": s.PublicState(r.csrf)})
+			// A failed control may return a partial state: announce the end of
+			// the control with the latest published state instead.
+			r.feed.end(true)
+			finished = true
+			writeJSON(w, 409, map[string]any{"error": e.Error(), "state": r.feed.remember(s).PublicState(r.csrf)})
 			return
 		}
+		r.feed.end(false)
+		finished = true
 		r.feed.Publish(s)
-		writeJSON(w, 200, s.PublicState(r.csrf))
+		writeJSON(w, 200, r.feed.remember(s).PublicState(r.csrf))
 		return
 	}
 	if q.Method != "GET" {

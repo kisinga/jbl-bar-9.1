@@ -478,11 +478,12 @@ func (r *remote) monitorAutoStandard(ctx context.Context) {
 			return
 		case <-ticker.C:
 		}
-		if !r.actionMu.TryLock() {
+		release, report, held := r.hold("")
+		if !held {
 			continue
 		}
 		if ctx.Err() != nil {
-			r.actionMu.Unlock()
+			release()
 			return
 		}
 		d := r.device
@@ -516,6 +517,7 @@ func (r *remote) monitorAutoStandard(ctx context.Context) {
 		if apply {
 			d.automation.Status = "APPLYING_STANDARD"
 			d.automationRunning = true
+			report("auto_standard")
 			// Publish settling status before the bounded native action takes d.mu.
 			ready := d.snapshotCurrent()
 			r.feed.publish(ready)
@@ -546,7 +548,7 @@ func (r *remote) monitorAutoStandard(ctx context.Context) {
 			r.feed.publish(d.snapshotCurrent())
 			d.mu.Unlock()
 		}
-		r.actionMu.Unlock()
+		release()
 	}
 }
 

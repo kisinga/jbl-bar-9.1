@@ -25,6 +25,11 @@ part of the native Go implementation.
 The [component guide](../../docs/COMPONENTS.md) describes the working boundaries:
 
 - `internal/server/`: shared HTTP, access protection, serialized actions and SSE.
+  It also tracks the control holding the action gate (`state.control` for states
+  implementing `server.ControlState`) and serves the latest state while it runs,
+  so reads and new streams never wait for a control. Background writers take the
+  gate through `TryHold`; Bar 9.1 reports its automatic Standard Mode gesture as
+  `auto_standard` and keeps its short monitors unreported.
 - `internal/extension/`: compiled feature actions, pure projections and optional
   workers, joined before native cleanup.
 - `backend_bar91.go` / `lifecycle_bar91.go`: existing native composition and policy.
