@@ -1,6 +1,12 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"reflect"
+	"testing"
+	"time"
+)
 
 func TestAVSyncPlan(t *testing.T) {
 	for _, c := range []struct {
@@ -42,5 +48,129 @@ func TestSmartObserved(t *testing.T) {
 	after := state{Available: true, Mode: "Smart"}
 	if !actionObserved("smart", before, after) || actionObserved("smart", before, before) {
 		t.Fatal("smart must be observed only when the mode becomes Smart")
+	}
+}
+
+func TestKeyPressWaitsForAcknowledgementBeforeRelease(t *testing.T) {
+	var order []string
+	var ackWait time.Duration
+	k := keyPress{
+		send: func(_ context.Context, key, duration string) error {
+			order = append(order, "send "+key+" "+duration)
+			return nil
+		},
+		ack: func(_ context.Context, wait time.Duration) error {
+			order = append(order, "ack")
+			ackWait = wait
+			return nil
+		},
+		// Before the firmware runs the hold the keys still look idle: a release
+		// check that came first would return at once.
+		release: func(context.Context, time.Duration) error { order = append(order, "release"); return nil },
+	}
+	if e := k.press(context.Background(), "0x1f02c", "3500"); e != nil {
+		t.Fatal(e)
+	}
+	if !reflect.DeepEqual(order, []string{"send 0x1f02c 3500", "ack", "release"}) {
+		t.Fatalf("order %v", order)
+	}
+	if ackWait <= 3500*time.Millisecond {
+		t.Fatalf("acknowledgement wait %v does not cover the hold", ackWait)
+	}
+	order = nil
+	k.ack = func(context.Context, time.Duration) error {
+		order = append(order, "ack")
+		return errors.New("not acknowledged")
+	}
+	if k.press(context.Background(), "0x6f000", "60") == nil || !reflect.DeepEqual(order, []string{"send 0x6f000 60", "ack"}) {
+		t.Fatalf("unacknowledged key must fail before the release check: %v", order)
+	}
+	order = nil
+	if k.press(context.Background(), "0x6f000", "x") == nil || len(order) != 0 {
+		t.Fatal("invalid duration must be refused before sending")
+	}
+}
+
+type fakeSync struct {
+	presses  []string
+	cooled   int
+	last     time.Time
+	shown    bool
+	delays   []uint32 // successive delay reads; error when exhausted
+	volume   uint32
+	pressErr map[int]error // error returned by the n-th press (0 = hold)
+}
+
+func (f *fakeSync) steps() avSyncSteps {
+	return avSyncSteps{
+		press: func(ctx context.Context, key, _ string) error {
+			n := len(f.presses)
+			f.presses = append(f.presses, key)
+			f.last = time.Now()
+			if e := ctx.Err(); e != nil {
+				return e
+			}
+			return f.pressErr[n]
+		},
+		shown: func(context.Context) bool { return f.shown },
+		delay: func() (uint32, error) {
+			if len(f.delays) == 0 {
+				return 0, errors.New("read failed")
+			}
+			v := f.delays[0]
+			f.delays = f.delays[1:]
+			return v, nil
+		},
+		volume: func() (uint32, error) { return f.volume, nil },
+		cooldown: func(last time.Time) {
+			f.cooled++
+			if last.Before(f.last) {
+				panic("cooldown measured before the last press")
+			}
+		},
+	}
+}
+
+func TestAVSyncCooldownOnEveryExit(t *testing.T) {
+	expired, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, c := range []struct {
+		name    string
+		ctx     context.Context
+		f       fakeSync
+		ok      bool
+		presses int
+	}{
+		{"success", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0, 10, 10, 20}}, true, 4},
+		{"hold failed", context.Background(), fakeSync{pressErr: map[int]error{0: errors.New("cli failed")}}, false, 1},
+		{"sync mode not shown", context.Background(), fakeSync{volume: 8}, false, 1},
+		{"volume moved", context.Background(), fakeSync{shown: true, volume: 9}, false, 3},
+		{"delay read failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0}}, false, 3},
+		{"limit reached", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{250, 250}}, false, 3},
+		{"step press failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0}, pressErr: map[int]error{2: errors.New("cli failed")}}, false, 3},
+		{"request expired", expired, fakeSync{shown: true, volume: 8}, false, 1},
+	} {
+		f := c.f
+		target := 20
+		if c.name == "limit reached" {
+			target = 260
+		}
+		e := f.steps().run(c.ctx, "0x6f000", 2, target, 8)
+		if (e == nil) != c.ok || f.cooled != 1 || len(f.presses) != c.presses {
+			t.Fatalf("%s: err=%v cooldowns=%d presses=%v", c.name, e, f.cooled, f.presses)
+		}
+	}
+}
+
+func TestAVSyncCooldownIgnoresExpiredRequests(t *testing.T) {
+	start := time.Now()
+	avSyncCooldown(start.Add(-avSyncWindowClosed + 150*time.Millisecond))
+	if elapsed := time.Since(start); elapsed < 120*time.Millisecond {
+		t.Fatalf("cooldown returned after %v", elapsed)
+	}
+	start = time.Now()
+	avSyncCooldown(start.Add(-avSyncWindowClosed - time.Second))
+	if time.Since(start) > 20*time.Millisecond {
+		t.Fatal("no wait once sync mode has closed")
 	}
 }

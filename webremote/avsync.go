@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -74,15 +75,117 @@ func (d *device) waitKeysReleased(ctx context.Context, limit time.Duration) erro
 	return nil
 }
 
-func (d *device) avSyncPress(ctx context.Context, key, duration string) error {
-	if e := d.cli(ctx, "mw.iom.se", key, duration); e != nil {
+// keyPress is the native key path used by the long-press controls, split out
+// so that its ordering can be tested without a soundbar.
+type keyPress struct {
+	send    func(ctx context.Context, key, duration string) error
+	ack     func(ctx context.Context, wait time.Duration) error
+	release func(ctx context.Context, limit time.Duration) error
+	gap     time.Duration
+}
+
+func (d *device) keyPresser() keyPress {
+	return keyPress{
+		send:    func(ctx context.Context, key, duration string) error { return d.cli(ctx, "mw.iom.se", key, duration) },
+		ack:     d.acknowledge,
+		release: d.waitKeysReleased,
+		gap:     avSyncPressGap,
+	}
+}
+
+// press sends one key and returns once the firmware has executed it and the
+// key is released. Accepting the cli request does not mean the firmware ran
+// it, and before the hold starts the keys still look idle, so the existing
+// acknowledgement marker must be consumed first; it is queued behind the
+// key, hence a wait longer than the hold.
+func (k keyPress) press(ctx context.Context, key, duration string) error {
+	ms, e := strconv.Atoi(duration)
+	if e != nil || ms <= 0 || ms > 10000 {
+		return errors.New("invalid key duration")
+	}
+	if e := k.send(ctx, key, duration); e != nil {
 		return e
 	}
-	if e := d.waitKeysReleased(ctx, 8*time.Second); e != nil {
+	if e := k.ack(ctx, time.Duration(ms)*time.Millisecond+3*time.Second); e != nil {
+		return fmt.Errorf("key was not acknowledged: %w", e)
+	}
+	if e := k.release(ctx, 8*time.Second); e != nil {
 		return e
 	}
-	time.Sleep(avSyncPressGap)
+	time.Sleep(k.gap)
 	return nil
+}
+
+func (d *device) avSyncPress(ctx context.Context, key, duration string) error {
+	return d.keyPresser().press(ctx, key, duration)
+}
+
+// avSyncSteps is the sync-mode part of the audio sync control.
+type avSyncSteps struct {
+	press    func(ctx context.Context, key, duration string) error
+	shown    func(ctx context.Context) bool // audio sync message on the display
+	delay    func() (uint32, error)         // saved delay, config 375
+	volume   func() (uint32, error)
+	cooldown func(last time.Time) // keeps the lock until sync mode has closed
+}
+
+// run enters sync mode and steps the delay. Once the hold has been sent, every
+// exit, including errors and an expired request, waits for the bar to leave
+// sync mode: until then + and - change the delay instead of the volume.
+func (a avSyncSteps) run(ctx context.Context, key string, steps, target int, volume uint32) (err error) {
+	last := time.Now()
+	press := func(k, duration string) error {
+		e := a.press(ctx, k, duration)
+		last = time.Now()
+		return e
+	}
+	defer func() { a.cooldown(last) }()
+	if e := press(avSyncKey, avSyncHold); e != nil {
+		return e
+	}
+	// The hold alone shows the audio sync message (26): confirm sync mode
+	// before any + so that a missed hold never reaches the volume.
+	if !a.shown(ctx) {
+		return errors.New("audio sync mode did not open; nothing else was sent")
+	}
+	// Display-only press: must change neither the delay nor the volume.
+	if e := press("0x6f000", "60"); e != nil {
+		return e
+	}
+	if v, e := a.volume(); e != nil || v != volume {
+		if e == nil && v == volume+1 {
+			_ = press("0x6f001", "60")
+		}
+		return errors.New("audio sync mode did not open; volume was restored, nothing changed")
+	}
+	for i := 0; i < steps; i++ {
+		previous, e := a.delay()
+		if e != nil {
+			return errors.New("audio sync value unavailable")
+		}
+		if int(previous) == target {
+			break
+		}
+		if e := press(key, "60"); e != nil {
+			return e
+		}
+		now, e := a.delay()
+		if e != nil {
+			return errors.New("audio sync value unavailable")
+		}
+		if now == previous {
+			return fmt.Errorf("audio sync stopped at %d ms (limit reached)", now)
+		}
+	}
+	return nil
+}
+
+// avSyncCooldown waits until sync mode has closed after the last press. It
+// deliberately ignores the request context, which may already have expired.
+func avSyncCooldown(last time.Time) {
+	if wait := time.Until(last.Add(avSyncWindowClosed)); wait > 0 {
+		time.Sleep(wait)
+	}
 }
 
 func (d *device) avSyncAction(ctx context.Context, target int) (state, error) {
@@ -124,52 +227,16 @@ func (d *device) avSyncAction(ctx context.Context, target int) (state, error) {
 		return before, nil
 	}
 	volume := *before.Volume
-	e = d.withEQConsole(ctx, func(ctx context.Context) error {
-		if e := d.avSyncPress(ctx, avSyncKey, avSyncHold); e != nil {
-			return e
-		}
-		// The hold alone shows the audio sync message (26): confirm sync mode
-		// before any + so that a missed hold never reaches the volume.
-		if !d.waitDisplay(ctx, time.Second, func(message, _ uint32) bool { return message == msgAudioSync }) {
-			return errors.New("audio sync mode did not open; nothing else was sent")
-		}
-		// Display-only press: must change neither the delay nor the volume.
-		if e := d.avSyncPress(ctx, "0x6f000", "60"); e != nil {
-			return e
-		}
-		if v, e := d.configByte(50); e != nil || v != volume {
-			if e == nil && v == volume+1 {
-				_ = d.avSyncPress(ctx, "0x6f001", "60")
-			}
-			return errors.New("audio sync mode did not open; volume was restored, nothing changed")
-		}
-		for i := 0; i < steps; i++ {
-			previous, e := d.configByte(avSyncConfig)
-			if e != nil {
-				return errors.New("audio sync value unavailable")
-			}
-			if int(previous) == target {
-				break
-			}
-			if e := d.avSyncPress(ctx, key, "60"); e != nil {
-				return e
-			}
-			now, e := d.configByte(avSyncConfig)
-			if e != nil {
-				return errors.New("audio sync value unavailable")
-			}
-			if now == previous {
-				return fmt.Errorf("audio sync stopped at %d ms (limit reached)", now)
-			}
-		}
-		// Keep the lock until the bar leaves audio sync mode.
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(avSyncWindowClosed):
-		}
-		return nil
-	})
+	sync := avSyncSteps{
+		press: d.avSyncPress,
+		shown: func(ctx context.Context) bool {
+			return d.waitDisplay(ctx, time.Second, func(m, _ uint32) bool { return m == msgAudioSync })
+		},
+		delay:    func() (uint32, error) { return d.configByte(avSyncConfig) },
+		volume:   func() (uint32, error) { return d.configByte(50) },
+		cooldown: avSyncCooldown,
+	}
+	e = d.withEQConsole(ctx, func(ctx context.Context) error { return sync.run(ctx, key, steps, target, volume) })
 	after := d.snapshotCurrent()
 	if e != nil {
 		return after, e
