@@ -207,7 +207,7 @@ func (d *device) centerAction(ctx context.Context, action string) (state, error)
 	}
 	c := &d.center
 	c.level, c.problem = next, ""
-	c.appliedStart, c.wasOn, c.passes = d.start, true, 2
+	c.markApplied(d.start, time.Now())
 	if e := saveCenterLevel(centerLevelPath, next); e != nil {
 		c.problem = "center level applied but not saved: " + e.Error()
 		return d.snapshotCurrent(), errors.New(c.problem)
@@ -219,16 +219,17 @@ func (d *device) centerAction(ctx context.Context, action string) (state, error)
 // once shortly after wake (or a firmware restart), then once more to cover
 // a late amplifier initialisation. Writes are idempotent.
 func (c *centerController) centerDue(on bool, start string, now time.Time) bool {
-	if c.level == centerDefault {
-		c.wasOn = on
-		return false
-	}
 	if !on {
 		c.wasOn = false
 		return false
 	}
+	// Track wakes at every level, so that a level chosen just after a wake
+	// still gets the remaining passes.
 	if !c.wasOn || c.appliedStart != start {
 		c.wasOn, c.wakeAt, c.passes, c.appliedStart = true, now, 0, start
+	}
+	if c.level == centerDefault {
+		return false
 	}
 	switch {
 	case c.passes == 0 && now.Sub(c.wakeAt) >= centerWakeSettle:
@@ -237,6 +238,19 @@ func (c *centerController) centerDue(on bool, start string, now time.Time) bool 
 		return true
 	}
 	return false
+}
+
+// markApplied records a level written by the control. The amplifiers can
+// still reload their defaults shortly after a wake, so the wake passes are
+// kept (or started, when the monitor has not seen the wake yet) and re-apply
+// the new level; only a change long after the wake skips them.
+func (c *centerController) markApplied(start string, now time.Time) {
+	switch {
+	case !c.wasOn || c.appliedStart != start:
+		c.wasOn, c.wakeAt, c.passes, c.appliedStart = true, now, 0, start
+	case now.Sub(c.wakeAt) >= centerWakeConfirm:
+		c.passes = 2
+	}
 }
 
 func (r *remote) monitorCenter(ctx context.Context) {
