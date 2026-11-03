@@ -141,13 +141,13 @@ func TestAVSyncCooldownOnEveryExit(t *testing.T) {
 		ok      bool
 		presses int
 	}{
-		{"success", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0, 10, 10, 20}}, true, 4},
+		{"success", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0, 10, 10, 20}}, true, 3},
 		{"hold failed", context.Background(), fakeSync{pressErr: map[int]error{0: errors.New("cli failed")}}, false, 1},
 		{"sync mode not shown", context.Background(), fakeSync{volume: 8}, false, 1},
-		{"volume moved", context.Background(), fakeSync{shown: true, volume: 9}, false, 3},
-		{"delay read failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0}}, false, 3},
-		{"limit reached", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{250, 250}}, false, 3},
-		{"step press failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0}, pressErr: map[int]error{2: errors.New("cli failed")}}, false, 3},
+		{"volume moved", context.Background(), fakeSync{shown: true, volume: 9, delays: []uint32{0}}, false, 3},
+		{"delay read failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0}}, false, 2},
+		{"limit reached", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{250, 250}}, false, 2},
+		{"step press failed", context.Background(), fakeSync{shown: true, volume: 8, delays: []uint32{0}, pressErr: map[int]error{1: errors.New("cli failed")}}, false, 2},
 		{"request expired", expired, fakeSync{shown: true, volume: 8}, false, 1},
 	} {
 		f := c.f
@@ -172,5 +172,21 @@ func TestAVSyncCooldownIgnoresExpiredRequests(t *testing.T) {
 	avSyncCooldown(start.Add(-avSyncWindowClosed - time.Second))
 	if time.Since(start) > 20*time.Millisecond {
 		t.Fatal("no wait once sync mode has closed")
+	}
+}
+
+func TestAVSyncFirstPressChangesTheDelay(t *testing.T) {
+	// The hold already shows the delay: one step down from 20 ms is one press.
+	f := fakeSync{shown: true, volume: 8, delays: []uint32{20, 10}}
+	if e := f.steps().run(context.Background(), "0x6f001", 1, 10, 8); e != nil {
+		t.Fatal(e)
+	}
+	if !reflect.DeepEqual(f.presses, []string{avSyncKey, "0x6f001"}) {
+		t.Fatalf("presses %v", f.presses)
+	}
+	// A step that reached the volume instead is undone with the opposite key.
+	f = fakeSync{shown: true, volume: 7, delays: []uint32{20}}
+	if f.steps().run(context.Background(), "0x6f001", 1, 10, 8) == nil || !reflect.DeepEqual(f.presses, []string{avSyncKey, "0x6f001", "0x6f000"}) {
+		t.Fatalf("volume step not undone: %v", f.presses)
 	}
 }

@@ -10,9 +10,9 @@ import (
 
 // Audio sync (lip-sync delay), as described in the owner's manual: hold the
 // remote's TV key for more than three seconds, release, then press + or -
-// within five seconds. The hold shows the audio sync message on the front
-// display, which is checked before any + or -. The first press only shows the
-// current delay; each following press changes it by 10 ms. The saved delay is config 375, in ms,
+// within five seconds. The hold opens sync mode and shows the current delay
+// (audio sync message on the front display, checked before any + or -); each
+// following press changes it by 10 ms. The saved delay is config 375, in ms,
 // so every step is confirmed by read-back.
 //
 // The bar stays in audio sync mode for five seconds after the last press and
@@ -148,16 +148,6 @@ func (a avSyncSteps) run(ctx context.Context, key string, steps, target int, vol
 	if !a.shown(ctx) {
 		return errors.New("audio sync mode did not open; nothing else was sent")
 	}
-	// Display-only press: must change neither the delay nor the volume.
-	if e := press("0x6f000", "60"); e != nil {
-		return e
-	}
-	if v, e := a.volume(); e != nil || v != volume {
-		if e == nil && v == volume+1 {
-			_ = press("0x6f001", "60")
-		}
-		return errors.New("audio sync mode did not open; volume was restored, nothing changed")
-	}
 	for i := 0; i < steps; i++ {
 		previous, e := a.delay()
 		if e != nil {
@@ -168,6 +158,20 @@ func (a avSyncSteps) run(ctx context.Context, key string, steps, target int, vol
 		}
 		if e := press(key, "60"); e != nil {
 			return e
+		}
+		// Second safeguard after the display check: the first step must not
+		// have reached the volume.
+		if i == 0 {
+			if v, e := a.volume(); e != nil || v != volume {
+				if e == nil && (v == volume+1 || v+1 == volume) {
+					undo := "0x6f001"
+					if v < volume {
+						undo = "0x6f000"
+					}
+					_ = press(undo, "60")
+				}
+				return errors.New("audio sync mode did not open; volume was restored, nothing changed")
+			}
 		}
 		now, e := a.delay()
 		if e != nil {
