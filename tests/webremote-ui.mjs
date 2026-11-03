@@ -8,7 +8,7 @@ const root = new URL('../', import.meta.url);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const systemFixture = () => ({sample:1,cpu_percent:18.2,cpu_cores:2,load_average:[0.21,0.14,0.09],memory:{total_bytes:268435456,available_bytes:146800640,used_bytes:121634816},storage:{total_bytes:134217728,available_bytes:100663296,used_bytes:33554432},network:{receive_bytes_per_second:16384,transmit_bytes_per_second:1536},uptime_seconds:90300,processes:64,temperature_c:46.5});
 const eqFixture = () => ({available:true,enabled:false,gains_db:[0,0,0,0,0],frequencies_hz:[125,500,2000,4000,8000],status:'original'});
-const initial = () => ({eq:eqFixture(),system:systemFixture(),available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, source_state:0, hostname:'jbl.local', csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,center:0,atmos:1,rear:2,rear_docked:true,night:false,av_sync_ms:20}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,media_ready:true,audio:'Disconnected',name:'My speaker'}});
+const initial = () => ({eq:eqFixture(),system:systemFixture(),available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, source_state:0, hostname:'jbl.local', csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,center:0,atmos:1,rear:2,rear_docked:true,rear_battery_left:80,rear_battery_right:90,night:false,av_sync_ms:20}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,media_ready:true,audio:'Disconnected',name:'My speaker'}});
 let state = initial(), calls = [], lastPayload = null, delay = 300, failure = '', offline = false, getDelay = 0, advertisedControls = null;
 const streams=new Set(); let stateGets=0, streamGets=0, revision=0, lastSnapshot='';
 function snapshot() {
@@ -86,13 +86,25 @@ const browser = await chromium.launch({headless:true});
 let checks=0;
 function check(value,message) {assert.ok(value,message);checks++;}
 try {
-  const page = await browser.newPage({viewport:{width:390,height:844}, reducedMotion:'reduce'});
+  const page = await browser.newPage({locale:'en-US',viewport:{width:390,height:844}, reducedMotion:'reduce'});
   const errors=[]; page.on('pageerror',error=>errors.push(error.message));
   const url='http://127.0.0.1:'+server.address().port;
   await page.goto(url);
   await page.waitForFunction(()=>document.querySelector('#connection').dataset.state==='online');
   check(stateGets===0 && streamGets===1,'initial state uses one push connection');
   check(await page.locator('h1').count()===1,'one clear page heading');
+  check(await page.locator('#system-panel .rear-battery-panel').count()===1 && await page.locator('.mode-panel .rear-battery-panel').count()===0,'rear battery indicators belong to System monitor');
+  check(await page.locator('#rear-battery-left').textContent()==='Left: 80%' && await page.locator('#rear-battery-right-meter').getAttribute('value')==='90','independent rear battery levels render with meters');
+  for (const [value,level,color] of [[19,'critical','#ed8585'],[20,'low','#e7c66a'],[39,'low','#e7c66a'],[40,'normal','#b6dba9']]) {
+    state.sound.rear_battery_left=value;
+    await page.waitForFunction(v=>document.querySelector('#rear-battery-left-meter').value===v,value);
+    check(await page.locator('#rear-battery-left-meter').getAttribute('data-level')===level && await page.locator('#rear-battery-left-meter').evaluate(e=>getComputedStyle(e).getPropertyValue('--battery-color').trim())===color,'battery threshold color at '+value+'%');
+  }
+  state.sound.rear_battery_left=0;delete state.sound.rear_battery_right;
+  await page.waitForFunction(()=>document.querySelector('#rear-battery-left').textContent==='Left: 0%');
+  check(await page.locator('#rear-battery-right').textContent()==='Right: Unavailable' && await page.locator('#rear-battery-right-meter').isHidden(),'zero is a real reading and missing side has no misleading meter');
+  state.sound.rear_battery_left=80;state.sound.rear_battery_right=90;
+  await page.waitForFunction(()=>document.querySelector('#rear-battery-left').textContent==='Left: 80%');
   state.automation={enabled:true,engine:'go',status:'WAITING_FOR_POWER_ON'};
   await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Go · Waiting for power-on');
   check(true,'Go automation engine and state appear in device details');
@@ -503,6 +515,7 @@ try {
   check((await page.locator('#cast-eq').textContent())==='Low 0 dB · High -2 dB (read only)','Cast tone readback shown without unsafe controls');
   for (const width of [320,390,1024]) {
     await page.setViewportSize({width,height:900});
+    check(await page.locator('#rear-battery-left-meter').evaluate(e=>{const a=e.getBoundingClientRect(),b=document.querySelector('#storage-progress').getBoundingClientRect();return a.height===b.height && Math.abs(a.width-b.width)<1;}),'battery bar matches Storage dimensions at '+width);
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'long media metadata fits at '+width);
     check(await page.locator('.transport button').evaluateAll(buttons=>buttons.every(button=>{const r=button.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.left>=0 && r.right<=innerWidth;})),'four 44px transport targets fit at '+width);
   }

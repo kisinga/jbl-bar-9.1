@@ -150,3 +150,23 @@ func TestBluetoothSelectionUsesSourceState(t *testing.T) {
 		t.Fatal("validated source-state ignored")
 	}
 }
+
+func TestEQResetBeforeControl(t *testing.T) {
+	for _, c := range []struct {
+		action string
+		on     bool
+		want   bool
+	}{
+		{"power", false, false}, // waking must not wait for an EQ restore that needs the bar on
+		{"power", true, true},
+		{"input_hdmi", true, true},
+		{"bass_next", true, true},
+		{"volume_up", true, false},
+		{"mute", false, false},
+		{"media_play", true, false},
+	} {
+		if got := eqResetBefore(c.action, c.on); got != c.want {
+			t.Fatalf("%s (on=%v): got %v", c.action, c.on, got)
+		}
+	}
+}

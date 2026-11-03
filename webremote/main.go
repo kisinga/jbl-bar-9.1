@@ -518,6 +518,21 @@ func actionObserved(action string, before, after state) bool {
 	}
 	return false
 }
+
+// eqResetBefore reports whether an active Front EQ must be restored before a
+// control. Volume, mute and playback leave it in place. Power from standby is
+// sent without it: the restore needs the bar on with an audio route, so it
+// would fail and block the only control that can wake the bar; the EQ monitor
+// restores the tuning once the bar is on.
+func eqResetBefore(action string, on bool) bool {
+	switch {
+	case action == "mute" || action == "volume_up" || action == "volume_down" || strings.HasPrefix(action, "media_"):
+		return false
+	case action == "power" && !on:
+		return false
+	}
+	return true
+}
 func controlBusy() bool {
 	if _, e := os.Stat("/tmp/jbl-standard-hook-active"); e == nil {
 		return true
@@ -533,7 +548,7 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	if !simple && action != "standard" && action != "smart" && action != "night_toggle" {
 		return out, errors.New("unknown control")
 	}
-	if d.eq.active && action != "mute" && action != "volume_up" && action != "volume_down" && !strings.HasPrefix(action, "media_") {
+	if d.eq.active && eqResetBefore(action, d.powerOn()) {
 		if e := d.resetFrontEQ(ctx); e != nil {
 			return d.snapshotCurrent(), e
 		}

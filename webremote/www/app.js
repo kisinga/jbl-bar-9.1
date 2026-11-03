@@ -400,6 +400,15 @@ function renderPlayback(s, ready, awake) {
 }
 function renderExtras(s, ready, awake) {
   const sound=s.sound || {};
+  for (const [side,label] of [['left','Left'],['right','Right']]) {
+    const value = sound['rear_battery_' + side];
+    const available = ready && Number.isInteger(value) && value >= 0 && value <= 100;
+    $('rear-battery-' + side).textContent = label + ': ' + (available ? value + '%' : 'Unavailable');
+    const meter = $('rear-battery-' + side + '-meter');
+    meter.hidden = !available;
+    meter.value = available ? value : 0;
+    meter.dataset.level = !available ? 'unknown' : value < 20 ? 'critical' : value < 40 ? 'low' : 'normal';
+  }
   $('night-value').textContent = sound.night == null ? 'Unavailable' : sound.night ? 'On' : 'Off';
   $('night-label').textContent = active === 'night_toggle' ? 'Changing…' : sound.night ? 'Turn off' : 'Turn on';
   $('night').setAttribute('aria-pressed', String(sound.night === true));

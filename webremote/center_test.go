@@ -148,3 +148,46 @@ func TestCenterReapplyAfterWake(t *testing.T) {
 		t.Fatal("not re-applied after a firmware restart")
 	}
 }
+
+func TestCenterChangeSoonAfterWakeIsReapplied(t *testing.T) {
+	wake := time.Unix(2000, 0)
+	// Level chosen 2 s after a wake the monitor already saw (at level 0).
+	c := centerController{level: centerDefault, loaded: true}
+	if c.centerDue(true, "s1", wake) {
+		t.Fatal("default level must never write")
+	}
+	c.level = 3
+	c.markApplied("s1", wake.Add(2*time.Second))
+	if !c.centerDue(true, "s1", wake.Add(4*time.Second)) {
+		t.Fatal("new level not re-applied by the settle pass")
+	}
+	c.passes++
+	if !c.centerDue(true, "s1", wake.Add(15*time.Second)) {
+		t.Fatal("new level not re-applied by the confirmation pass")
+	}
+	// Level chosen before the monitor noticed the wake: passes start from the change.
+	c = centerController{level: 2, loaded: true}
+	change := wake.Add(time.Second)
+	c.markApplied("s1", change)
+	if c.centerDue(true, "s1", change.Add(3*time.Second)) || !c.centerDue(true, "s1", change.Add(4*time.Second)) {
+		t.Fatal("passes must start from an unobserved wake")
+	}
+	// Long after the wake, the written level is final.
+	c = centerController{level: 1, loaded: true}
+	c.centerDue(true, "s1", wake)
+	c.passes = 2
+	c.level = 4
+	c.markApplied("s1", wake.Add(time.Minute))
+	if c.centerDue(true, "s1", wake.Add(2*time.Minute)) {
+		t.Fatal("no extra writes long after the wake")
+	}
+	// A change between the two passes keeps the confirmation pass.
+	c = centerController{level: 1, loaded: true}
+	c.centerDue(true, "s1", wake)
+	c.passes = 1
+	c.level = 5
+	c.markApplied("s1", wake.Add(8*time.Second))
+	if !c.centerDue(true, "s1", wake.Add(15*time.Second)) {
+		t.Fatal("confirmation pass lost after a change between passes")
+	}
+}
