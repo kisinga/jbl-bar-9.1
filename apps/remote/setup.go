@@ -194,10 +194,8 @@ func (d *device) setupPrepare(ctx context.Context) (state, error) {
 	if !d.powerOn() {
 		return d.snapshotCurrent(), errors.New("turn the bar on first")
 	}
-	if d.eq.active {
-		if e := d.resetFrontEQ(ctx); e != nil {
-			return d.snapshotCurrent(), e
-		}
+	if e := d.resetFrontEQBefore(ctx, "setup"); e != nil {
+		return d.snapshotCurrent(), e
 	}
 	before := d.snapshotLocked()
 	if !before.Available {

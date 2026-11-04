@@ -141,6 +141,8 @@ Application uses native custom DSP mode 5. It is not proven equivalent to stock 
 
 EQ is temporary: restart returns to original tuning, and web power/source/sound changes reset it first. The monitor also attempts a reset when the native route changes. Other native controls, standby/CEC and HDMI/eARC/Cast layouts still need qualification; Bluetooth has audible confirmation. Recovery files belong in `/var/JBLRemote`; preserve them after an error and try **Reset**. Do not edit another program’s `/mnt/ubi_boot/temp.json` or remove recovery files to force an unsupported route.
 
+The bar often leaves the qualified EQ route by itself: Smart Mode returns after wake, and HDMI Dolby uses the film page `0x840002`. On 4 Nov 2026, with an EQ applied on Bluetooth, the bar on HDMI in Smart Mode read native mode 2 and cache 2 on page `0x840002`: the custom mode (5) no longer played, yet the pending reset refused every native control, Standard included. When the full reader rejects the route, a narrow read-only reader of the HPP mode now decides. If the mode is not 5, controls proceed and the reset stays pending; the monitor confirms it (mode, preset and saved baseline) once Standard Bluetooth playback returns. If the mode is still 5, or cannot be read, input changes and Standard proceed, since both lead back to where Reset works, and other controls are refused with that instruction. Other reset failures still refuse the control. No new DSP write is involved.
+
 ### Install and remove
 
 Check that no unrelated installation owns `/var/JBLRemote`. Copy the output directory over SFTP, then install:

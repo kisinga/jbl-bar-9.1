@@ -575,8 +575,8 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 	if !simple && action != "standard" && action != "smart" && action != "night_toggle" {
 		return out, errors.New("unknown control")
 	}
-	if d.eq.active && eqResetBefore(action, d.powerOn()) {
-		if e := d.resetFrontEQ(ctx); e != nil {
+	if eqResetBefore(action, d.powerOn()) {
+		if e := d.resetFrontEQBefore(ctx, action); e != nil {
 			return d.snapshotCurrent(), e
 		}
 	}
