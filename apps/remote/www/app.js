@@ -233,7 +233,7 @@ async function pump() {
   const action = active;
   const requestPeer = playback.identity(current);
   try {
-    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(capabilities.command(action,gains,syncTarget,parameters)), signal: AbortSignal.timeout(action==='av_sync_set'?70000:30000)});
+    const response = await fetch('/api/action', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(capabilities.command(action,gains,syncTarget,parameters)), signal: AbortSignal.timeout(action==='av_sync_set'?70000:action.startsWith('eq_')?35000:30000)});
     const text = await response.text();
     let data;
     try { data = JSON.parse(text); } catch { throw new Error(text.trim() || 'Control unavailable. Refresh and try again.'); }

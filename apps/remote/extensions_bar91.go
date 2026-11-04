@@ -10,13 +10,17 @@ import (
 	"jbl-bar-toolkit/remote/internal/extension"
 )
 
+// bar91ActionAliases maps the v1 action names to the namespaced extension
+// actions. Execute and the reply-timeout policy both resolve through it.
+var bar91ActionAliases = map[string]string{
+	"eq_apply": "bar91.front-eq.apply", "eq_reset": "bar91.front-eq.reset",
+	"center_next": "bar91.center-level.next",
+}
+
 // Model composition is explicit. A future family backend registers only the
 // features it has qualified; it does not reuse 9.1 native actions or EQ tuning.
 func (r *remote) registerBar91Extensions() error {
-	r.actionAliases = map[string]string{
-		"eq_apply": "bar91.front-eq.apply", "eq_reset": "bar91.front-eq.reset",
-		"center_next": "bar91.center-level.next",
-	}
+	r.actionAliases = bar91ActionAliases
 	eq := func(action string) extension.Handler[state] {
 		return func(ctx context.Context, data json.RawMessage) (state, error) {
 			var parameters struct {
