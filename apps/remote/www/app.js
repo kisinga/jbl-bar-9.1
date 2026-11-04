@@ -25,7 +25,7 @@ const bassOffset=createBassOffset(document.querySelector('.mode-panel'));
 const advanced=createAdvanced($('advanced'));
 const components=[bluetooth,sound,playback,system,equalizer,details,advanced,bassOffset];
 let syncTimer=null;
-const context=()=>({state:capabilities.state(current),deviceName:capabilities.name(),online,ready:online && !!current?.available,awake:current?.power==='On',active,queued:queue.length,csrf});
+const context=()=>({state:capabilities.state(current),deviceName:capabilities.name(),online,ready:online && !!current?.available,awake:current?.power==='On',active,queued:queue.length,pending:active?[active,...queue]:[...queue],csrf});
 function feedback(text, kind = '') {
   $('message-text').textContent = text;
   $('message').dataset.kind = kind;
@@ -66,7 +66,7 @@ function render() {
   buttons.forEach(b => {
     const action = b.dataset.action;
     b.disabled = !ready || !['On', 'Standby'].includes(s.power) || (action !== 'power' && !awake) || (pending && !(isVolume(action) && isVolume(active))) || ((action === 'standard' || action === 'smart') && !['Standard','Smart'].includes(s.mode));
-    b.classList.toggle('pending-control', action === active && !isVolume(action));
+    b.classList.toggle('pending-control', action === active && !isVolume(action) && !segment(b));
     b.setAttribute('aria-busy', String(action === active));
   });
   if (typeof s.muted !== 'boolean') $('mute').disabled = true;
@@ -209,6 +209,17 @@ function avSyncTap(action){
   },900);
   render();feedback('Audio sync '+advanced.target()+' ms · sending when you stop tapping…','pending');
 }
+// A segment (level or mode) becomes the confirmed steps that reach it, run
+// one by one through the same queue and capability mapping as other controls.
+const segment = button => button.dataset.value !== undefined || button.dataset.mode !== undefined;
+function choose(button) {
+  if (button.disabled || !csrf || active || queue.length) return;
+  clearSyncDraft();
+  const steps = sound.plan(button, capabilities.state(current));
+  if (!steps) return;
+  for (let i = 0; i < steps; i++) queue.push(button.dataset.action);
+  void pump();
+}
 function enqueue(action) {
   const button = buttons.find(b => b.dataset.action === action);
   if (!button || button.disabled || !csrf) return;
@@ -271,7 +282,8 @@ function stopHold() {
 buttons.forEach(button => {
   button.addEventListener('click', event => {
     // Pointer input is handled on down; keyboard and assistive clicks have detail 0.
-    if (!isVolume(button.dataset.action) || event.detail === 0) enqueue(button.dataset.action);
+    if (segment(button)) choose(button);
+    else if (!isVolume(button.dataset.action) || event.detail === 0) enqueue(button.dataset.action);
   });
   if (!isVolume(button.dataset.action)) return;
   button.addEventListener('pointerdown', event => {
