@@ -24,7 +24,10 @@ try {
   assert.match(await page.locator('#network').textContent(),/192\.168\.9\.0\/24/);
   await page.locator('#ssh').check();
   await page.locator('#password').fill('fixture-browser-password');
+  assert.equal(await page.locator('#memory').isDisabled(),true);
   await page.locator('#standard').check();
+  assert.equal(await page.locator('#memory').isDisabled(),false);
+  await page.locator('#memory').check();
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#download').click();
   const download = await downloadPromise;
@@ -33,6 +36,7 @@ try {
   assert.match(data,/^action=check$/m);
   assert.match(data,/^ssh=true$/m);
   assert.match(data,/^auto_standard=true$/m);
+  assert.match(data,/^smart_mode_memory=true$/m);
   assert.match(data,/^ssh_password_hash=\$6\$/m);
   assert(!data.includes('fixture-browser-password'));
   await page.waitForFunction(() => document.querySelector('#password').value==='');

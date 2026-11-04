@@ -14,7 +14,9 @@ from repo_layout import ROOT, REMOTE, REMOTE_DEVICE, bar91_profile
 from check_profiles import check as check_profiles
 
 
-def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None, auto_standard=False):
+def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None, auto_standard=False, smart_mode_memory=False):
+    if smart_mode_memory and not auto_standard:
+        raise ValueError("--smart-mode-memory needs --auto-standard")
     check_profiles()
     profile = bar91_profile()
     network = ipaddress.ip_network(allowed_cidr, strict=False)
@@ -39,6 +41,7 @@ def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None, auto_stan
                    cwd=REMOTE, env=env, check=True)
     (output / "config.json").write_text(json.dumps({
         "listen": ":80", "allowed_cidr": str(network), "auto_standard": bool(auto_standard),
+        "smart_mode_memory": bool(smart_mode_memory),
     }, indent=2) + "\n")
     (output / "config.json").chmod(0o600)
     (output / "OWNER.txt").write_text("JBL_WEB_REMOTE_REV1\n")
@@ -58,5 +61,6 @@ if __name__ == "__main__":
     parser.add_argument("--bluetooth-helper", type=Path, help="Optional native AVRCP helper built with tools/build_bt.py")
     parser.add_argument("--eq-parser", type=Path, help="Optional native EQ parser built with tools/build_eq.py")
     parser.add_argument("--auto-standard", action="store_true", help="Let Go own automatic Standard Mode after wake")
+    parser.add_argument("--smart-mode-memory", action="store_true", help="With --auto-standard: after wake, restore the mode chosen before standby")
     args = parser.parse_args()
-    print("Private device files:", build(args.output, args.allowed_cidr, args.bluetooth_helper, args.eq_parser, args.auto_standard))
+    print("Private device files:", build(args.output, args.allowed_cidr, args.bluetooth_helper, args.eq_parser, args.auto_standard, args.smart_mode_memory))

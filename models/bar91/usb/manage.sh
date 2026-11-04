@@ -149,7 +149,7 @@ if [ "$WEB_REMOTE" = true ] || [ "$AUTO_STANDARD" = true ]; then
     atomic_copy "$USB/files/remote-start.sh" "$REMOTE_STORE/start.sh" || finish REMOTE_COPY_FAILED 1
     headless=false
     [ "$WEB_REMOTE" = true ] || headless=true
-    printf '{"listen":":%s","allowed_cidr":"%s","auto_standard":%s,"headless":%s}\n' "$WEB_PORT" "$ALLOWED_CIDR" "$AUTO_STANDARD" "$headless" > "$REMOTE_STORE/config.json" || finish REMOTE_CONFIG_FAILED 1
+    printf '{"listen":":%s","allowed_cidr":"%s","auto_standard":%s,"smart_mode_memory":%s,"headless":%s}\n' "$WEB_PORT" "$ALLOWED_CIDR" "$AUTO_STANDARD" "${SMART_MODE_MEMORY:-false}" "$headless" > "$REMOTE_STORE/config.json" || finish REMOTE_CONFIG_FAILED 1
     "$BB" rm -f "$REMOTE_STORE/DISABLED" "$REMOTE_STORE/READY" || finish REMOTE_ENABLE_FAILED 1
     /bin/sh "$REMOTE_STORE/start.sh" || finish REMOTE_START_FAILED 1
     count=0
@@ -189,7 +189,7 @@ fi
 "$BB" sync
 "$BB" rm "$STORE/DISABLED" || finish ENABLE_FAILED 1
 {
-    printf 'SSH=%s (port 2222)\nWEB_REMOTE=%s\nAUTO_STANDARD=%s\n' "$SSH" "$WEB_REMOTE" "$AUTO_STANDARD"
+    printf 'SSH=%s (port 2222)\nWEB_REMOTE=%s\nAUTO_STANDARD=%s\nSMART_MODE_MEMORY=%s\n' "$SSH" "$WEB_REMOTE" "$AUTO_STANDARD" "${SMART_MODE_MEMORY:-false}"
     [ "$WEB_REMOTE" != true ] || printf 'WEB=http://jbl.local:%s (or the bar IP and port)\n' "$WEB_PORT"
     case "$WEB_PORT:$WEB_REMOTE" in 80:true) printf 'WEB_FALLBACK=http://<bar-ip>:8080\n';; 8080:true) printf 'WEB_FALLBACK=http://<bar-ip>\n';; esac
     printf 'Remove USB, restart, and verify selected features and normal controls.\n'

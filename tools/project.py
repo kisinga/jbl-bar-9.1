@@ -48,6 +48,7 @@ def configuration(model: str, subnet: str, features: str, action: str) -> bytes:
     text = ('format=1\naction=' + action + '\nssh=' + str('ssh' in selected).lower() +
             '\nweb_remote=' + str('web' in selected).lower() +
             '\nauto_standard=' + str('auto-standard' in selected).lower() +
+            '\nsmart_mode_memory=' + str('smart-mode-memory' in selected).lower() +
             '\nallowed_cidr=' + subnet + '\nweb_port=80\n')
     data = text.encode('ascii')
     build_usb.parse_config(data)
@@ -125,7 +126,7 @@ def main(argv=None) -> int:
     build.add_argument('--model', default='auto', help='auto (default), or a reviewed hardware target')
     build.add_argument('--config', type=Path, help='Local config with settings and optional credentials')
     build.add_argument('--allowed-cidr', help='Your actual trusted LAN subnet')
-    build.add_argument('--features', help='web,ssh,auto-standard (default: web)')
+    build.add_argument('--features', help='web,ssh,auto-standard,smart-mode-memory (default: web)')
     build.add_argument('--action', choices=('check', 'install', 'migrate'), help='Default: check')
     build.add_argument('--mount', type=Path)
     build.add_argument('--output-dir', type=Path)

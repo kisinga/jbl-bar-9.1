@@ -99,6 +99,8 @@ python3 tools/build_web.py --allowed-cidr <trusted-lan-subnet> --auto-standard \
   --bluetooth-helper build/bt-remote --eq-parser build/eq-parser
 ```
 
+Add `--smart-mode-memory` as well to restore the mode chosen before standby instead of always selecting Standard ([USB setting](USB-TOOLKIT.md) `smart_mode_memory`). The wake then completes without a gesture when Smart is remembered (status `SMART_KEPT_THIS_WAKE`, `remembered_mode` in the automation state). A mode is remembered once the wake is handled and it has stayed five one-second samples, awake with idle keys and the same firmware process; it is written to `/var/JBLRemote/smart-mode.json` only when it changes. Standby with Standard, then wake, still needs a device record for this option.
+
 Go shares native controls, locking and readback with the web interface. An OS-held ownership lock excludes duplicate Go automation and recovery commands. It samples readiness every second, requires three stable awake samples, and acts once per wake. Standby has no deadline. Manual Smart selection is respected until the next standby or service/firmware restart. A failed gesture stops automatic attempts for that wake and leaves the reason in the page’s device details and `remote.log`.
 
 An installed revision 5/6 shell helper is verified, paused with an owned `DISABLED` marker and retained intact. Unknown/modified helpers and existing manual disable flags are preserved. No legacy helper is required if SSH and the web service are already available. The original button sequence is still used; this is not a direct native Smart Mode setter.

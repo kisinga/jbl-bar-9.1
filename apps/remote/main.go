@@ -32,10 +32,13 @@ import (
 )
 
 type config struct {
-	Headless     bool   `json:"headless"`
-	AutoStandard bool   `json:"auto_standard"`
-	Listen       string `json:"listen"`
-	AllowedCIDR  string `json:"allowed_cidr"`
+	Headless     bool `json:"headless"`
+	AutoStandard bool `json:"auto_standard"`
+	// SmartModeMemory restores the mode chosen before standby instead of
+	// always selecting Standard; it needs AutoStandard.
+	SmartModeMemory bool   `json:"smart_mode_memory"`
+	Listen          string `json:"listen"`
+	AllowedCIDR     string `json:"allowed_cidr"`
 }
 type bluetoothState struct {
 	peer         string // Current peer address stays inside native control code.
@@ -803,6 +806,9 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 func newRemote(cfg config) (*remote, error) {
 	if cfg.Headless && !cfg.AutoStandard {
 		return nil, errors.New("headless mode requires auto_standard")
+	}
+	if cfg.SmartModeMemory && !cfg.AutoStandard {
+		return nil, errors.New("smart_mode_memory requires auto_standard")
 	}
 	_, network, e := net.ParseCIDR(cfg.AllowedCIDR)
 	if e != nil {

@@ -112,6 +112,12 @@ try {
   state.automation={enabled:true,engine:'go',status:'AUTOMATION_FAILED',error:'Automatic retry stopped'};
   await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Automatic retry stopped');
   check(true,'automation failure shows its reason instead of claiming Standard selected');
+  state.automation={enabled:true,engine:'go',status:'SMART_KEPT_THIS_WAKE',remembered_mode:'Smart'};
+  await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Go · Smart Mode kept, as before standby · after standby: Smart');
+  check(true,'remembered Smart Mode is kept and named in device details');
+  state.automation={enabled:true,engine:'go',status:'AWAKE_STABILIZING_3',remembered_mode:'Standard'};
+  await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Go · Checking the mode after wake… · after standby: Standard');
+  check(true,'the wake check does not claim Standard before deciding');
   delete state.automation;
   await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Standard selected for this wake');
 
