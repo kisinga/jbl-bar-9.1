@@ -66,6 +66,8 @@ type frontEQState struct {
 	Frequencies []int     `json:"frequencies_hz"`
 	Status      string    `json:"status"`
 	Error       string    `json:"error,omitempty"`
+	// Kept: an EQ is kept until Reset and applied again after the bar drops it.
+	Kept bool `json:"kept"`
 }
 type eqRecovery struct {
 	Owner        string `json:"owner"`
@@ -73,6 +75,9 @@ type eqRecovery struct {
 	BaselineHash string `json:"baseline_sha256"`
 	ProcessStart string `json:"process_start"`
 	BootID       string `json:"boot_id"`
+	// Levels the baseline was read at, so a recovery after level changes
+	// does not compare the native preset to another level's block.
+	Levels *eqLevels `json:"levels,omitempty"`
 }
 type eqController struct {
 	active, needsReset, recoveryChecked bool
@@ -81,6 +86,13 @@ type eqController struct {
 	registry                            []eqEntry
 	target, directory, problem          string
 	native                              eqNativeState
+	// Kept EQ (eq_keep.go): the EQ to apply again until Reset, the levels
+	// the baseline/expected blocks were made for, and the keeper's state.
+	keep, keptLoaded, levelsKnown, baselineStale bool
+	kept                                         [5]float64
+	levels                                       eqLevels
+	keepStable                                   int
+	keepBlocked, lastNote                        string
 }
 
 func eqDigest(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
@@ -211,6 +223,21 @@ func (m *eqController) prepare(ctx context.Context, block []byte) error {
 	return nil
 }
 func (d *device) frontEQStatus(s state) *frontEQState {
+	out := d.frontEQStatusNative(s)
+	m := &d.eq
+	if m.keep {
+		out.Kept = true
+		if !m.active {
+			// Show the kept EQ while it waits to be applied again.
+			out.Gains = append([]float64(nil), m.kept[:]...)
+			if out.Status != "reset_required" {
+				out.Status, out.Error = "waiting", eqKeepWaiting
+			}
+		}
+	}
+	return out
+}
+func (d *device) frontEQStatusNative(s state) *frontEQState {
 	m := &d.eq
 	out := &frontEQState{Enabled: m.active, Gains: append([]float64(nil), m.gains[:]...), Frequencies: []int{125, 500, 2000, 4000, 8000}, Status: "unavailable"}
 	if eqParserPayload == "" {
@@ -275,19 +302,21 @@ func (d *device) resetFrontEQ(ctx context.Context) (err error) {
 		m.needsReset = true
 		return e
 	}
-	muted, e := d.configByte(155)
-	if e != nil {
-		return e
-	}
-	defer func() {
-		if e := d.eqRestoreMute(muted != 0); e != nil {
-			err = e
-		}
-	}()
-	if e = d.eqMute(ctx, true); e != nil {
-		return e
-	}
+	// When the bar already returned to the native preset by itself (source
+	// change, Standard after Smart), there is nothing to switch: no mute.
 	if n.Mode != 0 || n.Cache != 0 {
+		muted, e := d.configByte(155)
+		if e != nil {
+			return e
+		}
+		defer func() {
+			if e := d.eqRestoreMute(muted != 0); e != nil {
+				err = e
+			}
+		}()
+		if e = d.eqMute(ctx, true); e != nil {
+			return e
+		}
 		if e = d.resetEQNative(ctx); e != nil {
 			m.needsReset = true
 			return e
@@ -302,11 +331,19 @@ func (d *device) resetFrontEQ(ctx context.Context) (err error) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	if len(m.baseline) == eqBlockSize && !bytes.Equal(n.Block, m.baseline) {
+	// The baseline is the native block for the levels the EQ was applied at.
+	// After the firmware recomputed the EQ for other levels, the native preset
+	// for the current levels is what returns; mode and cache confirm it.
+	comparable := !m.baselineStale
+	if lv, ok := d.eqLevels(); ok && m.levelsKnown && lv != m.levels {
+		comparable = false
+	}
+	if comparable && len(m.baseline) == eqBlockSize && !bytes.Equal(n.Block, m.baseline) {
 		m.needsReset = true
 		return errors.New("native preset returned, but tuning differs from the saved baseline")
 	}
 	m.active, m.needsReset = false, false
+	m.baselineStale, m.levelsKnown = false, false
 	m.gains = [5]float64{}
 	m.expected = nil
 	m.problem = ""
@@ -339,6 +376,13 @@ func (d *device) applyFrontEQ(ctx context.Context, gains [5]float64) (err error)
 	if controlBusy() || !d.idleKeys() {
 		return errors.New("sound controls are busy; retry shortly")
 	}
+	// A new EQ on top of one the firmware recomputed for other levels starts
+	// from the native preset of the current levels.
+	if m.active && m.baselineStale {
+		if e := d.resetFrontEQ(ctx); e != nil {
+			return e
+		}
+	}
 	n, e := d.readEQNative()
 	if e != nil {
 		return e
@@ -359,6 +403,8 @@ func (d *device) applyFrontEQ(ctx context.Context, gains [5]float64) (err error)
 		}
 		m.baseline = append([]byte(nil), n.Block...)
 		m.native = n
+		m.levels, m.levelsKnown = d.eqLevels()
+		m.baselineStale = false
 	}
 	recipe, expected, e := generateFrontEQ(m.baseline, m.defaults, m.registry, gains)
 	if e != nil {
@@ -378,6 +424,10 @@ func (d *device) applyFrontEQ(ctx context.Context, gains [5]float64) (err error)
 		}
 		target := filepath.Join(dir, "active.json")
 		record := eqRecovery{Owner: "JBL_FRONT_EQ_REV1", Target: target, BaselineHash: eqDigest(m.baseline), ProcessStart: d.start, BootID: eqBootID()}
+		if m.levelsKnown {
+			levels := m.levels
+			record.Levels = &levels
+		}
 		raw, _ := json.Marshal(record)
 		if e = eqWriteExclusive(eqBackupPath, m.baseline); e != nil {
 			os.RemoveAll(dir)
@@ -440,16 +490,26 @@ func (d *device) eqAction(ctx context.Context, action string, gains []float64) (
 		return d.snapshotCurrent(), e
 	}
 	var e error
+	if !d.eq.keptLoaded {
+		d.loadKeptFrontEQ()
+	}
 	if action == "eq_reset" {
 		if gains != nil {
 			e = errors.New("reset does not accept band values")
 		} else {
+			// Reset forgets the kept EQ, even while it waits to be applied again.
+			d.forgetKeptFrontEQ()
 			e = d.resetFrontEQ(ctx)
 		}
 	} else if action == "eq_apply" && len(gains) == 5 {
 		var bands [5]float64
 		copy(bands[:], gains)
 		e = d.applyFrontEQ(ctx, bands)
+		if bands == [5]float64{} {
+			d.forgetKeptFrontEQ()
+		} else if e == nil {
+			d.keepFrontEQGains(bands)
+		}
 	} else {
 		e = errors.New("provide five Front EQ values")
 	}
@@ -481,6 +541,9 @@ func (d *device) recoverFrontEQ(ctx context.Context) {
 	}
 	m.target, m.directory = record.Target, filepath.Dir(record.Target)
 	m.baseline = base
+	if record.Levels != nil {
+		m.levels, m.levelsKnown = *record.Levels, true
+	}
 	m.active, m.needsReset = true, true
 	// Start ticks can repeat across boots. Never compare a fresh calibration
 	// against a previous boot's snapshot, even if the process start matches.
@@ -514,13 +577,13 @@ func (r *remote) monitorFrontEQ(ctx context.Context) {
 			if !d.eq.recoveryChecked {
 				d.recoverFrontEQ(c)
 			}
+			if !d.eq.keptLoaded {
+				d.loadKeptFrontEQ()
+			}
 			if d.eq.active {
-				n, e := d.readEQNative()
-				if e != nil || n.Mode != 5 || n.outer != d.eq.native.outer || !bytes.Equal(n.Block, d.eq.expected) {
-					if e = d.resetFrontEQ(c); e != nil {
-						d.eq.problem = eqPendingProblem(e, d.readHPPMode)
-					}
-				}
+				d.followFrontEQ(c)
+			} else {
+				d.keepFrontEQ(c)
 			}
 			cancel()
 		}

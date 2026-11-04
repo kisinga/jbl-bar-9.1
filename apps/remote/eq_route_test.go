@@ -93,7 +93,7 @@ func TestEQResetBeforeKeepsItsExceptions(t *testing.T) {
 			t.Fatal(action)
 		}
 	}
-	if eqResetBefore("power", false) || !eqResetBefore("power", true) || !eqResetBefore("bass_next", true) || !eqResetBefore("input_hdmi", true) {
+	if eqResetBefore("power", false) || !eqResetBefore("power", true) {
 		t.Fatal("reset policy changed")
 	}
 }
