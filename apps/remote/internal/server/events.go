@@ -14,6 +14,10 @@ type Feed[S State] struct {
 	mu           sync.Mutex
 	clients      map[chan S]bool
 	lastRevision uint64
+	latest       S
+	hasLatest    bool
+	held         bool
+	control      Control
 }
 
 func (f *Feed[S]) Subscribe() (chan S, func()) {
@@ -32,7 +36,17 @@ func (f *Feed[S]) Publish(s S) {
 	if s.StateRevision() < f.lastRevision {
 		return
 	}
+	f.latest, f.hasLatest = s, true
+	f.broadcastLocked(s)
+}
+
+// broadcastLocked sends s, with the current control, to every client.
+func (f *Feed[S]) broadcastLocked(s S) {
+	if s.StateRevision() < f.lastRevision {
+		return
+	}
 	f.lastRevision = s.StateRevision()
+	s = f.withControlLocked(s)
 	for c := range f.clients {
 		select {
 		case c <- s:
@@ -92,7 +106,7 @@ func (r *Server[S]) stream(w http.ResponseWriter, q *http.Request) {
 		flusher.Flush()
 		return e == nil
 	}
-	if !send(r.backend.Snapshot()) {
+	if !send(r.snapshot()) {
 		return
 	}
 	var done <-chan struct{}

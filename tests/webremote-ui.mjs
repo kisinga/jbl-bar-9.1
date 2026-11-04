@@ -482,6 +482,13 @@ try {
   await page.locator('#mode-select [data-mode=Standard]').click();
   await page.waitForFunction(()=>document.querySelector('#mode-select [aria-checked=true]').textContent==='Standard');
   check(lastPayload?.action==='standard' && state.mode==='Standard','mode control returns to Standard');
+  state.control={busy:true,action:'av_sync_set',since:1}; await page.waitForFunction(()=>document.querySelector('#summary').textContent.includes('Another control is running'));
+  check(await page.locator('[data-action=volume_up]').isDisabled() && await page.locator('#mode-select [data-mode=Smart]').isDisabled() && await page.locator('[data-level=bass] [data-value="2"]').isDisabled() && await page.locator('#night').isDisabled() && (await page.locator('#summary').textContent()).includes('Another control is running'),'a control running elsewhere disables the shell and components and says so');
+  const busyCalls=calls.length; await page.locator('[data-action=volume_up]').click({force:true}); await pause(150);
+  check(calls.length===busyCalls,'nothing is sent while another control runs');
+  state.control={busy:false}; await page.waitForFunction(()=>!document.querySelector('#summary').textContent.includes('Another control is running')); await pause(100);
+  check(await page.locator('[data-action=volume_up]').isEnabled() && await page.locator('#night').isEnabled(),'controls return when the other control finishes');
+  delete state.control;
   check(await page.locator('#calibrate').isHidden() && await page.locator('#audio-format-row').isHidden(),'setup controls and audio format stay hidden on older remotes');
   state.setup={sub_pairing:false}; state.sound.audio_format='DOLBY SURROUND DD+'; await page.locator('#refresh').click(); await pause(200);
   check(await page.locator('#audio-format').textContent()==='DOLBY SURROUND DD+','audio format shown in Sound');
