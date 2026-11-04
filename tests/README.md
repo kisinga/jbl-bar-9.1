@@ -65,3 +65,8 @@ writing to GitHub. `webremote-ui.mjs` also produces sample README screenshots at
 `build/readme-remote.png` and `build/readme-advanced.png`. To refresh the public
 images after reviewing them, copy those to `docs/web-remote.png` and
 `docs/web-remote-advanced.png` respectively.
+
+The USB fixtures also cover automatic clean installation and legacy migration,
+updates with public packages that preserve private settings/SSH keys/tuning,
+same-package reinsertion, corrupt installed/USB payloads, changed hooks,
+preflight refusal, startup failure and recovery after an update.

@@ -11,17 +11,17 @@ for a prebuilt release. SSH and optional Wi-Fi credentials can be in this config
 the page derives them locally. Keep the configured USB private.
 Set action=check in JBLToolkit/config.txt. Insert with the bar fully on and wait
 FIVE MINUTES. Read CHECKS.txt, PREFLIGHT.txt, DIAGNOSTICS.txt, native-check.json and STATUS.txt on the computer.
-Require CHECK_PASSED_READY_FOR_INSTALL_OR_CONFIGURE. Existing installations are
-preserved and reported as blockers; do not delete them to bypass ownership checks.
+Require CHECK_PASSED_READY_FOR_INSTALL_OR_CONFIGURE. Recognized installations
+are checked for update or migration; do not delete them to bypass ownership checks.
 The check does not install services, change networking or press controls.
 
-INSTALL
+INSTALL / UPDATE
 1. Keep the matching recovery ZIP on your computer.
 2. Extract the install ZIP directly to a clean FAT32 USB root.
    Expect AutoScript/AutoScript and JBLToolkit/config.txt (no enclosing folder).
 3. In config.txt set the actual trusted LAN subnet and selected features.
-   Keep action=install. SETUP.html can prepare credentials locally in config.txt;
-   private owner builds can also bundle them separately.
+   Choose Install / update everything (action=update). SETUP.html can prepare
+   credentials locally in config.txt; private builds can bundle them separately.
 4. Turn the bar fully on and wait for normal playback. Insert USB, leave controls
    alone and wait FIVE MINUTES. Audio may briefly mute if auto_standard=true.
 5. Return USB to the computer. Require JBLToolkit/STATUS.txt to say
@@ -37,7 +37,10 @@ INSTALL
 CHANGES AND LOGS
 Reinsert with action=install to export logs without changing features.
 For explicit changes, edit feature/network settings and use action=configure.
-Use the SAME package. Different immutable payloads require a separate migration.
+For newer toolkit packages, choose action=update. Existing toolkit settings,
+SSH credentials/host keys and saved sound settings are retained. Bundled app and
+scripts are replaced; JBL firmware is not flashed. Reinsertions of the same
+package only export status. Unknown/modified installs stop before replacement.
 Credentials edited in config.txt apply only with action=configure; existing
 sessions remain until closed/rebooted. Keep your current config before changing it.
 Configuration actions restart managed services. Existing SSH sessions may remain.
@@ -45,7 +48,8 @@ Do not combine standalone Smart Mode, SSH or web installers with this package.
 
 LEGACY MIGRATION (ADVANCED)
 Normal install preserves existing standalone stores and refuses adoption.
-Only action=migrate handles the exact reviewed rev6 + SSH + remote chain.
+Install / update automatically migrates the exact reviewed rev6 + SSH + remote
+chain. The explicit action=migrate remains available for advanced use.
 Read MIGRATION_CHECK.txt and the repository guide first. It verifies owner
 markers, exact scripts and hook snapshots, stops recognized services, retains
 original files inactive in /var/JBLToolkitLegacy and installs the toolkit.

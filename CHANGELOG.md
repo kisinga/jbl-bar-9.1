@@ -4,6 +4,12 @@ User-facing changes go here. Before publishing another release, change `VERSION`
 in `tools/build_usb.py` and add a matching `## <version>` section. Release notes
 are generated from that section plus the installation and recovery instructions.
 
+## 0.3.0-dev.9
+
+- Use one **Install / update everything** USB action for clean installation, recognized standalone migration and existing toolkit updates.
+- Toolkit updates preserve installed feature/network settings, SSH credentials and host keys, and saved sound settings while replacing the bundled application and scripts.
+- Check package integrity, installed runtime ownership, firmware, storage and the startup hook before updating. Unknown or modified installations stop with a status report.
+
 ## 0.3.0-dev.8
 
 - Install from one USB package with an offline setup page and automatic hardware identification. Bar 9.1 is the only included model.

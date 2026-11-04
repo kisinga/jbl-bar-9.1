@@ -383,6 +383,79 @@ exit 0
                     assert not (store / 'ssh-input/wifi.psk.hex').exists()
                     assert not (usb / 'logs/config.txt').exists()
                     assert expected_credentials['SSH_PASSWORD_HASH'] not in (usb / 'setup.log').read_text()
+                if label == 'automatic_clean_update':
+                    assert (store / 'package.manifest').read_bytes() == (usb / 'SHA256SUMS').read_bytes()
+                    pid = (remote / 'remote.pid').read_bytes()
+                    assert launch()[1] == 'ALREADY_INSTALLED_LOGS_EXPORTED'
+                    assert (remote / 'remote.pid').read_bytes() == pid
+                    (usb / 'RECOVER').touch()
+                    assert launch()[1] == 'RECOVERED_REBOOT_REQUIRED'
+                    assert hook.read_bytes() == original
+                    passed(label)
+                    return
+                if label.startswith('usb_update_'):
+                    old_config = (store / 'config.txt').read_bytes()
+                    old_pid = (remote / 'remote.pid').read_bytes()
+                    old_password = (store / 'ssh-input/password.hash').read_bytes()
+                    (ssh / 'host_ed25519').write_bytes(b'original-private-host-key')
+                    original_keys = {n:(ssh / n).read_bytes() for n in ('host_ed25519','host_ed25519.pub')}
+                    (remote / 'bass-offset.json').write_text('{"offset_db":-1.5}')
+                    (usb / 'VERSION.txt').write_text('next-build\n')
+                    with (usb / 'files/remote').open('ab') as stream:
+                        stream.write(b'next-build')
+                    with (usb / 'boot.sh').open('a') as stream:
+                        stream.write('\n# new manager revision\n')
+                    # A public update needs no credentials or chosen feature flags:
+                    # preserve all installed settings, credentials and tuning.
+                    for name in ('files/ssh/password.hash','files/ssh/wifi.ssid.hex','files/ssh/wifi.psk.hex'):
+                        (usb / name).unlink()
+                        immutable_names.remove(name)
+                    (usb / 'config.txt').write_bytes(changed(action='update',ssh='false',web_remote='false',auto_standard='false'))
+                    if label == 'usb_update_bad_credentials':
+                        (store / 'ssh-input/password.hash').write_text('invalid-hash')
+                    if label == 'usb_update_runtime_corrupt':
+                        with (remote / 'start.sh').open('a') as stream: stream.write('\n# corrupt\n')
+                    if label == 'usb_update_hook_changed':
+                        hook.write_bytes(managed + b'# foreign hook\n')
+                    if label == 'usb_update_start_failure':
+                        (usb / 'files/remote-start.sh').write_text('exit 1\n')
+                    if label == 'usb_update_preflight_failure':
+                        (usb / 'preflight.sh').write_text('preflight() { PREFLIGHT_REASON=FIXTURE_FAILURE; return 1; }\n')
+                    manifest()
+                    if label == 'usb_update_bad_usb':
+                        (usb / 'files/remote').write_bytes(b'corrupt USB')
+                    result, status = launch()
+                    expected_failures = {
+                        'usb_update_bad_credentials':'UPDATE_SSH_CREDENTIALS_INVALID_NO_CHANGES',
+                        'usb_update_runtime_corrupt':'UPDATE_RUNTIME_INTEGRITY_FAILED_NO_CHANGES',
+                        'usb_update_hook_changed':'STARTUP_HOOK_CHANGED_PRESERVED',
+                        'usb_update_preflight_failure':'PREFLIGHT_FAILED_CHECK_FIRMWARE_STORAGE_AND_NATIVE_SSH',
+                        'usb_update_bad_usb':'PACKAGE_INTEGRITY_FAILED',
+                        'usb_update_start_failure':'REMOTE_START_FAILED',
+                    }
+                    if label in expected_failures:
+                        assert result.returncode != 0 and status == expected_failures[label], (status,(usb / 'setup.log').read_text())
+                        if label == 'usb_update_start_failure':
+                            assert (store / 'DISABLED').exists() and hook.read_bytes() == original
+                        else:
+                            assert (remote / 'remote.pid').read_bytes() == old_pid
+                            assert not (store / 'DISABLED').exists()
+                    else:
+                        assert result.returncode == 0 and status == 'INSTALLED_PENDING_REBOOT_TEST', (status,(usb / 'setup.log').read_text())
+                        assert (store / 'package.manifest').read_bytes() == (usb / 'SHA256SUMS').read_bytes()
+                        assert (store / 'config.txt').read_bytes() == old_config
+                        assert (store / 'ssh-input/password.hash').read_bytes() == old_password
+                        assert (remote / 'remote').read_bytes() == (usb / 'files/remote').read_bytes()
+                        assert (store / 'boot.sh').read_bytes() == (usb / 'boot.sh').read_bytes()
+                        assert (remote / 'bass-offset.json').read_text() == '{"offset_db":-1.5}'
+                        assert all((ssh / n).read_bytes() == v for n,v in original_keys.items())
+                        assert hook.read_bytes() == managed and not (store / 'DISABLED').exists()
+                        assert launch()[1] == 'ALREADY_INSTALLED_LOGS_EXPORTED'
+                        (usb / 'RECOVER').touch()
+                        assert launch()[1] == 'RECOVERED_REBOOT_REQUIRED'
+                        assert hook.read_bytes() == original
+                    passed(label)
+                    return
                 # Qualification cannot pass on the installation's own kernel boot.
                 installed_config = (usb / 'config.txt').read_bytes()
                 (usb / 'config.txt').write_bytes(installed_config.replace(b'action=install', b'action=verify'))
@@ -483,6 +556,10 @@ exit 0
 
     for migration in ('complete', 'resume', 'live_remote', 'changed_script', 'changed_hook', 'symlink', 'unrelated_pid', 'missing_credentials'):
         scenario('legacy_migration_' + migration, config=changed(action='migrate'), migration=migration)
+    scenario('automatic_legacy_update', config=changed(action='update'), migration='complete')
+    scenario('automatic_clean_update', config=changed(action='update',ssh='false'))
+    for update in ('complete','runtime_corrupt','hook_changed','bad_usb','bad_credentials','preflight_failure','start_failure'):
+        scenario('usb_update_' + update, config=changed(ssh='true'))
     scenario('install_configure_reinsert_recover_original_hook')
     scenario('check_does_not_install', config=changed(action='check', ssh='false'))
     scenario('check_collects_native_after_preflight_failure', config=changed(action='check', ssh='false'), fail='preflight')

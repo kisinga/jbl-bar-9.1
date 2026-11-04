@@ -33,7 +33,9 @@ result=0
     done
 } > "$USB/DIAGNOSTICS.txt" 2>&1
 preflight_all || result=1
+migration_eligible=false
 if legacy_check; then
+    migration_eligible=true
     printf 'MIGRATION_ELIGIBLE=true\nPROFILE=reviewed-rev6-prototype-ssh-remote-chain\n' > "$USB/MIGRATION_CHECK.txt"
 else
     printf 'MIGRATION_ELIGIBLE=false\nREASON=%s\n' "$LEGACY_REASON" > "$USB/MIGRATION_CHECK.txt"
@@ -49,17 +51,22 @@ fi
     printf 'MIGRATION_REVIEW=MIGRATION_CHECK.txt\n'
     if owned; then
         printf 'TOOLKIT=present\n'
-        "$BB" cmp -s "$STORE/package.manifest" "$USB/SHA256SUMS" || { printf 'BLOCKER=DIFFERENT_TOOLKIT_PACKAGE\n'; result=1; }
+        "$BB" cmp -s "$STORE/package.manifest" "$USB/SHA256SUMS" || printf 'UPDATE_AVAILABLE=true\n'
+        runtime_integrity >/dev/null 2>&1 || { printf 'BLOCKER=INSTALLED_RUNTIME_INTEGRITY\n'; result=1; }
     else
         printf 'TOOLKIT=absent_or_unrecognized\n'
         for path in "$STORE" "$SSH_STORE" "$REMOTE_STORE" /var/JBLStandard; do
             if [ -e "$path" ] || [ -L "$path" ]; then
-                printf 'BLOCKER=EXISTING_STORE:%s\n' "$path"
-                result=1
+                if [ "$migration_eligible" = true ] && [ "$path" != "$STORE" ]; then
+                    printf 'MIGRATION_SOURCE=%s\n' "$path"
+                else
+                    printf 'BLOCKER=EXISTING_STORE:%s\n' "$path"
+                    result=1
+                fi
             fi
         done
         if [ -e "$HOOK" ] || [ -L "$HOOK" ]; then
-            if ! regular "$HOOK" || "$BB" grep -Eq 'JBL(Standard|LocalSSH|Remote|Toolkit)' "$HOOK"; then
+            if [ "$migration_eligible" != true ] && { ! regular "$HOOK" || "$BB" grep -Eq 'JBL(Standard|LocalSSH|Remote|Toolkit)' "$HOOK"; }; then
                 printf 'BLOCKER=EXISTING_OR_UNSAFE_COMPONENT_HOOK\n'
                 result=1
             fi

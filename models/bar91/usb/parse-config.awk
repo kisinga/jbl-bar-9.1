@@ -32,7 +32,7 @@ END {
     count=split("format action ssh web_remote auto_standard allowed_cidr web_port", keys, " ")
     for (i=1; i<=count; i++) if (!(keys[i] in values)) fail("missing " keys[i])
     if (values["format"]!="1") fail("unsupported format")
-    if (values["action"] !~ /^(install|configure|uninstall|check|verify|migrate)$/) fail("invalid action")
+    if (values["action"] !~ /^(install|configure|uninstall|check|verify|migrate|update)$/) fail("invalid action")
     for (i=3; i<=5; i++) if (values[keys[i]] !~ /^(true|false)$/) fail("invalid boolean " keys[i])
     # Optional: restore the mode chosen before standby (needs auto_standard).
     if (!("smart_mode_memory" in values)) values["smart_mode_memory"]="false"

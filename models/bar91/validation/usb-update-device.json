@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "date": "2026-11-04",
+  "version": "0.3.0-dev.9",
+  "scope": "One Bar 9.1: automatic migration from the recognized standalone setup and startup before reboot.",
+  "observed_receipts": {
+    "status": "INSTALLED_PENDING_REBOOT_TEST",
+    "migration": "LEGACY_RETIRED_CONTINUING_WITH_INSTALL",
+    "legacy_archive": "/var/JBLToolkitLegacy",
+    "selected_features": {
+      "ssh": true,
+      "web_remote": true,
+      "auto_standard": true,
+      "smart_mode_memory": false
+    }
+  },
+  "owner_report": "The web interface was updated and working before reboot.",
+  "host_checks": {
+    "total_cases": 297,
+    "usb_cases": 124,
+    "offline_setup_browser": "passed"
+  },
+  "not_yet_established": [
+    "USB-free cold boot and managed boot verification",
+    "Standby/CEC wake behavior for this build",
+    "Recovery on hardware for this build",
+    "Managed toolkit to newer toolkit update on hardware",
+    "EQ and other audio feature behavior for this build"
+  ]
+}

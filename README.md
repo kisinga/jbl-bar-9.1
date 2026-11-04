@@ -20,8 +20,10 @@ restart and recovery process still needs hardware testing.
 - Your phone or computer connected to the same home network as the bar.
 
 Already using an older installation? **Keep its original USB and recovery ZIP.**
-Installing a new release over an older one is not supported yet. See the
-[existing installation guide](models/bar91/README.md) before making changes.
+Use the latest USB and choose **Install / update everything**. It detects
+your setup, updates toolkit components while keeping installed settings and SSH
+keys, or migrates the recognized older standalone setup. Unknown installations
+stop with an explanation. [Existing installation guide](models/bar91/README.md).
 
 ## Get started
 
@@ -43,7 +45,7 @@ Installing a new release over an older one is not supported yet. See the
    plug in the stick, and wait **five minutes**. Bring it back to your computer
    and open `JBLToolkit/STATUS.txt`. Continue only if it says
    `CHECK_PASSED_READY_FOR_INSTALL_OR_CONFIGURE`.
-5. **Install.** Open `SETUP.html` again, choose **Install selected features**,
+5. **Install.** Open `SETUP.html` again, choose **Install / update everything**,
    download and replace `config.txt` again. Safely eject the stick, put it back
    in the powered-on bar, and wait five minutes. Read `STATUS.txt` afterward;
    continue only if it says `INSTALLED_PENDING_REBOOT_TEST`. Otherwise follow
@@ -67,6 +69,22 @@ successful [Test and package toolkit run](https://github.com/kisinga/jbl-bar-too
 Sign in to GitHub and download **jbl-bar-toolkit-usb-development**. Extract
 GitHub's outer ZIP first, then follow the steps above with the USB/recovery ZIPs
 inside. These downloads expire after 30 days.
+
+## Update later
+
+Download the new USB ZIP and matching recovery ZIP. Back up your old USB, then
+extract the new package to a clean FAT32 stick. Open `SETUP.html`, choose
+**Install / update everything**, and replace `JBLToolkit/config.txt` with the
+download. Insert the USB into the powered-on bar, leave it alone for **five
+minutes**, then read `JBLToolkit/STATUS.txt` on your computer. Expect
+`INSTALLED_PENDING_REBOOT_TEST`; remove the USB and repeat the restart checks above.
+
+An existing toolkit keeps its installed feature/network settings, SSH credentials,
+SSH host keys and saved sound settings. The update replaces the bundled app and
+scripts; it does not flash JBL firmware. Use **Apply changes to this installed
+version** separately if you want to change features. Keep the matching recovery
+ZIP. A failed update can disable services; its status and recovery instructions
+explain the next step.
 
 ## Make the sound yours
 

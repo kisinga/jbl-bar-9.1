@@ -11,5 +11,9 @@ routes still need research. Model-specific ZIPs are also provided by CI.
 
 Full combined installation, USB-free restart and recovery qualification remains
 pending. Recovery is independent of the remote and config. Keep an existing
-installation's original USB/recovery; cross-version updates remain unimplemented.
+installation's original USB/recovery. Choose **Install / update everything**
+to install, migrate a recognized standalone setup, or update a toolkit. Toolkit
+updates retain installed settings, SSH credentials/host keys and sound settings.
+Unknown or modified installations stop before replacement. This updates toolkit
+software, not JBL firmware.
 Public ZIPs contain no owner credentials. Configured USBs must stay private.

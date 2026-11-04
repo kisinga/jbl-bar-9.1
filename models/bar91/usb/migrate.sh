@@ -23,7 +23,7 @@ trap 'finish MIGRATION_INTERRUPTED_RETAIN_ARCHIVE_AND_REBOOT 1' HUP INT TERM
 "$BB" awk -f "$USB/parse-config.awk" "$USB/config.txt" > "$LOCK/plan" || finish CONFIG_INVALID 1
 . "$LOCK/plan" || finish CONFIG_INVALID 1
 "$BB" rm "$LOCK/plan"
-[ "$ACTION" = migrate ] || finish INVALID_MIGRATION_ACTION 1
+case "$ACTION" in migrate|update) ;; *) finish INVALID_MIGRATION_ACTION 1;; esac
 [ "$SSH" != true ] || [ -n "${SSH_PASSWORD_HASH-}" ] || regular "$USB/files/ssh/password.hash" || finish MIGRATION_SSH_CREDENTIALS_REQUIRED_NO_CHANGES 1
 if owned; then
     legacy_archive_owned && regular "$LEGACY_STORE/RETIRED" &&

@@ -44,6 +44,16 @@ if [ "$ACTION" = check ] || [ "$ACTION" = verify ]; then
     "$BB" sync
     exit "$result"
 fi
+# One user action: update a managed installation, migrate the reviewed legacy
+# chain, or install on a clean bar. Unknown stores still fail identity checks.
+if [ "$ACTION" = update ] && ! owned; then
+    if [ -e "$SSH_STORE" ] || [ -L "$SSH_STORE" ] ||
+       [ -e "$REMOTE_STORE" ] || [ -L "$REMOTE_STORE" ] ||
+       [ -e "$STANDARD_STORE" ] || [ -L "$STANDARD_STORE" ] ||
+       [ -e "$LEGACY_STORE" ] || [ -L "$LEGACY_STORE" ]; then
+        /bin/sh "$USB/migrate.sh" || exit 1
+    fi
+fi
 if [ "$ACTION" = migrate ]; then
     /bin/sh "$USB/migrate.sh" || exit 1
 fi

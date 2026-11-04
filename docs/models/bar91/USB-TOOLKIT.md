@@ -106,7 +106,7 @@ exFAT is **not qualified**. The second hardware check found no exFAT entry in th
 | Key | Values | Behavior |
 | --- | --- | --- |
 | `format` | `1` | Configuration schema version. |
-| `action` | `check`, `install`, `migrate`, `verify`, `configure`, `uninstall` | Qualification preflight, clean installation, exact reviewed migration, verification, explicit changes, or recovery. |
+| `action` | `check`, `update`, `install`, `migrate`, `verify`, `configure`, `uninstall` | Qualification preflight; automatic install/update/migration; explicit install, migration, verification, configuration or recovery. |
 | `ssh` | `true`, `false` | Starts/stops the managed SSH listener and its future startup. Port is fixed at `2222`. Existing sessions can remain until reboot. |
 | `web_remote` | `true`, `false` | Enables/disables HTTP and discovery. |
 | `auto_standard` | `true`, `false` | Automatically selects Standard Mode after wake. Independent of HTTP/SSH. |
@@ -147,10 +147,29 @@ Reinsert the original installation USB with `action=install` to export status. E
 
 To make changes, edit `JBLToolkit/config.txt`, set `action=configure`, and repeat installation verification. This restarts managed services while retaining SSH host keys. Enabling SSH needs credentials in config or the original immutable bundle. An edited config hash applies to the stopped managed listener; open sessions can remain until reboot. Native startup guards still apply. Return to `action=install` after successful configuration for passive log collection.
 
-Keep the **same immutable package**. A different build or changed bundled
-credential file is rejected before services change. Config credential fields
-are editable and strictly parsed. Automatic application upgrades need a separate
-migration; never replace manifests to bypass the guard.
+## Update everything from USB
+
+Use the latest USB package and choose **Install / update everything** in
+`SETUP.html` (`action=update`). Insert it into the powered-on bar and wait five
+minutes. Read `STATUS.txt`, remove the USB, restart and verify as above.
+
+The installer detects a clean bar, a recognized standalone migration source,
+or a managed toolkit. Existing toolkit updates preserve installed feature/network
+settings, SSH credentials and host keys, and sound-state files such as the saved
+bass offset. All bundled application/manager/SSH scripts are updated. JBL firmware
+and vendor libraries remain on the device. Same-package reinsertion exports logs.
+Use `action=configure` separately for deliberate settings changes.
+
+Before replacing an existing toolkit, the updater checks installed runtime
+integrity, ownership, the startup hook and normal firmware/storage prerequisites.
+It commits the new package identity after service readiness. Failures after
+replacement starts disable services and attempt recovery; this is not an atomic
+rollback to the previous app. Keep the matching recovery package and inspect the
+status before rebooting. Modified/unknown installations are preserved and refused.
+The new path is host-tested. One recognized standalone migration reached
+`INSTALLED_PENDING_REBOOT_TEST`, and the owner confirmed the updated web interface
+worked before reboot ([device record](../../../models/bar91/validation/usb-update-device.json)).
+Cold boot, managed-to-managed updates and recovery qualification remain pending.
 
 ## Recovery
 
@@ -171,10 +190,12 @@ Installed files, credentials, native Wi-Fi profiles and existing SSH sessions ar
 Normal `install` refuses existing `/var/JBLStandard`, `/var/JBLLocalSSH` or
 `/var/JBLRemote` stores and recognizable leftover startup commands.
 
-An explicit **`action=migrate`** supports one reviewed chain: rev6 Smart Mode,
+**Install / update everything** automatically migrates one reviewed chain
+(explicit `action=migrate` is also available): rev6 Smart Mode,
 the known prototype/portable SSH boot script and the recorded standalone remote.
 `check` writes `MIGRATION_CHECK.txt`. Even an eligible legacy chain remains a
-normal-install blocker; migration must be selected deliberately. Before changes,
+blocker for the advanced first-install-only action; the automatic update action
+selects the reviewed migration path. Before changes,
 migration checks exact owners, scripts, hook snapshots, native prerequisites
 and no-replace publication. It stops only recognized services, lets gesture/boot
 workers finish, then moves the old stores into `/var/JBLToolkitLegacy` on the
