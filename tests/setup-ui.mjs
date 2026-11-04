@@ -40,6 +40,12 @@ try {
   assert.match(data,/^ssh_password_hash=\$6\$/m);
   assert(!data.includes('fixture-browser-password'));
   await page.waitForFunction(() => document.querySelector('#password').value==='');
+  await page.locator('#action').selectOption('update');
+  await page.locator('#ssh').uncheck();
+  const updateDownloadPromise=page.waitForEvent('download');
+  await page.locator('#download').click();
+  const updateDownload=await updateDownloadPromise;
+  assert.match(await readFile(await updateDownload.path(),'utf8'),/^action=update$/m);
   assert.deepEqual(errors,[]);
   assert.deepEqual(network,[]);
   console.log('Offline setup browser: PASS (file URL, default check, LAN preview, credentials, download, no network)');

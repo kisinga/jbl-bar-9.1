@@ -67,7 +67,7 @@
   }
   async function configuration(settings) {
     const allowed = subnet(settings.address, settings.prefix);
-    if (!["check","install","verify","configure","uninstall","migrate"].includes(settings.action)) throw Error("Unknown action.");
+    if (!["check","install","verify","configure","uninstall","migrate","update"].includes(settings.action)) throw Error("Unknown action.");
     const lines = ["# Private local JBL Bar 9.1 configuration", "format=1", "action=" + settings.action,
       "ssh=" + !!settings.ssh, "web_remote=" + !!settings.web, "auto_standard=" + !!settings.standard,
       "smart_mode_memory=" + !!(settings.standard && settings.memory),

@@ -5,6 +5,8 @@ USB=${JBL_TOOLKIT_USB:-/mnt/sda1/JBLToolkit}
 umask 077
 mutated=0
 stage=
+update_existing=false
+config_source=$USB/config.txt
 finish() {
     trap '' HUP INT TERM
     [ -z "$stage" ] || [ ! -d "$stage" ] || "$BB" rm -rf "$stage"
@@ -34,11 +36,36 @@ export_logs() {
 "$BB" awk -f "$USB/parse-config.awk" "$USB/config.txt" > "$LOCK/plan" || finish CONFIG_INVALID 1
 . "$LOCK/plan" || finish CONFIG_INVALID 1
 "$BB" rm "$LOCK/plan"
-case "$ACTION" in migrate) ACTION=install;; install|configure) ;; *) finish INVALID_INSTALL_ACTION 1;; esac
+case "$ACTION" in migrate) ACTION=install;; install|configure|update) ;; *) finish INVALID_INSTALL_ACTION 1;; esac
 if [ -e "$STORE" ] || [ -L "$STORE" ]; then
     owned || finish TOOLKIT_STORE_CONFLICT 1
     [ -z "$("$BB" find "$STORE" -type l)" ] || finish TOOLKIT_SYMLINK_CONFLICT 1
-    "$BB" cmp -s "$STORE/package.manifest" "$USB/SHA256SUMS" || finish PACKAGE_VERSION_CONFLICT_USE_ORIGINAL_USB 1
+    if [ "$ACTION" = update ]; then
+        # Validate the current installation before stopping or replacing anything.
+        runtime_integrity >/dev/null 2>&1 || finish UPDATE_RUNTIME_INTEGRITY_FAILED_NO_CHANGES 1
+        if "$BB" cmp -s "$STORE/package.manifest" "$USB/SHA256SUMS" && [ ! -e "$STORE/DISABLED" ]; then
+            export_logs || finish LOG_EXPORT_FAILED 1
+            finish ALREADY_INSTALLED_LOGS_EXPORTED 0
+        fi
+        regular "$STORE/config.txt" || finish UPDATE_CONFIG_MISSING_NO_CHANGES 1
+        unset SSH_PASSWORD_HASH WIFI_SSID_HEX WIFI_PSK_HEX
+        "$BB" awk -f "$USB/parse-config.awk" "$STORE/config.txt" > "$LOCK/plan" || finish UPDATE_CONFIG_INVALID_NO_CHANGES 1
+        . "$LOCK/plan" || finish UPDATE_CONFIG_INVALID_NO_CHANGES 1
+        "$BB" rm "$LOCK/plan"
+        ACTION=update
+        config_source=$STORE/config.txt
+        update_existing=true
+        if [ "$SSH" = true ] && [ -z "${SSH_PASSWORD_HASH-}" ]; then
+            regular "$STORE/ssh-input/password.hash" || finish UPDATE_SSH_CREDENTIALS_MISSING_NO_CHANGES 1
+            SSH_PASSWORD_HASH=$("$BB" cat "$STORE/ssh-input/password.hash") || finish UPDATE_SSH_CREDENTIALS_MISSING_NO_CHANGES 1
+            { "$BB" cat "$STORE/config.txt"; printf '\nssh_password_hash=%s\n' "$SSH_PASSWORD_HASH"; } |
+                "$BB" awk -f "$USB/parse-config.awk" >/dev/null || finish UPDATE_SSH_CREDENTIALS_INVALID_NO_CHANGES 1
+        fi
+        # Updating binaries must not reprovision the owner's network.
+        unset WIFI_SSID_HEX WIFI_PSK_HEX
+    else
+        "$BB" cmp -s "$STORE/package.manifest" "$USB/SHA256SUMS" || finish PACKAGE_VERSION_CONFLICT_USE_ORIGINAL_USB 1
+    fi
     if [ "$ACTION" = install ]; then
         export_logs || finish LOG_EXPORT_FAILED 1
         [ ! -e "$STORE/DISABLED" ] || finish TOOLKIT_DISABLED_USE_CONFIGURE_OR_RECOVER 1
@@ -48,6 +75,7 @@ if [ -e "$STORE" ] || [ -L "$STORE" ]; then
         [ ! -e "$HOOK" ] && [ ! -L "$HOOK" ] && regular "$STORE/hook.absent" || finish STARTUP_HOOK_CHANGED_PRESERVED 1
     fi
 else
+    [ "$ACTION" != update ] || ACTION=install
     [ "$ACTION" = install ] || finish NOT_INSTALLED_USE_INSTALL 1
     for path in "$SSH_STORE" "$REMOTE_STORE" /var/JBLStandard; do
         [ ! -e "$path" ] && [ ! -L "$path" ] || finish EXISTING_COMPONENT_REMOVE_WITH_ORIGINAL_INSTALLER 1
@@ -97,10 +125,13 @@ stop_ssh || finish SSH_STOP_FAILED_REBOOT_AND_RECOVER 1
 for name in common.sh boot.sh parse-config.awk; do
     atomic_copy "$USB/$name" "$STORE/$name" || finish MANAGER_COPY_FAILED 1
 done
-atomic_copy "$USB/config.txt" "$STORE/config.txt" || finish CONFIG_SAVE_FAILED 1
+atomic_copy "$config_source" "$STORE/config.txt" || finish CONFIG_SAVE_FAILED 1
 [ ! -e "$STORE/ssh-input" ] || directory "$STORE/ssh-input" || finish SSH_STAGE_CONFLICT 1
 "$BB" mkdir -p "$STORE/ssh-input" || finish SSH_STAGE_FAILED 1
 for path in "$USB"/files/ssh/*; do
+    if [ "$update_existing" = true ]; then
+        case "${path##*/}" in password.hash|wifi.ssid.hex|wifi.psk.hex) continue;; esac
+    fi
     atomic_copy "$path" "$STORE/ssh-input/${path##*/}" || finish SSH_STAGE_FAILED 1
 done
 if [ -n "${SSH_PASSWORD_HASH-}" ]; then
@@ -186,6 +217,8 @@ else
     "$BB" ln -T "$STORE/hook.activation" "$HOOK" || finish HOOK_COMMIT_FAILED 1
     "$BB" rm "$STORE/hook.activation" || finish HOOK_COMMIT_FAILED 1
 fi
+# Commit the new package identity only after the runtime and hook are ready.
+atomic_copy "$USB/SHA256SUMS" "$STORE/package.manifest" || finish MANIFEST_SAVE_FAILED 1
 "$BB" sync
 "$BB" rm "$STORE/DISABLED" || finish ENABLE_FAILED 1
 {

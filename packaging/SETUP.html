@@ -9,12 +9,12 @@
 </style>
 <h1>Your JBL Bar, under your control.</h1>
 <p>This package automatically selects a compatible implementation. It currently includes the <strong>JBL Bar 9.1 True Wireless Surround</strong> only; Bar 800, 1000, 1300 and MK2 installation is not implemented.</p>
-<p class="notice">Development build: full combined installation, restart and recovery qualification is still pending. The USB checks refuse unrecognized firmware and existing installations.</p>
+<p class="notice">Development build: full combined installation, restart and recovery qualification is still pending. The USB checks refuse unrecognized firmware and unrecognized installations.</p>
 <ol>
 <li>Extract the installation ZIP onto a clean FAT32 USB. Keep <code>AutoScript</code> and <code>JBLToolkit</code> at its root.</li>
 <li>Fill this form and download <code>config.txt</code>. Move it into the USB’s <code>JBLToolkit</code> folder, replacing the existing file.</li>
 <li>Safely eject, insert into the fully awake bar, and wait five minutes. Bring the USB back and read <code>JBLToolkit/STATUS.txt</code> and <code>JBLToolkit/HARDWARE.txt</code>.</li>
-<li>After <code>CHECK_PASSED_READY_FOR_INSTALL_OR_CONFIGURE</code>, return here, choose <b>Install</b>, replace the config and repeat. A blocked check needs attention; see <code>CHECKS.txt</code> and <code>PREFLIGHT.txt</code>.</li>
+<li>After <code>CHECK_PASSED_READY_FOR_INSTALL_OR_CONFIGURE</code>, return here, choose <b>Install / update everything</b>, replace the config and repeat. A blocked check needs attention; see <code>CHECKS.txt</code> and <code>PREFLIGHT.txt</code>.</li>
 <li>After installation, remove USB and open <a href="http://jbl.local">http://jbl.local</a> on your home network. Try the bar’s IP address or port 8080 if needed. Restart the bar without USB and verify the remote and normal audio controls.</li>
 </ol>
 <form id="setup">
@@ -37,8 +37,8 @@
 </details>
 </fieldset>
 <fieldset><legend>USB action</legend>
-<label><select id="action"><option value="check">Check compatibility first — leaves services unchanged</option><option value="install">Install selected features</option><option value="verify">Verify after a restart without USB</option><option value="configure">Apply changes to this installed version</option><option value="uninstall">Uninstall — restore the original startup hook</option><option value="migrate">Migrate the exact reviewed legacy installation (advanced)</option></select></label>
-<small>Existing standalone installs are preserved. Migration accepts only the documented, exact legacy chain; it retains inactive original files on the bar.</small>
+<label><select id="action"><option value="check">Check compatibility first — leaves services unchanged</option><option value="update">Install / update everything</option><option value="install">First installation only (advanced)</option><option value="verify">Verify after a restart without USB</option><option value="configure">Apply changes to this installed version</option><option value="uninstall">Uninstall — restore the original startup hook</option><option value="migrate">Migrate the exact reviewed legacy installation (advanced)</option></select></label>
+<small>Install / update detects your setup automatically. Toolkit updates keep installed settings and SSH keys. Recognized older standalone installs are migrated with their original files kept on the bar. Unknown installations stop with an explanation.</small>
 </fieldset>
 <button id="download" type="submit">Download config.txt</button>
 <output id="result" role="status" aria-live="polite"></output>

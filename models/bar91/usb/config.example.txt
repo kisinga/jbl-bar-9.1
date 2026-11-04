@@ -2,6 +2,7 @@
 # First set your actual trusted LAN subnet. Do not use a guest/public network.
 format=1
 # check: preflight and existing-install blockers without changing services.
+# update: install, migrate or update automatically; keep installed settings.
 # install: first installation; later insertions only export status.
 # verify: read-only runtime/native checks and evidence of a new managed boot.
 # migrate: explicitly retire the exact reviewed standalone chain, then install.

@@ -18,7 +18,7 @@ import build_web
 import hardware
 
 from repo_layout import ROOT, USB as SOURCE, SSH, REMOTE_DEVICE
-VERSION = "0.3.0-dev.8"
+VERSION = "0.3.0-dev.9"
 
 
 def parse_config(data: bytes) -> dict[str, str]:
@@ -40,8 +40,8 @@ def build(output: Path, config: bytes, *, password: str | None = None,
           wifi: tuple[str, str] | None = None, bluetooth_helper: Path | None = None,
           eq_parser: Path | None = None) -> tuple[Path, Path]:
     settings = parse_config(config)
-    if settings["ACTION"] not in ("install", "check", "migrate"):
-        raise ValueError("Build with action=install, check or migrate; use the recovery ZIP for emergency removal")
+    if settings["ACTION"] not in ("install", "check", "migrate", "update"):
+        raise ValueError("Build with action=update, install, check or migrate; use the recovery ZIP for emergency removal")
     encoded_password = settings.get("SSH_PASSWORD_HASH")
     if encoded_password and (password is not None or ssh_password_hash_file is not None):
         raise ValueError("Credentials already provided in config; choose one credential source")
