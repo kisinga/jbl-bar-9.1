@@ -6,12 +6,61 @@ on:
     branches: [main, master]
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish this version from main as a downloadable prerelease
+        type: boolean
+        default: false
+
+# Serialize publishing and allow a failed draft to be repaired on retry.
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
+      - name: Check version, changelog and release source before expensive work
+        env:
+          PUBLISH: ${{ inputs.publish || 'false' }}
+          REF: ${{ github.ref }}
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/release.py check
+          if [[ "$REF" == refs/tags/* ]]; then
+            python3 tools/release.py check --tag "$TAG"
+            git merge-base --is-ancestor HEAD origin/main
+          fi
+          if [[ "$PUBLISH" == true ]]; then
+            [[ "$REF" == refs/heads/main ]] || { echo 'Publish must run from main'; exit 1; }
+            tag="$(python3 -c 'import sys; sys.path.insert(0,"tools"); import build_usb; print("v" + build_usb.VERSION)')"
+            if git rev-parse --verify "refs/tags/$tag" >/dev/null 2>&1; then
+              [[ "$(git rev-parse "refs/tags/$tag^{commit}")" == "$GITHUB_SHA" ]] || { echo 'Version tag already belongs to another commit. Bump VERSION and update CHANGELOG.md.'; exit 1; }
+            fi
+            # Fail early for already published versions; API failures also fail this step.
+            gh release list --limit 1000 --json tagName,isDraft > "$RUNNER_TEMP/releases.json"
+            python3 - "$tag" "$RUNNER_TEMP/releases.json" <<'PY'
+          import json, sys
+          if any(r['tagName'] == sys.argv[1] and not r['isDraft'] for r in json.load(open(sys.argv[2]))):
+              sys.exit('Version already published. Bump VERSION and update CHANGELOG.md.')
+          PY
+          fi
+
   test:
+    needs: preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
@@ -50,6 +99,7 @@ jobs:
           node tests/webremote-ui.mjs
           node tests/component-ui.mjs
           node tests/setup-ui.mjs
+          node tests/bass-offset-ui.mjs
       - name: Select reviewed package implementations
         id: targets
         run: |
@@ -100,8 +150,8 @@ jobs:
         run: |
           printf 'Download **%s** from Artifacts. Extract the wrapper, then extract **-usb.zip** to FAT32 and open **SETUP.html**. Keep **-recovery.zip**.\n\nHardware selection is automatic; only included, reviewed implementations can run. Combined hardware qualification remains pending.\n' "$ARTIFACT_NAME" >> "$GITHUB_STEP_SUMMARY"
 
-  release-draft:
-    if: startsWith(github.ref, 'refs/tags/v')
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main')
     needs: package
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -111,39 +161,28 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: jbl-*-usb-development
           merge-multiple: true
           path: release-assets
-      - name: Verify all model assets and the tag
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          python3 - <<'PY'
-          import hashlib, json, os
-          from pathlib import Path
-          root = Path('release-assets')
-          reports = list(root.glob('*release.json'))
-          assert reports, 'Missing public release metadata'
-          for report in reports:
-              data = json.loads(report.read_text())
-              assert os.environ['RELEASE_TAG'] == 'v' + data['version'], 'Tag/version mismatch'
-          for manifest in root.glob('*SHA256SUMS'):
-              for line in manifest.read_text().splitlines():
-                  digest, name = line.split('  ', 1)
-                  assert Path(name).name == name, 'Unexpected asset path'
-                  assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest
-          PY
-      - name: Create a draft prerelease
+      - name: Verify complete assets and create the release with its changelog
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
         run: |
-          if gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft > existing-draft.txt; then
-            test "$(cat existing-draft.txt)" = true || { echo 'Published release exists; refusing replacement.'; exit 1; }
-            gh release upload "$RELEASE_TAG" release-assets/* --clobber
-            gh release edit "$RELEASE_TAG" --draft --prerelease --notes-file packaging/RELEASE-NOTES.md
+          if [[ "$REF_TYPE" == tag ]]; then
+            python3 tools/release.py publish --draft
           else
-            gh release create "$RELEASE_TAG" release-assets/* --verify-tag --draft --prerelease --title "JBL Bar Toolkit $RELEASE_TAG" --notes-file packaging/RELEASE-NOTES.md
+            python3 tools/release.py publish
           fi
+      - name: Link the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(python3 -c 'import sys; sys.path.insert(0,"tools"); import build_usb; print("v" + build_usb.VERSION)')"
+          gh release view "$tag" --json url --jq '"Download USB and recovery packages: " + .url' >> "$GITHUB_STEP_SUMMARY"

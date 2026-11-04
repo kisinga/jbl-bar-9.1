@@ -13,6 +13,7 @@ import build_ssh
 import build_usb
 import prepare_usb
 import hardware
+from release import source_commit
 from repo_layout import ROOT
 
 CONFIG = b'''# Open SETUP.html to create your local configuration before use.
@@ -54,7 +55,7 @@ def build(output: Path, model: str = "auto") -> list[Path]:
     prefix = '' if model == 'auto' else model + '-'
     info = output / (prefix + 'release.json')
     info.write_text(json.dumps({
-        'schema': 1, 'version': build_usb.VERSION, 'model': 'bar91',
+        'schema': 1, 'version': build_usb.VERSION, 'source_commit': source_commit(), 'model': 'bar91',
         'target': model, 'selection': 'automatic', 'included_models': [selected],
         'profile': 'bar91-23.06.41.80', 'architecture': 'linux-armv7',
         'qualification': 'hardware-test-pending', 'default_action': 'check',

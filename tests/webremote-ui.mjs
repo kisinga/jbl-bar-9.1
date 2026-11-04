@@ -9,6 +9,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const systemFixture = () => ({sample:1,cpu_percent:18.2,cpu_cores:2,load_average:[0.21,0.14,0.09],memory:{total_bytes:268435456,available_bytes:146800640,used_bytes:121634816},storage:{total_bytes:134217728,available_bytes:100663296,used_bytes:33554432},network:{receive_bytes_per_second:16384,transmit_bytes_per_second:1536},uptime_seconds:90300,processes:64,temperature_c:46.5});
 const eqFixture = () => ({available:true,enabled:false,gains_db:[0,0,0,0,0],frequencies_hz:[125,500,2000,4000,8000],status:'original'});
 const initial = () => ({eq:eqFixture(),system:systemFixture(),available:true, power:'On', mode:'Standard', volume:12, muted:false, input:'TV / ARC', source:6, source_state:0, hostname:'jbl.local', csrf:'fixture', uptime:90300, watcher:'STANDARD_THIS_WAKE', sound:{bass:0,center:0,atmos:1,rear:2,rear_docked:true,rear_battery_left:80,rear_battery_right:90,night:false,av_sync_ms:20}, wifi:{available:true,connected:true,ssid:'Example Wi-Fi',ip:'192.168.50.1',signal_dbm:-48,frequency_mhz:5180}, bluetooth:{selected:false,connectable:false,discoverable:false,connected:false,media_ready:true,audio:'Disconnected',name:'My speaker'}});
+let screenshotFeatures = null;
 let state = initial(), calls = [], lastPayload = null, delay = 300, failure = '', offline = false, getDelay = 0, advertisedControls = null;
 const streams=new Set(); let stateGets=0, streamGets=0, revision=0, lastSnapshot='';
 function snapshot() {
@@ -34,7 +35,10 @@ const pushTimer=setInterval(()=>{
  for(const res of streams){if(offline){res.destroy();streams.delete(res);continue;}const text=JSON.stringify(snapshot());if(text!==res.lastSnapshot){res.lastSnapshot=text;res.write('data: '+text+'\n\n');}}
 },50);
 const server = createServer(async (req, res) => {
-  if(req.url==='/api/features'){res.writeHead(404);res.end();return;}
+  if(req.url==='/api/features'){
+    if(!screenshotFeatures){res.writeHead(404);res.end();return;}
+    res.setHeader('Content-Type','application/json');res.end(JSON.stringify(screenshotFeatures));return;
+  }
   if(req.url==='/api/events') {
     streamGets++;
     if(offline){req.socket.destroy();return;}
@@ -588,6 +592,24 @@ try {
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-new.png',root)),fullPage:true});
   await page.setViewportSize({width:1200,height:900});
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-desktop-new.png',root)),fullPage:true});
+  // Reproducible README images use feature discovery and sample state only.
+  screenshotFeatures={schema:1,model:'bar91',name:'BAR 9.1',
+    actions:await page.locator('[data-action]').evaluateAll(elements=>[...new Set([...elements.map(e=>e.dataset.action),'av_sync_set'])]),
+    extensions:[
+      {id:'bar91.bass-offset',component:'bass-offset',included:true,actions:['bar91.bass-offset.set']},
+      {id:'bar91.front-eq',component:'front-eq',included:true,actions:['bar91.front-eq.apply','bar91.front-eq.reset']},
+      {id:'bar91.center',component:'center-level',included:true,actions:['bar91.center.next']}
+    ]};
+  state=initial();state.sound.bass=2;state.sound.rear_docked=false;
+  state.sound.audio_format='DOLBY SURROUND DD+';
+  state.setup={sub_pairing:false,subwoofer:'Connected'};
+  state.extensions={'bar91.bass-offset':{offset_db:-1.5,status:'applied'}};
+  await page.setViewportSize({width:1200,height:1050});
+  await page.reload();
+  await page.waitForFunction(()=>document.querySelector('#bass-offset').value==='-1.5' && !document.querySelector('#bass-offset-save').disabled);
+  await page.screenshot({path:fileURLToPath(new URL('build/readme-remote.png',root))});
+  await page.locator('#advanced summary').click();
+  await page.locator('#advanced').screenshot({path:fileURLToPath(new URL('build/readme-advanced.png',root))});
   await page.emulateMedia({reducedMotion:'no-preference'});
   check(await page.locator('.panel').first().evaluate(e=>getComputedStyle(e).animationName)==='arrive','motion enabled only when preference permits');
   check(errors.length===0,'no browser exceptions: '+errors.join(', '));

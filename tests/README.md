@@ -58,3 +58,10 @@ capability discovery, unknown state and cancelling an unsent sync draft.
 `bass-offset-ui.mjs` checks typed extension requests, explicit saves, draft
 preservation, standby, calibration, failures, capability inclusion and mobile
 layout using synthetic state. It never contacts a soundbar.
+
+`check_release.py` checks changelog validation, complete target/checksum coverage,
+source provenance, immutable publication, retry guards and upload failures without
+writing to GitHub. `webremote-ui.mjs` also produces sample README screenshots at
+`build/readme-remote.png` and `build/readme-advanced.png`. To refresh the public
+images after reviewing them, copy those to `docs/web-remote.png` and
+`docs/web-remote-advanced.png` respectively.
