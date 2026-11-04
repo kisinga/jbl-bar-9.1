@@ -33,7 +33,10 @@ const LEVELS={bass:{action:'bass_next',count:5},atmos:{action:'atmos_next',count
     $('night-label').textContent = active === 'night_toggle' ? 'Changing…' : sound.night ? 'Turn off' : 'Turn on';
     $('night').setAttribute('aria-pressed', String(sound.night === true));
     $('night').disabled = !ready || !awake || !!active || sound.night == null;
-    $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5';
+    // A saved bass offset (set in Advanced) shifts every level: show it here too.
+    const offset=s.bass_offset?.offset_db;
+    const shifted=Number.isFinite(offset) && offset !== 0 ? ' · offset ' + (offset > 0 ? '+' : '') + offset.toFixed(1) + ' dB' : '';
+    $('bass-value').textContent=sound.bass == null ? 'Unavailable' : 'Level ' + (sound.bass+1) + ' of 5' + shifted;
     $('atmos-value').textContent=['Low','Mid','High'][sound.atmos] || 'Unavailable';
     const rear=['Low','Mid','High','Muted'][sound.rear] || 'Unavailable';
     $('rear-value').textContent=sound.rear_docked ? rear + ' · speakers docked' : rear;

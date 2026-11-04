@@ -54,6 +54,8 @@ try {
   page.on('pageerror',error=>errors.push(error.message));
   const url='http://127.0.0.1:'+server.address().port;
   await page.goto(url);
+  await page.locator('#advanced summary').click();
+  check(await page.locator('#advanced [data-component=bass-offset]').count()===1 && await page.locator('.sound-settings > [data-component=bass-offset]').count()===1,'bass offset sits under Advanced with the set-once settings');
   await page.waitForFunction(()=>!document.querySelector('#bass-offset').disabled);
   check(await page.locator('[data-component=bass-offset]').isVisible(),'declared component is visible');
   check(await page.locator('#bass-offset option').count()===13,'thirteen half-decibel settings');
@@ -67,12 +69,14 @@ try {
   await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Bass offset saved for startup.');
   check(JSON.stringify(calls[0])==='{"action":"fixture.bass.set","parameters":{"offset_db":-3}}','declared namespace and typed parameters, no shared command field');
   check((await page.locator('#bass-offset-state').textContent()).includes('Waiting for supported Standard playback'),'save does not claim a DSP write');
+  check(await page.locator('#bass-value').textContent()==='Level 3 of 5 · offset -3.0 dB','the Bass row shows a saved offset');
   state.power='Standby';
   await page.waitForFunction(()=>document.querySelector('#power-label').textContent==='Turn on');
   check(await page.locator('#bass-offset-save').isEnabled(),'save available in standby');
   await page.locator('#bass-offset').selectOption('0');await page.locator('#bass-offset-save').click();
   await page.waitForFunction(()=>document.querySelector('#bass-offset-state').textContent.startsWith('0.0 dB set.'));
   check(calls[1].parameters.offset_db===0,'zero can be explicitly saved to restore stock');
+  check(await page.locator('#bass-value').textContent()==='Level 3 of 5','no offset shown once it is back to zero');
   state.extensions['fixture.bass']={offset_db:0,status:'paused',error:'Readback failed'};
   await page.waitForFunction(()=>document.querySelector('#bass-offset-state').textContent.includes('Readback failed'));
   check((await page.locator('#bass-offset-state').textContent()).includes('paused'),'pause and reason are visible');

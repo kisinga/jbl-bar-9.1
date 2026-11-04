@@ -106,6 +106,9 @@ The `bar91.bass-offset` extension is registered in
 `apps/remote/extensions_bar91.go`. Its monitor uses the existing extension
 worker lifecycle and shares the action gate with HTTP controls. The UI lives
 in `apps/remote/www/components/bass-offset.js` and uses the same action queue.
+The control sits under **Advanced**, with the other set-once settings (audio
+sync, calibration, subwoofer pairing); the Bass row shows a saved non-zero
+offset next to its level.
 No bass-specific fields are added to the shared server command.
 
 `GET /api/features` advertises the `bass-offset` component and its `set` action.
