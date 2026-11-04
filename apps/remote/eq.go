@@ -231,6 +231,10 @@ func (d *device) frontEQStatus(s state) *frontEQState {
 	n, e := d.readEQNative()
 	if e != nil {
 		out.Error = e.Error()
+		// A reset pending on another route: say what happens next.
+		if m.active && errors.Is(e, errEQRoute) && m.problem != "" {
+			out.Error = m.problem
+		}
 		return out
 	}
 	out.Available = true
@@ -514,7 +518,7 @@ func (r *remote) monitorFrontEQ(ctx context.Context) {
 				n, e := d.readEQNative()
 				if e != nil || n.Mode != 5 || n.outer != d.eq.native.outer || !bytes.Equal(n.Block, d.eq.expected) {
 					if e = d.resetFrontEQ(c); e != nil {
-						d.eq.problem = "EQ reset pending: " + e.Error()
+						d.eq.problem = eqPendingProblem(e, d.readHPPMode)
 					}
 				}
 			}

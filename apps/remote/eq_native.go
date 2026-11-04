@@ -95,6 +95,50 @@ func eqLibraryBase(maps []eqMemoryMap, path string) (uint32, error) {
 
 type eqNativeRead func(uint32, int) ([]byte, error)
 
+// errEQRoute: the active audio route is not the qualified Front EQ route.
+var errEQRoute = errors.New("native EQ is not ready on this audio route")
+
+// eqReadHPPMode reads only the native HPP processing mode (5 = custom Front
+// EQ). Unlike eqReadStateFor it accepts any route: it tells whether the custom
+// EQ still plays where the full reader cannot qualify the route. It requires
+// the same pointer chain twice and never writes.
+func eqReadHPPMode(read eqNativeRead, hppBase uint32) (uint32, error) {
+	word := func(a uint32) (uint32, error) {
+		b, e := read(a, 4)
+		if e != nil {
+			return 0, e
+		}
+		if len(b) != 4 {
+			return 0, io.ErrUnexpectedEOF
+		}
+		return binary.LittleEndian.Uint32(b), nil
+	}
+	chain := func() (uint32, uint32, uint32, error) {
+		outer, e := word(hppBase + 0xa45c)
+		if e != nil || outer == 0 {
+			return 0, 0, 0, errors.New("native audio mode unavailable")
+		}
+		instance, e := word(outer)
+		if e != nil || instance == 0 {
+			return 0, 0, 0, errors.New("native audio mode unavailable")
+		}
+		mode, e := word(instance + 0x1108)
+		if e != nil || mode > 15 {
+			return 0, 0, 0, errors.New("native audio mode unavailable")
+		}
+		return outer, instance, mode, nil
+	}
+	o1, i1, m1, e := chain()
+	if e != nil {
+		return 0, e
+	}
+	o2, i2, m2, e := chain()
+	if e != nil || o1 != o2 || i1 != i2 || m1 != m2 {
+		return 0, errors.New("native audio mode changed during readback")
+	}
+	return m1, nil
+}
+
 func eqReadState(read eqNativeRead, hppBase, hdspBase uint32) (eqNativeState, error) {
 	return eqReadStateFor(read, hppBase, hdspBase, false)
 }
@@ -111,7 +155,7 @@ func eqReadStateFor(read eqNativeRead, hppBase, hdspBase uint32, bass bool) (eqN
 		}
 		return binary.LittleEndian.Uint32(b), nil
 	}
-	fail := func() (eqNativeState, error) { return out, errors.New("native EQ is not ready on this audio route") }
+	fail := func() (eqNativeState, error) { return out, errEQRoute }
 	active, e := word(eqSpeakerBase + 0x40)
 	if e != nil || active != 1 {
 		return fail()
@@ -233,49 +277,11 @@ func (d *device) readEQNative() (eqNativeState, error) {
 
 func (d *device) readAudioNative(bass bool) (eqNativeState, error) {
 	var empty eqNativeState
-	if d.pid == 0 {
-		return empty, errors.New("soundbar is starting")
-	}
-	if !d.same() {
-		return empty, errors.New("soundbar restarted")
-	}
-	raw, e := os.ReadFile(fmt.Sprintf("/proc/%d/maps", d.pid))
-	if e != nil {
-		return empty, errors.New("audio mappings unavailable")
-	}
-	maps, e := eqParseMaps(string(raw))
+	read, hb, db, done, e := d.audioMemory()
 	if e != nil {
 		return empty, e
 	}
-	hb, e := eqLibraryBase(maps, "/system/usr/local/lib/libHPP.so")
-	if e != nil {
-		return empty, e
-	}
-	db, e := eqLibraryBase(maps, "/system/usr/lib/libhdsp.so")
-	if e != nil {
-		return empty, e
-	}
-	pb, e := eqLibraryBase(maps, "/system/usr/lib/ppc/libppc.so")
-	if e != nil {
-		return empty, e
-	}
-	key := fmt.Sprintf("%d:%s:%x:%x:%x", d.pid, d.start, hb, db, pb)
-	if e = d.eqCheckNativeLibraries(key, false); e != nil {
-		return empty, e
-	}
-	mem, e := os.Open(fmt.Sprintf("/proc/%d/mem", d.pid))
-	if e != nil {
-		return empty, errors.New("audio readback unavailable")
-	}
-	defer mem.Close()
-	read := func(a uint32, n int) ([]byte, error) {
-		if !eqMapped(maps, a, n, true) {
-			return nil, errors.New("unexpected audio state pointer")
-		}
-		b := make([]byte, n)
-		_, e := mem.ReadAt(b, int64(a))
-		return b, e
-	}
+	defer done()
 	state, e := eqReadStateFor(read, hb, db, bass)
 	if e != nil {
 		return empty, e
@@ -284,6 +290,70 @@ func (d *device) readAudioNative(bass bool) (eqNativeState, error) {
 		return empty, errors.New("soundbar restarted")
 	}
 	return state, nil
+}
+
+// readHPPMode reads the native processing mode on any route (see eqReadHPPMode).
+func (d *device) readHPPMode() (uint32, error) {
+	read, hb, _, done, e := d.audioMemory()
+	if e != nil {
+		return 0, e
+	}
+	defer done()
+	mode, e := eqReadHPPMode(read, hb)
+	if e != nil {
+		return 0, e
+	}
+	if !d.same() {
+		return 0, errors.New("soundbar restarted")
+	}
+	return mode, nil
+}
+
+// audioMemory opens the pinned native audio libraries for guarded reads.
+func (d *device) audioMemory() (read eqNativeRead, hb, db uint32, done func(), err error) {
+	if d.pid == 0 {
+		return nil, 0, 0, nil, errors.New("soundbar is starting")
+	}
+	if !d.same() {
+		return nil, 0, 0, nil, errors.New("soundbar restarted")
+	}
+	raw, e := os.ReadFile(fmt.Sprintf("/proc/%d/maps", d.pid))
+	if e != nil {
+		return nil, 0, 0, nil, errors.New("audio mappings unavailable")
+	}
+	maps, e := eqParseMaps(string(raw))
+	if e != nil {
+		return nil, 0, 0, nil, e
+	}
+	hb, e = eqLibraryBase(maps, "/system/usr/local/lib/libHPP.so")
+	if e != nil {
+		return nil, 0, 0, nil, e
+	}
+	db, e = eqLibraryBase(maps, "/system/usr/lib/libhdsp.so")
+	if e != nil {
+		return nil, 0, 0, nil, e
+	}
+	pb, e := eqLibraryBase(maps, "/system/usr/lib/ppc/libppc.so")
+	if e != nil {
+		return nil, 0, 0, nil, e
+	}
+	key := fmt.Sprintf("%d:%s:%x:%x:%x", d.pid, d.start, hb, db, pb)
+	if e = d.eqCheckNativeLibraries(key, false); e != nil {
+		return nil, 0, 0, nil, e
+	}
+	mem, e := os.Open(fmt.Sprintf("/proc/%d/mem", d.pid))
+	if e != nil {
+		return nil, 0, 0, nil, errors.New("audio readback unavailable")
+	}
+	read = func(a uint32, n int) ([]byte, error) {
+		if !eqMapped(maps, a, n, true) {
+			return nil, errors.New("unexpected audio state pointer")
+		}
+		b := make([]byte, n)
+		_, e := mem.ReadAt(b, int64(a))
+		return b, e
+	}
+	return read, hb, db, func() { mem.Close() }, nil
 }
 
 // withEQConsole reuses the remote's two existing console fields. The native
