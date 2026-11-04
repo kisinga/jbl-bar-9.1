@@ -205,15 +205,27 @@ function pendingMessage() {
   return active === 'power' ? 'Changing power state…' : 'Applying your change…';
 }
 function clearSyncDraft(){clearTimeout(syncTimer);syncTimer=null;advanced.clear();}
-function avSyncTap(action){
-  if(!advanced.adjust(action,current)) return;
+// One submit path for the sync draft: taps wait until they stop, a typed
+// value (Enter or blur) goes at once. Both become a single av_sync_set.
+function submitSync(delay){
   clearTimeout(syncTimer);
   syncTimer=setTimeout(()=>{
     syncTimer=null;
     if(!online || active || advanced.target()===current?.sound?.av_sync_ms){advanced.clear();render();return;}
-    queue.push('av_sync_set');void pump();
-  },900);
-  render();feedback('Audio sync '+advanced.target()+' ms · sending when you stop tapping…','pending');
+    if(!queue.includes('av_sync_set')) queue.push('av_sync_set');
+    void pump();
+  },delay);
+  render();
+}
+function avSyncTap(action){
+  if(!advanced.adjust(action,current)) return;
+  submitSync(900);
+  feedback('Audio sync '+advanced.target()+' ms · sending when you stop tapping…','pending');
+}
+function avSyncTyped(){
+  if(!csrf || active) return;
+  if(advanced.type(current)) submitSync(0);
+  else {clearTimeout(syncTimer);syncTimer=null;render();}
 }
 // A segment (level or mode) becomes the confirmed steps that reach it, run
 // one by one through the same queue and capability mapping as other controls.
@@ -321,6 +333,8 @@ document.addEventListener('visibilitychange', () => {
   stopHold();
   if (document.hidden) {stream?.close();stream=null;} else connectStream();
 });
+$('av-sync-input').addEventListener('change', avSyncTyped);
+$('av-sync-input').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); } });
 $('refresh').addEventListener('click', () => { connectStream(); void refresh(); });
 $('cancel-volume').addEventListener('click', () => {
   queue = [];
