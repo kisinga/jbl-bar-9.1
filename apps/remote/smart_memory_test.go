@@ -72,11 +72,11 @@ func TestSmartMemoryRecordsAChoiceKeptAfterTheWake(t *testing.T) {
 	}
 	w.handled = true // Standard applied
 	std := standardWake()
-	if mode, kept := settleFor(&w, std, settleSamples); !kept || mode != 0 {
+	if mode, kept := settleFor(&w, std, settleOther); !kept || mode != 0 {
 		t.Fatalf("Standard after the gesture not settled: %d %v", mode, kept)
 	}
-	// The owner selects Smart: it must stay settleSamples before being kept.
-	if _, kept := settleFor(&w, s, settleSamples-1); kept {
+	// Smart from the physical remote or the firmware: it must stay settleOther.
+	if _, kept := settleFor(&w, s, settleOther-1); kept {
 		t.Fatal("a short Smart was remembered")
 	}
 	if mode, kept := w.settle(s); !kept || mode != 3 {
@@ -168,25 +168,25 @@ func TestSmartMemoryManualChoiceWinsBeforeTheGesture(t *testing.T) {
 	var w wakeTracker
 	s := readyWake() // Smart after wake, Standard remembered
 	w.observeFor(s, false)
-	w.chosen() // the owner selects Smart (or Standard) from the page
+	w.chosen(3) // the owner selects Smart from the page
 	for i := 0; i < 5; i++ {
 		status, apply := w.observeFor(s, false)
 		if apply || status != "MANUAL_MODE_THIS_WAKE" {
 			t.Fatalf("the automation overrode a manual choice: %s apply=%v", status, apply)
 		}
 	}
-	if mode, kept := settleFor(&w, s, settleSamples); !kept || mode != 3 {
+	if mode, kept := settleFor(&w, s, settleRequested); !kept || mode != 3 {
 		t.Fatalf("manual Smart not remembered: %d %v", mode, kept)
 	}
 	// A choice after the wake was handled changes nothing for this wake.
 	var done wakeTracker
 	done.handled = true
-	done.chosen()
+	done.chosen(3)
 	if done.manual {
 		t.Fatal("a handled wake was relabelled")
 	}
 	failed := wakeTracker{failed: true}
-	failed.chosen()
+	failed.chosen(3)
 	if failed.handled {
 		t.Fatal("a failed wake was marked handled")
 	}
@@ -196,5 +196,55 @@ func TestSmartMemoryManualChoiceWinsBeforeTheGesture(t *testing.T) {
 	w.observeFor(asleep, false)
 	if w.manual || w.handled {
 		t.Fatal("manual choice carried into the next wake")
+	}
+}
+
+// Observed on 4 Nov 2026: Standard kept, then the power button; the firmware
+// switched to Smart about 25 s before it reported standby. That Smart must not
+// be remembered.
+func TestSmartMemoryIgnoresTheSmartBeforeStandby(t *testing.T) {
+	var w wakeTracker
+	std := standardWake()
+	for i := 0; i < 3; i++ {
+		w.observeFor(std, false)
+	}
+	if !w.handled {
+		t.Fatal("Standard wake not handled")
+	}
+	settleFor(&w, std, settleOther)
+	smart := readyWake()
+	for i := 0; i < 25; i++ {
+		w.observeFor(smart, false)
+		if _, kept := w.settle(smart); kept {
+			t.Fatalf("Smart before standby remembered after %d s", i+1)
+		}
+	}
+	asleep := smart
+	asleep.power = 0
+	w.observeFor(asleep, false)
+	if _, kept := w.settle(asleep); kept {
+		t.Fatal("mode remembered in standby")
+	}
+}
+
+func TestSmartMemoryRequestedChoiceIsQuickOnlyForItsMode(t *testing.T) {
+	var w wakeTracker
+	std := standardWake()
+	for i := 0; i < 3; i++ {
+		w.observeFor(std, false)
+	}
+	settleFor(&w, std, settleOther)
+	// Smart selected from the page: remembered after settleRequested.
+	w.chosen(3)
+	smart := readyWake()
+	if mode, kept := settleFor(&w, smart, settleRequested); !kept || mode != 3 {
+		t.Fatalf("requested Smart not remembered quickly: %d %v", mode, kept)
+	}
+	// Standard selected from the page, but the firmware switches to Smart
+	// before it settles (power button): that Smart takes the long window.
+	w.chosen(0)
+	settleFor(&w, std, 2)
+	if _, kept := settleFor(&w, smart, settleRequested); kept {
+		t.Fatal("an unrequested mode used the quick window")
 	}
 }

@@ -78,6 +78,11 @@ type wakeTracker struct {
 	settledCount int
 	// manual: the owner chose the mode before the automation acted.
 	manual bool
+	// requested: a mode the owner selected from the page or Home Assistant
+	// (0 Standard, 3 Smart) and that settle has not reported yet.
+	requested       bool
+	requestedMode   uint32
+	settledReported bool
 }
 
 func (w *wakeTracker) observe(s wakeSample) (string, bool) { return w.observeFor(s, false) }
@@ -136,29 +141,52 @@ func (w *wakeTracker) observeFor(s wakeSample, keepSmart bool) (string, bool) {
 // chosen completes a wake the automation has not acted on yet: a Standard or
 // Smart selection made by the owner (page, Home Assistant) wins over the
 // remembered or default mode, and is remembered like any later choice.
-func (w *wakeTracker) chosen() {
+func (w *wakeTracker) chosen(mode uint32) {
 	if !w.handled && !w.failed {
 		w.handled, w.manual = true, true
 	}
+	w.requested, w.requestedMode = true, mode
 }
 
-// settleSamples: a mode must stay this many one-second samples before it is
-// remembered, so a transient mode around standby is not taken for a choice.
-const settleSamples = 5
+// A mode is remembered once it has stayed this many one-second samples:
+//   - settleRequested for the mode the owner selected from the page or Home
+//     Assistant: the choice is known to be intentional;
+//   - settleOther for any other change (physical remote, firmware). On 4 Nov
+//     2026 the firmware switched to Smart about 25 s before it reported standby
+//     after the power button, so a short window took that for a choice.
+const (
+	settleRequested = 5
+	settleOther     = 60
+)
 
-// settle reports, once, a mode kept for settleSamples after this wake was
-// handled. Before that the bar's own post-wake Smart (or the gesture being
-// applied) is never taken for the owner's choice; a failed wake records nothing.
+// settle reports, once, a mode kept long enough after this wake was handled.
+// Before that the bar's own post-wake Smart (or the gesture being applied) is
+// never taken for the owner's choice; a failed wake records nothing, and a
+// standby before the window ends discards the change.
 func (w *wakeTracker) settle(s wakeSample) (uint32, bool) {
 	if !w.handled || w.failed || s.identity == "" || s.identity != w.last.identity || s.power != 1 || s.system != 0 || !s.idle || (s.mode != 0 && s.mode != 3) {
 		w.settledCount = 0
 		return 0, false
 	}
-	if s.mode != w.settledMode {
+	if s.mode != w.settledMode || w.settledCount == 0 {
+		if s.mode != w.settledMode {
+			w.settledReported = false
+		}
 		w.settledMode, w.settledCount = s.mode, 0
 	}
 	w.settledCount++
-	return s.mode, w.settledCount == settleSamples
+	need := settleOther
+	if w.requested && s.mode == w.requestedMode {
+		need = settleRequested
+	}
+	if w.settledReported || w.settledCount < need {
+		return s.mode, false
+	}
+	w.settledReported = true
+	if s.mode == w.requestedMode {
+		w.requested = false
+	}
+	return s.mode, true
 }
 
 // smartMemoryPath keeps the last mode the owner chose (smart_mode_memory). It
@@ -465,7 +493,7 @@ func (r *remote) monitorAutoStandard(ctx context.Context) {
 		}
 		if d.manualModes != manualSeen {
 			manualSeen = d.manualModes
-			tracker.chosen()
+			tracker.chosen(d.manualMode)
 		}
 		status, apply := tracker.observeFor(sample, remembered == "Smart")
 		if r.cfg.SmartModeMemory {

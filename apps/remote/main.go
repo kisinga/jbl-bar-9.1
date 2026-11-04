@@ -81,8 +81,10 @@ type state struct {
 type device struct {
 	automation        *automationState
 	automationRunning bool
-	// manualModes counts Standard/Smart selections not made by the automation.
+	// manualModes counts Standard/Smart selections not made by the automation;
+	// manualMode is the last one's mode (0 Standard, 3 Smart).
 	manualModes uint64
+	manualMode  uint32
 	eq          eqController
 	monitor     systemMonitor
 	mu          sync.Mutex
@@ -801,6 +803,10 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 				}
 				if (action == "standard" || action == "smart") && !d.automationRunning {
 					d.manualModes++
+					d.manualMode = 0
+					if action == "smart" {
+						d.manualMode = 3
+					}
 				}
 				return out, nil
 			}
