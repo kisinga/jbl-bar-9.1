@@ -53,6 +53,11 @@ according to its capabilities.
 Experimental [bass offset](docs/BASS_OFFSET.md) adjusts all five native bass levels
 from -3 to +3 dB in half-decibel steps, with an explicit Save offset control.
 
+**Home Assistant:** [naonak/jbl-bar-9.1-ha](https://github.com/naonak/jbl-bar-9.1-ha)
+is a separate HACS integration for the **Bar 9.1 only**, using this web remote's
+local API. It is maintained in its own repository; see the
+[Bar 9.1 setup](docs/models/bar91/STANDALONE.md#home-assistant).
+
 Single USB is the canonical path for new installations. **Keep an existing
 installation's original USB and recovery package.** Cross-version USB/SSH
 updates are not implemented yet; packages refuse incompatible replacements.
