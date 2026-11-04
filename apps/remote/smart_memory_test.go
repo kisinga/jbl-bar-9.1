@@ -163,3 +163,38 @@ func TestSmartMemoryNeedsAutoStandard(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestSmartMemoryManualChoiceWinsBeforeTheGesture(t *testing.T) {
+	var w wakeTracker
+	s := readyWake() // Smart after wake, Standard remembered
+	w.observeFor(s, false)
+	w.chosen() // the owner selects Smart (or Standard) from the page
+	for i := 0; i < 5; i++ {
+		status, apply := w.observeFor(s, false)
+		if apply || status != "MANUAL_MODE_THIS_WAKE" {
+			t.Fatalf("the automation overrode a manual choice: %s apply=%v", status, apply)
+		}
+	}
+	if mode, kept := settleFor(&w, s, settleSamples); !kept || mode != 3 {
+		t.Fatalf("manual Smart not remembered: %d %v", mode, kept)
+	}
+	// A choice after the wake was handled changes nothing for this wake.
+	var done wakeTracker
+	done.handled = true
+	done.chosen()
+	if done.manual {
+		t.Fatal("a handled wake was relabelled")
+	}
+	failed := wakeTracker{failed: true}
+	failed.chosen()
+	if failed.handled {
+		t.Fatal("a failed wake was marked handled")
+	}
+	// The next wake starts from the remembered mode again.
+	asleep := s
+	asleep.power = 0
+	w.observeFor(asleep, false)
+	if w.manual || w.handled {
+		t.Fatal("manual choice carried into the next wake")
+	}
+}

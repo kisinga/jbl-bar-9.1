@@ -118,6 +118,13 @@ try {
   state.automation={enabled:true,engine:'go',status:'AWAKE_STABILIZING_3',remembered_mode:'Standard'};
   await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Go · Checking the mode after wake… · after standby: Standard');
   check(true,'the wake check does not claim Standard before deciding');
+  check(await page.locator('[data-action=volume_up]').isDisabled() && await page.locator('[data-action=night_toggle]').isDisabled() && (await page.locator('#summary').textContent()).startsWith('Checking the sound mode after wake'),'controls wait while the bar settles after wake, as the server refuses them');
+  state.mode='Smart';state.automation={enabled:true,engine:'go',status:'AWAKE_STABILIZING_3',remembered_mode:'Standard'};
+  await page.waitForFunction(()=>document.querySelector('#summary').textContent.startsWith('Returning to Standard after wake'));
+  check(true,'the summary says Standard is being restored');
+  state.mode='Standard';state.automation={enabled:true,engine:'go',status:'MANUAL_MODE_THIS_WAKE',remembered_mode:'Smart'};
+  await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Go · Your mode choice kept for this wake · after standby: Smart');
+  check(await page.locator('[data-action=volume_up]').isEnabled(),'controls return once the wake is handled');
   delete state.automation;
   await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Standard selected for this wake');
 

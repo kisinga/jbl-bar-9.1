@@ -76,6 +76,8 @@ type wakeTracker struct {
 	// A mode kept after the wake was handled (see settle).
 	settledMode  uint32
 	settledCount int
+	// manual: the owner chose the mode before the automation acted.
+	manual bool
 }
 
 func (w *wakeTracker) observe(s wakeSample) (string, bool) { return w.observeFor(s, false) }
@@ -97,6 +99,9 @@ func (w *wakeTracker) observeFor(s wakeSample, keepSmart bool) (string, bool) {
 		}
 	}
 	if w.handled {
+		if w.manual {
+			return "MANUAL_MODE_THIS_WAKE", false
+		}
 		if keepSmart {
 			return "SMART_KEPT_THIS_WAKE", false
 		}
@@ -126,6 +131,15 @@ func (w *wakeTracker) observeFor(s wakeSample, keepSmart bool) (string, bool) {
 		return "SMART_KEPT_THIS_WAKE", false
 	}
 	return fmt.Sprintf("AWAKE_STABILIZING_%d", s.mode), s.mode == 3 && w.stable >= 3
+}
+
+// chosen completes a wake the automation has not acted on yet: a Standard or
+// Smart selection made by the owner (page, Home Assistant) wins over the
+// remembered or default mode, and is remembered like any later choice.
+func (w *wakeTracker) chosen() {
+	if !w.handled && !w.failed {
+		w.handled, w.manual = true, true
+	}
 }
 
 // settleSamples: a mode must stay this many one-second samples before it is
@@ -420,6 +434,9 @@ func (r *remote) monitorAutoStandard(ctx context.Context) {
 		}
 	}
 	var tracker wakeTracker
+	r.device.mu.Lock()
+	manualSeen := r.device.manualModes
+	r.device.mu.Unlock()
 	remembered := ""
 	if r.cfg.SmartModeMemory {
 		remembered = loadSmartMemory(smartMemoryPath)
@@ -445,6 +462,10 @@ func (r *remote) monitorAutoStandard(ctx context.Context) {
 		sample, e := d.wakeSample()
 		if e != nil {
 			sample = wakeSample{}
+		}
+		if d.manualModes != manualSeen {
+			manualSeen = d.manualModes
+			tracker.chosen()
 		}
 		status, apply := tracker.observeFor(sample, remembered == "Smart")
 		if r.cfg.SmartModeMemory {

@@ -81,16 +81,18 @@ type state struct {
 type device struct {
 	automation        *automationState
 	automationRunning bool
-	eq                eqController
-	monitor           systemMonitor
-	mu                sync.Mutex
-	pid               int
-	start             string
-	revision          uint64
-	cliChecked        bool
-	center            centerController
-	format            formatTracker
-	bass              bassController
+	// manualModes counts Standard/Smart selections not made by the automation.
+	manualModes uint64
+	eq          eqController
+	monitor     systemMonitor
+	mu          sync.Mutex
+	pid         int
+	start       string
+	revision    uint64
+	cliChecked  bool
+	center      centerController
+	format      formatTracker
+	bass        bassController
 }
 type remote struct {
 	http          *server.Server[state]
@@ -796,6 +798,9 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 			if actionObserved(action, before, out) {
 				if (action == "standard" || action == "smart") && !standardSettingsPreserved(before, out) {
 					return out, errors.New("Sound mode changed but volume or mute changed; automatic retry stopped")
+				}
+				if (action == "standard" || action == "smart") && !d.automationRunning {
+					d.manualModes++
 				}
 				return out, nil
 			}
