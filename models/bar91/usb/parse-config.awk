@@ -24,7 +24,7 @@ function cidr(value, parts, octets, count, i, ip, unit, private) {
     if (split($0, fields, "=") != 2) { fail("expected key=value at line " NR); next }
     key=fields[1]; value=fields[2]
     sub(/[ \t]+$/, "", key); sub(/^[ \t]+/, "", value)
-    if (key !~ /^(format|action|ssh|web_remote|auto_standard|allowed_cidr|web_port|ssh_password_hash|wifi_ssid_hex|wifi_psk_hex)$/) { fail("unknown key at line " NR); next }
+    if (key !~ /^(format|action|ssh|web_remote|auto_standard|smart_mode_memory|allowed_cidr|web_port|ssh_password_hash|wifi_ssid_hex|wifi_psk_hex)$/) { fail("unknown key at line " NR); next }
     if (key in values) { fail("duplicate " key); next }
     values[key]=value
 }
@@ -34,6 +34,10 @@ END {
     if (values["format"]!="1") fail("unsupported format")
     if (values["action"] !~ /^(install|configure|uninstall|check|verify|migrate)$/) fail("invalid action")
     for (i=3; i<=5; i++) if (values[keys[i]] !~ /^(true|false)$/) fail("invalid boolean " keys[i])
+    # Optional: restore the mode chosen before standby (needs auto_standard).
+    if (!("smart_mode_memory" in values)) values["smart_mode_memory"]="false"
+    if (values["smart_mode_memory"] !~ /^(true|false)$/) fail("invalid boolean smart_mode_memory")
+    else if (values["smart_mode_memory"]=="true" && values["auto_standard"]!="true") fail("smart_mode_memory requires auto_standard=true")
     if (!cidr(values["allowed_cidr"])) fail("expected canonical private IPv4 subnet, /16 through /30")
     port=values["web_port"]
     if (port !~ /^[0-9]+$/ || sprintf("%d", port)!=port || (port!=80 && (port<1024 || port>65535)) || port==2222) fail("invalid web_port")
@@ -48,6 +52,7 @@ END {
     }
     if (bad) exit 1
     for (i=1; i<=count; i++) print toupper(keys[i]) "=" values[keys[i]]
+    print "SMART_MODE_MEMORY=" values["smart_mode_memory"]
     # Only bounded crypt/hex alphabets reach shell assignments. Never execute
     # configuration text, and never emit a plaintext password into a plan.
     if ("ssh_password_hash" in values) print "SSH_PASSWORD_HASH='" hash "'"

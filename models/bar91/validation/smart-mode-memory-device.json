@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-04",
+  "scope": "One owned JBL Bar 9.1, Go web service with auto_standard and smart_mode_memory, over existing root SSH; no firmware flash. Times are remote.log timestamps (one-second sampling); power was switched with the bar's own controls.",
+  "firmware_sha256": "86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441c90b63",
+  "poll_seconds": 1,
+  "stable_awake_samples": 3,
+  "settle_requested_samples": 5,
+  "settle_other_samples": 60,
+  "cases": [
+    {
+      "case": "first-build-standby-smart-recorded",
+      "build": "5-sample window for every change (superseded)",
+      "log": ["01:44:40 ALREADY_STANDARD_THIS_WAKE", "01:45:25 remembered mode Smart", "01:45:50 WAITING_FOR_POWER_ON", "01:45:52 AWAKE_STABILIZING_3", "01:46:00 SMART_KEPT_THIS_WAKE"],
+      "result": "Standard before standby, Smart kept after wake: wrong",
+      "finding": "The firmware switched to Smart about 25 s before it reported standby after the power button; five samples took that for a choice."
+    },
+    {
+      "case": "smart-remembered-after-restart",
+      "build": "final",
+      "log": ["01:59:41 AWAKE_STABILIZING_3", "01:59:45 SMART_KEPT_THIS_WAKE"],
+      "result": "Smart remembered in smart-mode.json across a service restart: wake completed without a gesture",
+      "gesture_sent": false
+    },
+    {
+      "case": "requested-standard",
+      "build": "final",
+      "log": ["02:00:03 remembered mode Standard"],
+      "result": "Standard selected from the page was remembered"
+    },
+    {
+      "case": "standard-standby-wake-1",
+      "build": "final",
+      "log": ["02:00:07 WAITING_FOR_POWER_ON", "02:00:11 AWAKE_STABILIZING_3", "02:00:19 STANDARD_THIS_WAKE"],
+      "observed_awake_to_standard_seconds": 8,
+      "standard_confirmed": true
+    },
+    {
+      "case": "standard-standby-wake-2",
+      "build": "final",
+      "log": ["02:00:33 WAITING_FOR_POWER_ON", "02:00:37 AWAKE_STABILIZING_3", "02:00:46 STANDARD_THIS_WAKE"],
+      "observed_awake_to_standard_seconds": 9,
+      "standard_confirmed": true,
+      "note": "Standby 14 s after the previous wake: the firmware's Smart before standby was not remembered."
+    }
+  ],
+  "browser": {
+    "controls_disabled_while_settling_after_wake": true
+  },
+  "observations": [
+    "remote.log showed a 2016 timestamp before the first final-build wake: the service started before the bar's clock was set; smart-mode.json was read correctly.",
+    "Not yet recorded with the final build: Smart selected from the page, then standby and wake (the Smart-kept wake above used a Smart record from the first build)."
+  ]
+}

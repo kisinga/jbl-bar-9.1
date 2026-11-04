@@ -46,6 +46,9 @@ for label, data in {
     'ambiguous_octet': changed(allowed_cidr='192.168.001.0/24'),
     'ssh_port_collision': changed(web_port='2222'),
     'bad_boolean': changed(auto_standard='yes'),
+    'memory_without_auto_standard': changed(auto_standard='false') + b'smart_mode_memory=true\n',
+    'bad_memory_boolean': CONFIG + b'smart_mode_memory=yes\n',
+    'duplicate_memory': CONFIG + b'smart_mode_memory=true\nsmart_mode_memory=false\n',
     'unknown_action': changed(action='upgrade'),
     'unsupported_format': changed(format='2'),
     'missing_key': CONFIG.replace(b'ssh=true\n', b''),
@@ -61,6 +64,9 @@ for label, data in {
 for subnet in ('10.23.0.0/16', '172.20.8.0/24', '192.168.1.0/30'):
     assert build_usb.parse_config(changed(allowed_cidr=subnet))['ALLOWED_CIDR'] == subnet
 assert build_usb.parse_config(CONFIG.replace(b'\n', b'\r\n'))['SSH'] == 'true'
+assert build_usb.parse_config(CONFIG)['SMART_MODE_MEMORY'] == 'false'
+assert build_usb.parse_config(CONFIG + b'smart_mode_memory=true\n')['SMART_MODE_MEMORY'] == 'true'
+passed('optional_smart_mode_memory')
 passed('canonical_private_subnets_and_windows_line_endings')
 
 (ROOT / 'dist').mkdir(exist_ok=True)

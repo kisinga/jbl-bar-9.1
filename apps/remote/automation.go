@@ -56,6 +56,9 @@ type automationState struct {
 	Engine  string `json:"engine"`
 	Status  string `json:"status"`
 	Error   string `json:"error,omitempty"`
+	// RememberedMode is the mode restored after the next wake when
+	// smart_mode_memory is enabled ("Standard" or "Smart").
+	RememberedMode string `json:"remembered_mode,omitempty"`
 }
 type wakeSample struct {
 	identity                    string
@@ -70,9 +73,24 @@ type wakeTracker struct {
 	stable          int
 	handled, failed bool
 	failureReason   string
+	// A mode kept after the wake was handled (see settle).
+	settledMode  uint32
+	settledCount int
+	// manual: the owner chose the mode before the automation acted.
+	manual bool
+	// requested: a mode the owner selected from the page or Home Assistant
+	// (0 Standard, 3 Smart) and that settle has not reported yet.
+	requested       bool
+	requestedMode   uint32
+	settledReported bool
 }
 
-func (w *wakeTracker) observe(s wakeSample) (string, bool) {
+func (w *wakeTracker) observe(s wakeSample) (string, bool) { return w.observeFor(s, false) }
+
+// observeFor is observe for one wake. keepSmart (smart_mode_memory, Smart
+// remembered) completes the wake without a gesture once it is stable: the bar
+// returns to Smart by itself after wake, so no Smart gesture is ever needed.
+func (w *wakeTracker) observeFor(s wakeSample, keepSmart bool) (string, bool) {
 	if s.identity == "" {
 		// A read gap is not a new wake. Keep completion/failure so a transient
 		// procfs/config read cannot replay a gesture or override a manual choice.
@@ -86,6 +104,12 @@ func (w *wakeTracker) observe(s wakeSample) (string, bool) {
 		}
 	}
 	if w.handled {
+		if w.manual {
+			return "MANUAL_MODE_THIS_WAKE", false
+		}
+		if keepSmart {
+			return "SMART_KEPT_THIS_WAKE", false
+		}
 		return "STANDARD_THIS_WAKE", false
 	}
 	if w.failed {
@@ -107,7 +131,110 @@ func (w *wakeTracker) observe(s wakeSample) (string, bool) {
 		w.failureReason = ""
 		return "ALREADY_STANDARD_THIS_WAKE", false
 	}
+	if keepSmart && w.stable >= 3 {
+		w.handled = true
+		return "SMART_KEPT_THIS_WAKE", false
+	}
 	return fmt.Sprintf("AWAKE_STABILIZING_%d", s.mode), s.mode == 3 && w.stable >= 3
+}
+
+// chosen completes a wake the automation has not acted on yet: a Standard or
+// Smart selection made by the owner (page, Home Assistant) wins over the
+// remembered or default mode, and is remembered like any later choice.
+func (w *wakeTracker) chosen(mode uint32) {
+	if !w.handled && !w.failed {
+		w.handled, w.manual = true, true
+	}
+	w.requested, w.requestedMode = true, mode
+}
+
+// A mode is remembered once it has stayed this many one-second samples:
+//   - settleRequested for the mode the owner selected from the page or Home
+//     Assistant: the choice is known to be intentional;
+//   - settleOther for any other change (physical remote, firmware). On 4 Nov
+//     2026 the firmware switched to Smart about 25 s before it reported standby
+//     after the power button, so a short window took that for a choice.
+const (
+	settleRequested = 5
+	settleOther     = 60
+)
+
+// settle reports, once, a mode kept long enough after this wake was handled.
+// Before that the bar's own post-wake Smart (or the gesture being applied) is
+// never taken for the owner's choice; a failed wake records nothing, and a
+// standby before the window ends discards the change.
+func (w *wakeTracker) settle(s wakeSample) (uint32, bool) {
+	if !w.handled || w.failed || s.identity == "" || s.identity != w.last.identity || s.power != 1 || s.system != 0 || !s.idle || (s.mode != 0 && s.mode != 3) {
+		w.settledCount = 0
+		return 0, false
+	}
+	if s.mode != w.settledMode || w.settledCount == 0 {
+		if s.mode != w.settledMode {
+			w.settledReported = false
+		}
+		w.settledMode, w.settledCount = s.mode, 0
+	}
+	w.settledCount++
+	need := settleOther
+	if w.requested && s.mode == w.requestedMode {
+		need = settleRequested
+	}
+	if w.settledReported || w.settledCount < need {
+		return s.mode, false
+	}
+	w.settledReported = true
+	if s.mode == w.requestedMode {
+		w.requested = false
+	}
+	return s.mode, true
+}
+
+// smartMemoryPath keeps the last mode the owner chose (smart_mode_memory). It
+// survives standby, mains power loss and service restarts, and is rewritten
+// only when the remembered mode changes.
+var smartMemoryPath = "/var/JBLRemote/smart-mode.json"
+
+func modeName(mode uint32) string {
+	if mode == 3 {
+		return "Smart"
+	}
+	return "Standard"
+}
+
+// loadSmartMemory returns the remembered mode; Standard when there is none
+// yet or the file is not this remote's, as with plain auto_standard.
+func loadSmartMemory(path string) string {
+	b, e := os.ReadFile(path)
+	if e != nil {
+		return "Standard"
+	}
+	switch strings.TrimSpace(string(b)) {
+	case `{"mode":"Smart"}`:
+		return "Smart"
+	}
+	return "Standard"
+}
+func saveSmartMemory(path, mode string) error {
+	if mode != "Smart" && mode != "Standard" {
+		return errors.New("invalid remembered mode")
+	}
+	tmp := path + ".new"
+	_ = os.Remove(tmp)
+	f, e := os.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY|syscall.O_NOFOLLOW, 0600)
+	if e != nil {
+		return e
+	}
+	if _, e = f.WriteString(`{"mode":"` + mode + `"}` + "\n"); e == nil {
+		e = f.Sync()
+	}
+	if c := f.Close(); e == nil {
+		e = c
+	}
+	if e != nil {
+		os.Remove(tmp)
+		return e
+	}
+	return os.Rename(tmp, path)
 }
 
 // Verify all pinned payload members before pausing or restoring a legacy worker.
@@ -335,6 +462,14 @@ func (r *remote) monitorAutoStandard(ctx context.Context) {
 		}
 	}
 	var tracker wakeTracker
+	r.device.mu.Lock()
+	manualSeen := r.device.manualModes
+	r.device.mu.Unlock()
+	remembered := ""
+	if r.cfg.SmartModeMemory {
+		remembered = loadSmartMemory(smartMemoryPath)
+		log.Printf("Smart Mode automation: remembered mode %s", remembered)
+	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -356,11 +491,25 @@ func (r *remote) monitorAutoStandard(ctx context.Context) {
 		if e != nil {
 			sample = wakeSample{}
 		}
-		status, apply := tracker.observe(sample)
+		if d.manualModes != manualSeen {
+			manualSeen = d.manualModes
+			tracker.chosen(d.manualMode)
+		}
+		status, apply := tracker.observeFor(sample, remembered == "Smart")
+		if r.cfg.SmartModeMemory {
+			if mode, kept := tracker.settle(sample); kept && modeName(mode) != remembered {
+				if e := saveSmartMemory(smartMemoryPath, modeName(mode)); e != nil {
+					log.Printf("Smart Mode automation: cannot remember %s: %v", modeName(mode), e)
+				} else {
+					remembered = modeName(mode)
+					log.Printf("Smart Mode automation: remembered mode %s", remembered)
+				}
+			}
+		}
 		// Keep a failure's reason visible until the wake ends.
 		failure := tracker.failureReason
 		changed := d.automation == nil || d.automation.Status != status
-		d.automation = &automationState{Enabled: true, Engine: "go", Status: status, Error: failure}
+		d.automation = &automationState{Enabled: true, Engine: "go", Status: status, Error: failure, RememberedMode: remembered}
 		if changed {
 			log.Printf("Smart Mode automation: %s", status)
 		}

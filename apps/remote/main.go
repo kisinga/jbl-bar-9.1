@@ -32,10 +32,13 @@ import (
 )
 
 type config struct {
-	Headless     bool   `json:"headless"`
-	AutoStandard bool   `json:"auto_standard"`
-	Listen       string `json:"listen"`
-	AllowedCIDR  string `json:"allowed_cidr"`
+	Headless     bool `json:"headless"`
+	AutoStandard bool `json:"auto_standard"`
+	// SmartModeMemory restores the mode chosen before standby instead of
+	// always selecting Standard; it needs AutoStandard.
+	SmartModeMemory bool   `json:"smart_mode_memory"`
+	Listen          string `json:"listen"`
+	AllowedCIDR     string `json:"allowed_cidr"`
 }
 type bluetoothState struct {
 	peer         string // Current peer address stays inside native control code.
@@ -78,16 +81,20 @@ type state struct {
 type device struct {
 	automation        *automationState
 	automationRunning bool
-	eq                eqController
-	monitor           systemMonitor
-	mu                sync.Mutex
-	pid               int
-	start             string
-	revision          uint64
-	cliChecked        bool
-	center            centerController
-	format            formatTracker
-	bass              bassController
+	// manualModes counts Standard/Smart selections not made by the automation;
+	// manualMode is the last one's mode (0 Standard, 3 Smart).
+	manualModes uint64
+	manualMode  uint32
+	eq          eqController
+	monitor     systemMonitor
+	mu          sync.Mutex
+	pid         int
+	start       string
+	revision    uint64
+	cliChecked  bool
+	center      centerController
+	format      formatTracker
+	bass        bassController
 }
 type remote struct {
 	http          *server.Server[state]
@@ -794,6 +801,13 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 				if (action == "standard" || action == "smart") && !standardSettingsPreserved(before, out) {
 					return out, errors.New("Sound mode changed but volume or mute changed; automatic retry stopped")
 				}
+				if (action == "standard" || action == "smart") && !d.automationRunning {
+					d.manualModes++
+					d.manualMode = 0
+					if action == "smart" {
+						d.manualMode = 3
+					}
+				}
 				return out, nil
 			}
 		}
@@ -803,6 +817,9 @@ func (d *device) action(ctx context.Context, action string) (out state, err erro
 func newRemote(cfg config) (*remote, error) {
 	if cfg.Headless && !cfg.AutoStandard {
 		return nil, errors.New("headless mode requires auto_standard")
+	}
+	if cfg.SmartModeMemory && !cfg.AutoStandard {
+		return nil, errors.New("smart_mode_memory requires auto_standard")
 	}
 	_, network, e := net.ParseCIDR(cfg.AllowedCIDR)
 	if e != nil {

@@ -75,6 +75,12 @@ function render() {
   updateSync();
   for (const component of components) component.render(context());
   if (/starting|Starting in|Measuring/.test(s.setup?.calibration || '')) for(const button of buttons) button.disabled=true;
+  // Right after wake the automation checks the mode, then may restore Standard:
+  // the bar refuses native controls meanwhile ("settling"), so say so instead.
+  if (ready && s.automation?.enabled && /^(AWAKE_STABILIZING_|APPLYING_STANDARD)/.test(s.automation.status || '')) {
+    for (const button of buttons) button.disabled = true;
+    $('summary').textContent = s.automation.status === 'APPLYING_STANDARD' || (s.mode === 'Smart' && s.automation.remembered_mode !== 'Smart') ? 'Returning to Standard after wake… controls return in a few seconds.' : 'Checking the sound mode after wake… controls return in a few seconds.';
+  }
   capabilities.apply();
 }
 function updateSync() {

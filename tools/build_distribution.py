@@ -41,7 +41,8 @@ def build(output: Path, model: str = "auto") -> list[Path]:
         if any(n.endswith(('/password.hash', '/wifi.ssid.hex', '/wifi.psk.hex')) for n in files):
             raise ValueError('Public package must not contain credentials')
         settings = build_usb.parse_config(files['JBLToolkit/config.txt'])
-        if settings['SSH'] != 'false' or settings['ACTION'] != 'check' or len(settings) != 7:
+        public = {'FORMAT', 'ACTION', 'SSH', 'WEB_REMOTE', 'AUTO_STANDARD', 'SMART_MODE_MEMORY', 'ALLOWED_CIDR', 'WEB_PORT'}
+        if settings['SSH'] != 'false' or settings['ACTION'] != 'check' or set(settings) != public:
             raise ValueError('Public configuration must be credential-free and check-only')
         stem = f'jbl-{"bar-toolkit" if model == "auto" else selected}-v{build_usb.VERSION}'
         package = output / (stem + '-usb.zip')

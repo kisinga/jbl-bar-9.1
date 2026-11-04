@@ -70,6 +70,7 @@
     if (!["check","install","verify","configure","uninstall","migrate"].includes(settings.action)) throw Error("Unknown action.");
     const lines = ["# Private local JBL Bar 9.1 configuration", "format=1", "action=" + settings.action,
       "ssh=" + !!settings.ssh, "web_remote=" + !!settings.web, "auto_standard=" + !!settings.standard,
+      "smart_mode_memory=" + !!(settings.standard && settings.memory),
       "allowed_cidr=" + allowed, "web_port=80"];
     if (settings.ssh) lines.push("ssh_password_hash=" + await passwordHash(settings.password));
     if (settings.ssid || settings.wifiPassword) {
@@ -84,6 +85,8 @@
   if (typeof document === "undefined") return;
   const $ = id => document.getElementById(id);
   $("ssh").addEventListener("change", () => { $("password").disabled = !$("ssh").checked; $("password").required = $("ssh").checked; });
+  // Remembering the mode needs automatic Standard Mode.
+  $("standard").addEventListener("change", () => { $("memory").disabled = !$("standard").checked; if (!$("standard").checked) $("memory").checked = false; });
   const showNetwork = () => { try { $("network").textContent = "Allowed home network: " + subnet($("address").value, $("prefix").value); } catch { $("network").textContent = "Only devices on this network can use the remote."; } };
   $("address").addEventListener("input", showNetwork);
   $("prefix").addEventListener("change", showNetwork);
@@ -92,7 +95,7 @@
     $("result").textContent = "Preparing your local configuration…";
     try {
       const config = await configuration({address:$("address").value, prefix:$("prefix").value,
-        action:$("action").value, web:$("web").checked, ssh:$("ssh").checked, standard:$("standard").checked,
+        action:$("action").value, web:$("web").checked, ssh:$("ssh").checked, standard:$("standard").checked, memory:$("memory").checked,
         password:$("password").value, ssid:$("ssid").value, wifiPassword:$("wifiPassword").value});
       const url = URL.createObjectURL(new Blob([config], {type:"text/plain;charset=utf-8"}));
       const link = document.createElement("a"); link.href = url; link.download = "config.txt"; link.click();

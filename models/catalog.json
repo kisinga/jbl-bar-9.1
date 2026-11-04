@@ -8,7 +8,7 @@
       "status": "development",
       "installation": "single-usb; complete installation/recovery qualification pending",
       "control": "on-bar web remote and guarded native controls",
-      "install_features": ["web", "ssh", "auto-standard"],
+      "install_features": ["web", "ssh", "auto-standard", "smart-mode-memory"],
       "guide": "docs/models/bar91/USB-TOOLKIT.md"
     },
     {
