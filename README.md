@@ -181,9 +181,10 @@ and offer self-update. Offline bundles include those files already.
 ## For contributors
 
 ```sh
-go run ./apps/build               # CI's builder: apps, offline bundles and USB ZIPs
+go run ./apps/build               # Shared builder: apps, offline bundles and USB ZIPs
 ./jbl dev                         # Local remote preview with sample data
-./jbl test --full                 # Contributor checks; see requirements below
+./jbl test                        # Fast Go checks
+./jbl test --full                 # Complete checks; see requirements below
 ```
 
 [Development requirements and checks](CONTRIBUTING.md).

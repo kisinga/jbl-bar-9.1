@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -41,6 +42,20 @@ cases.append('unsupported_models_refused_before_prompt_or_output')
 result = subprocess.run([str(ROOT / 'jbl'), 'dev', '--listen', '0.0.0.0:8080'], capture_output=True, text=True)
 assert result.returncode == 1 and '127.0.0.1' in result.stderr
 cases.append('development_preview_refuses_network_exposure_before_launch')
+for arguments in (['test'], ['test', '--full'], ['test', '--ui']):
+    with patch.object(project.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)) as launch:
+        assert project.main(arguments) == 0
+        commands = [call.args[0] for call in launch.call_args_list]
+        go_tests = [command for command in commands if command[:2] == ['go', 'test']]
+        browsers = [command for command in commands if command[0] == 'node']
+        if '--ui' in arguments:
+            assert not go_tests and len(browsers) == 1
+        elif '--full' in arguments:
+            assert len(go_tests) == 2 and all('-race' in command for command in go_tests)
+            assert len(browsers) == 1 and any(str(ROOT/'tools/test.py') in command for command in commands)
+        else:
+            assert len(go_tests) == 2 and all('-short' in command for command in go_tests) and not browsers
+cases.append('test_commands_keep_fast_short_full_race_and_ui_paths_distinct')
 result = subprocess.run([str(ROOT / 'jbl'), 'build', '--model', 'bar1000'], capture_output=True, text=True)
 assert result.returncode == 1 and 'not qualified' in result.stderr
 cases.append('public_build_cannot_enable_a_research_model')
@@ -162,6 +177,16 @@ with tempfile.TemporaryDirectory(prefix='distribution-test-',dir=ROOT/'dist') as
     assert {p.name for p in paths}.isdisjoint(p.name for p in specific)
     assert json.loads(specific[2].read_text())['target']=='bar91'
     assert prepare_usb.package_files(specific[0])['AutoScript/AutoScript']==files['AutoScript/AutoScript']
+    # Publish exactly the public files verified above, not a second fresh build.
+    if destination := os.environ.get('JBL_TEST_ARTIFACTS'):
+        target = Path(destination).resolve()
+        assert target.is_relative_to((ROOT/'build').resolve()) and target != ROOT/'build'
+        assert not target.exists(), 'Artifact export must not replace existing files'
+        for model, public_paths in [('auto', paths), ('bar91', specific)]:
+            folder = target/model
+            folder.mkdir(parents=True)
+            for source in public_paths:
+                shutil.copy2(source, folder/source.name)
 cases.append('public_arm_zip_setup_recovery_checksums_and_local_config')
 cases.append('automatic_and_model_specific_public_assets_do_not_collide')
 cases.append('native_and_independent_legacy_payload_entry_bytes_match')

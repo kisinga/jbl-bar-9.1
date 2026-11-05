@@ -145,7 +145,9 @@ def main(argv=None) -> int:
     inspect.add_argument('--host', required=True, help='Explicit private IPv4 address; no discovery or scanning')
     inspect.add_argument('--output-dir', type=Path, help='New session directory under research/private/ (default: timestamped)')
     test = commands.add_parser('test', help='Run fast Go tests; no bar, credentials or firmware needed')
-    test.add_argument('--full', action='store_true', help='Also run host integration, Go race checks and vet')
+    test_modes = test.add_mutually_exclusive_group()
+    test_modes.add_argument('--full', action='store_true', help='Host integration, Go race/vet and browser checks')
+    test_modes.add_argument('--ui', action='store_true', help='Browser regressions only (npm ci first)')
     distribution = commands.add_parser('build', help='Build a public model-specific USB ZIP without credentials')
     distribution.add_argument('--model', default='auto', help='auto (default), or a reviewed hardware target')
     distribution.add_argument('--output-dir', type=Path)
@@ -175,14 +177,17 @@ def main(argv=None) -> int:
                 command += ['--fixture', str(args.fixture.resolve(strict=True))]
             return subprocess.run(command, cwd=ROOT / 'apps/remote').returncode
         if args.command == 'test':
-            subprocess.run(['go', 'test', './apps/build', './apps/usbsetup', './internal/buildtool', './internal/usbsetup', './packaging'], cwd=ROOT, check=True)
-            subprocess.run(['go', 'test', './...'], cwd=ROOT / 'apps/remote', check=True)
+            packages = ['./apps/build', './apps/usbsetup', './internal/buildtool', './internal/usbsetup', './packaging']
+            if not args.ui:
+                mode = '-race' if args.full else '-short'
+                subprocess.run(['go', 'test', mode, *packages], cwd=ROOT, check=True)
+                subprocess.run(['go', 'test', mode, './...'], cwd=ROOT / 'apps/remote', check=True)
             if args.full:
-                subprocess.run(['go', 'test', '-race', './apps/build', './apps/usbsetup', './internal/buildtool', './internal/usbsetup', './packaging'], cwd=ROOT, check=True)
-                subprocess.run(['go', 'vet', './apps/build', './apps/usbsetup', './internal/buildtool', './internal/usbsetup', './packaging'], cwd=ROOT, check=True)
-                subprocess.run([sys.executable, str(ROOT / 'tools/test.py')], cwd=ROOT, check=True)
-                subprocess.run(['go', 'test', '-race', './...'], cwd=ROOT / 'apps/remote', check=True)
+                subprocess.run(['go', 'vet', *packages], cwd=ROOT, check=True)
                 subprocess.run(['go', 'vet', './...'], cwd=ROOT / 'apps/remote', check=True)
+                subprocess.run([sys.executable, str(ROOT / 'tools/test.py')], cwd=ROOT, check=True)
+            if args.full or args.ui:
+                subprocess.run(['node', str(ROOT / 'tools/test-ui.mjs')], cwd=ROOT, check=True)
             return 0
         if args.command == 'build':
             if args.model != 'auto':

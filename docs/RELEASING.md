@@ -1,7 +1,8 @@
 # Releases
 
-Merging and publishing are separate choices. Every PR and merge to `main` runs
-checks and builds downloadable USB/recovery packages. Publishing happens only
+Merging and publishing are separate choices. PR checks follow affected paths;
+shared-code PRs and every merge to `main` run the full suite and produce verified
+USB/recovery downloads. Publishing happens only
 when a maintainer requests it. There is no timer, release bot or extra secret.
 
 ## Publish when ready
@@ -70,7 +71,8 @@ source/version mismatches stop the release before uploading.
 A release stays a draft until its assets are uploaded successfully. Retry a
 failed run from the **same commit** to repair an unfinished draft. Published
 releases are never overwritten; make a new version and changelog entry instead.
-Publishing is serialized per ref, and tags pointing at another commit are
+Publishing is serialized across release runs; obsolete validation runs are
+cancelled. Tags pointing at another commit are
 refused. Repository Actions must allow `GITHUB_TOKEN` to write contents for the
 release job; all other jobs use read-only permissions.
 
@@ -87,6 +89,8 @@ The shared Go builder in `internal/buildtool/` creates USB/recovery ZIPs,
 cross-compiles six binaries without CGO, and produces their offline bundles.
 CI and local builds invoke `go run ./apps/build`; obsolete Python packaging
 entry points have been removed. Independent legacy payload fixtures remain.
+CI exports the exact distributions checked by those fixtures; it does not build
+a second set for upload. Full local checks and requirements are in [Contributing](../CONTRIBUTING.md).
 Dependency licenses are embedded (`--licenses` or the interface footer); after dependency changes,
 regenerate them with `go run ./apps/build --write-licenses`. Linux raw
 formatting uses go-diskfs; keep its version pinned unless the disk-image/fsck

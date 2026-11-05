@@ -12,10 +12,10 @@ on:
         type: boolean
         default: false
 
-# Serialize publishing and allow a failed draft to be repaired on retry.
+# Cancel obsolete validation; publishing has its own serialized group.
 concurrency:
-  group: package-${{ github.ref }}
-  cancel-in-progress: false
+  group: package-${{ (github.event_name == 'workflow_dispatch' && inputs.publish || startsWith(github.ref, 'refs/tags/')) && 'publish' || github.ref }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.publish) && !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
   contents: read
@@ -24,6 +24,11 @@ jobs:
   preflight:
     runs-on: ubuntu-24.04
     timeout-minutes: 3
+    outputs:
+      host: ${{ steps.scope.outputs.host }}
+      native: ${{ steps.scope.outputs.native }}
+      remote: ${{ steps.scope.outputs.remote }}
+      ui: ${{ steps.scope.outputs.ui }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -59,12 +64,15 @@ jobs:
           PY
           fi
 
-  test:
+      - name: Select checks (full validation for pushes and releases)
+        id: scope
+        run: python3 tools/ci.py --github-output "$GITHUB_OUTPUT"
+
+  host:
     needs: preflight
+    if: needs.preflight.outputs.host == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    outputs:
-      matrix: ${{ steps.targets.outputs.matrix }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -74,49 +82,129 @@ jobs:
           python-version: '3.13'
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: '1.25.7'
-          cache: false
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            apps/remote/go.mod
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.16.0'
       - name: Install host fixture dependencies
-        run: sudo apt-get update && sudo apt-get install -y busybox dosfstools
+        timeout-minutes: 3
+        run: |
+          # The Azure mirror has stalled font downloads for minutes in CI.
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 update
+          sudo apt-get install -y busybox dosfstools
       - name: Host fixtures and immutable standalone baseline
-        run: python3 tools/test.py
+        run: python3 tools/test.py --artifacts build/ci-packages
       - name: Portable setup race checks and vet
         run: |
           go test -race ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
           go vet ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
-      - name: Go race checks and vet
+      - name: Record fixture timings
+        if: always()
+        run: |
+          if [[ -f build/test-results/timings.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          print('### Host fixture timings\n\n| Suite | Seconds |\n| --- | ---: |')
+          for name, elapsed in sorted(json.load(open('build/test-results/timings.json')).items(), key=lambda item: -item[1]):
+              print(f'| {name} | {elapsed:.1f} |')
+          PY
+          fi
+      # These exact files passed distribution, checksum and legacy-byte checks.
+      # Upload explicit public paths only; never dist/, private configs or blobs.
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: jbl-bar-toolkit-usb-development
+          path: |
+            build/ci-packages/auto/*-usb.zip
+            build/ci-packages/auto/*-recovery.zip
+            build/ci-packages/auto/jbl-setup-*
+            build/ci-packages/auto/*-setup-*.zip
+            build/ci-packages/auto/SHA256SUMS
+            build/ci-packages/auto/release.json
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: jbl-bar91-usb-development
+          path: |
+            build/ci-packages/bar91/*-usb.zip
+            build/ci-packages/bar91/*-recovery.zip
+            build/ci-packages/bar91/*SHA256SUMS
+            build/ci-packages/bar91/*release.json
+          if-no-files-found: error
+          retention-days: 30
+
+  remote:
+    needs: preflight
+    if: needs.preflight.outputs.remote == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            apps/remote/go.mod
+      - name: Preserve the frozen remote control inventory
+        run: python3 tests/check_remote_ui.py
+      - name: Remote race checks, vet and ARM embedded-asset build
         working-directory: apps/remote
         run: |
           go test -race ./...
           go vet ./...
+          GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -o ../../build/ci-remote .
+
+  browser:
+    needs: preflight
+    if: needs.preflight.outputs.ui != 'none'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            apps/remote/go.mod
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.16.0'
-      - name: Install browser fixture tools
+          cache: npm
+      - name: Install pinned browser tools
+        timeout-minutes: 3
+        run: npm ci --no-audit --no-fund --fetch-retries=2 --fetch-timeout=30000
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('package-lock.json') }}
+      - name: Install browser system libraries
+        timeout-minutes: 3
         run: |
-          npm install --prefix build/ui-tools --no-save --package-lock=false playwright@1.63.0
-          build/ui-tools/node_modules/.bin/playwright install --with-deps chromium
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
+          npx --no-install playwright install-deps chromium
+      - name: Install headless Chromium (reuses browser cache)
+        timeout-minutes: 3
+        run: npx --no-install playwright install --only-shell chromium
       - name: Browser, component and portable setup regressions
         env:
-          PLAYWRIGHT_MODULE: ${{ github.workspace }}/build/ui-tools/node_modules/playwright/index.mjs
+          SUITE: ${{ needs.preflight.outputs.ui }}
         run: |
-          node tests/webremote-ui.mjs
-          node tests/component-ui.mjs
-          node tests/setup-ui.mjs
-          node tests/setup-local.mjs
-          node tests/bass-offset-ui.mjs
-      - name: Select reviewed package implementations
-        id: targets
-        run: |
-          python3 - <<'PY'
-          import os, subprocess
-          matrix = subprocess.check_output(['go', 'run', './apps/build', '--matrix'], text=True).strip()
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
-              stream.write('matrix=' + matrix + '\n')
-          PY
+          npm run test:ui -- --suite "$SUITE"
 
   setup-native:
     needs: preflight
+    if: needs.preflight.outputs.native == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -129,54 +217,33 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: '1.25.7'
-          cache: false
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            apps/remote/go.mod
       - name: Portable setup fixtures (temporary directories only)
         run: |
           go test ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
           go vet ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
 
-  package:
-    needs: [test, setup-native]
+  # One stable required check also succeeds for documentation-only changes.
+  test:
+    if: always()
+    needs: [preflight, host, remote, browser, setup-native]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.test.outputs.matrix) }}
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: '1.25.7'
-          cache: false
-      - name: Build public USB and independent recovery ZIPs
+      - name: Require every selected check to pass
         env:
-          PACKAGE_MODEL: ${{ matrix.model }}
-        run: go run ./apps/build --model "$PACKAGE_MODEL"
-      # Explicit public files only. Never upload dist/, private configs or blobs.
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: ${{ matrix.artifact }}
-          path: |
-            dist/release/*-usb.zip
-            dist/release/*-recovery.zip
-            dist/release/jbl-setup-*
-            dist/release/*-setup-*.zip
-            dist/release/*SHA256SUMS
-            dist/release/*release.json
-          if-no-files-found: error
-          retention-days: 30
-      - name: Explain the download
-        env:
-          ARTIFACT_NAME: ${{ matrix.artifact }}
-        run: |
-          printf 'Download **%s** from Artifacts. Extract the wrapper, then extract the matching **-setup-OS-ARCH.zip** offline bundle and run its executable beside the included toolkit/recovery ZIPs. Keep **-recovery.zip**.\n\nHardware selection is automatic; only included, reviewed implementations can run. Combined hardware qualification remains pending.\n' "$ARTIFACT_NAME" >> "$GITHUB_STEP_SUMMARY"
+          NEEDS: ${{ toJSON(needs) }}
+        run: python3 tools/ci.py --verify
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main')
-    needs: package
+    needs: test
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
