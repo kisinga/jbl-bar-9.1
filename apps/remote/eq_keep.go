@@ -111,7 +111,9 @@ func (d *device) smartModeNow() bool {
 }
 
 // followFrontEQ handles an applied EQ for one monitor tick. Callers hold d.mu.
-func (d *device) followFrontEQ(ctx context.Context) {
+// report names a reset while it runs (seconds, muted), so clients wait for
+// it as for any control instead of seeing an unexplained refusal.
+func (d *device) followFrontEQ(ctx context.Context, report func(string)) {
 	m := &d.eq
 	n, readErr := d.readEQNative()
 	levels, known := d.eqLevels()
@@ -132,6 +134,7 @@ func (d *device) followFrontEQ(ctx context.Context) {
 		// Source change, Standard after Smart, wake: the native preset is
 		// already back. Finish the reset without muting; the keeper applies
 		// the chosen EQ again.
+		report("eq_reset")
 		if e := d.resetFrontEQ(ctx); e != nil {
 			m.problem = eqPendingProblem(e, d.readHPPMode)
 			m.note("Front EQ cleanup pending: %v", e)
@@ -139,6 +142,7 @@ func (d *device) followFrontEQ(ctx context.Context) {
 		}
 		m.note("Front EQ removed by the bar; it is applied again when Standard audio plays")
 	default:
+		report("eq_reset")
 		if e := d.resetFrontEQ(ctx); e != nil {
 			m.problem = eqPendingProblem(e, d.readHPPMode)
 		}
@@ -146,8 +150,8 @@ func (d *device) followFrontEQ(ctx context.Context) {
 }
 
 // keepFrontEQ applies the kept EQ again once it is not applied, for one
-// monitor tick. Callers hold d.mu.
-func (d *device) keepFrontEQ(ctx context.Context) {
+// monitor tick. Callers hold d.mu; report names the re-apply while it runs.
+func (d *device) keepFrontEQ(ctx context.Context, report func(string)) {
 	m := &d.eq
 	if !m.keep || m.active || m.problem != "" || !d.powerOn() || controlBusy() || !d.idleKeys() || d.smartModeNow() {
 		m.keepStable = 0
@@ -167,6 +171,7 @@ func (d *device) keepFrontEQ(ctx context.Context) {
 	}
 	m.keepStable = 0
 	gains := m.kept
+	report("eq_apply")
 	if e := d.applyFrontEQ(ctx, gains); e != nil {
 		m.keepBlocked = eqDigest(n.Block)
 		m.note("Front EQ could not be applied again: %v", e)

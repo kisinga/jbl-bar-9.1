@@ -566,7 +566,7 @@ func (r *remote) monitorFrontEQ(ctx context.Context) {
 		if eqParserPayload == "" {
 			continue
 		}
-		release, _, held := r.hold("")
+		release, report, held := r.hold("")
 		if !held {
 			continue
 		}
@@ -581,9 +581,9 @@ func (r *remote) monitorFrontEQ(ctx context.Context) {
 				d.loadKeptFrontEQ()
 			}
 			if d.eq.active {
-				d.followFrontEQ(c)
+				d.followFrontEQ(c, report)
 			} else {
-				d.keepFrontEQ(c)
+				d.keepFrontEQ(c, report)
 			}
 			cancel()
 		}
