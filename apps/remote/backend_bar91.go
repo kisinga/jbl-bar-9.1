@@ -36,15 +36,16 @@ func (b bar91Backend) Features() server.Features {
 // hold takes the shared action gate for a native background writer. action
 // names a control clients should wait for; empty keeps a short monitor out of
 // the reported control while state reads still use the cached snapshot.
+// Monitors tick in phase, so a busy gate is retried briefly (retryGate).
 func (r *remote) hold(action string) (release func(), report func(string), ok bool) {
 	if r.http == nil {
-		if !r.actionMu.TryLock() {
+		if !retryGate(r.actionMu.TryLock) {
 			return nil, nil, false
 		}
 		return r.actionMu.Unlock, func(string) {}, true
 	}
-	h, ok := r.http.TryHold(action)
-	if !ok {
+	var h *server.Hold[state]
+	if !retryGate(func() bool { h, ok = r.http.TryHold(action); return ok }) {
 		return nil, nil, false
 	}
 	return h.Release, h.Report, true
