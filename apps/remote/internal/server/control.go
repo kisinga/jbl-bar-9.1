@@ -1,6 +1,9 @@
 package server
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Control reports the control that holds the action gate. Clients use it to
 // wait for a running control instead of sending one that would be refused.
@@ -130,3 +133,31 @@ func (r *Server[S]) snapshot() S {
 
 // Snapshot is the state as served by /api/state.
 func (r *Server[S]) Snapshot() S { return r.snapshot() }
+
+// backgroundPoll is how often a control waiting for a background hold retries.
+const backgroundPoll = 20 * time.Millisecond
+
+// takeGate takes the action gate for an HTTP control. Monitors hold it for
+// a few milliseconds at a time without reporting a control; a control that
+// arrives meanwhile waits for them, up to backgroundWait, instead of being
+// refused with "Another control is running". A reported control (an HTTP
+// action or a named background gesture) is refused at once, as before.
+func (r *Server[S]) takeGate(ctx context.Context) bool {
+	if r.actionMu.TryLock() {
+		return true
+	}
+	deadline := time.Now().Add(r.backgroundWait)
+	// Not reported yet also covers the instant between a holder's TryLock and
+	// its begin, and the shutdown cleanup: both end within the wait.
+	for !r.feed.Control().Busy && time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(backgroundPoll):
+		}
+		if r.actionMu.TryLock() {
+			return true
+		}
+	}
+	return false
+}
