@@ -656,9 +656,16 @@ try {
   check(await page.locator('#playback-progress').getAttribute('value')==='75','timeline uses receiver position');
   await page.locator('.device-details summary').click();
   check((await page.locator('#cast-eq').textContent())==='Low 0 dB · High -2 dB (read only)','Cast tone readback shown without unsafe controls');
-  for (const width of [320,390,650,768,900,1024,1440]) {
+  for (const width of [320,390,650,768,900,1024,1440,1920,2560]) {
     await page.setViewportSize({width,height:900});
     check(await page.locator('#rear-battery-left-meter').evaluate(e=>{const a=e.getBoundingClientRect(),b=e.closest('.rear').getBoundingClientRect();return a.height>=3 && a.width>0 && a.left>=b.left-1 && a.right<=b.right+1;}),'compact battery meter stays beside its speaker at '+width);
+    check(await page.locator('.battery,.sub-caption,.bass-caption').evaluateAll(labels=>{
+      const bodies=[...document.querySelectorAll('.speaker,.subwoofer')].map(e=>e.getBoundingClientRect());
+      return labels.filter(e=>e.getBoundingClientRect().height>0).every(e=>{
+        const r=e.getBoundingClientRect();
+        return bodies.every(b=>r.right<=b.left || r.left>=b.right || r.bottom<=b.top || r.top>=b.bottom);
+      });
+    }),'speaker status labels stay clear of device bodies at '+width);
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'long media metadata fits at '+width);
     check(await page.locator('.transport button').evaluateAll(buttons=>buttons.every(button=>{const r=button.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.left>=0 && r.right<=innerWidth;})),'four 44px transport targets fit at '+width);
   }
@@ -666,7 +673,7 @@ try {
   const beforeIdle=stateGets;await pause(1200);
   check(stateGets===beforeIdle,'idle browser never polls the state endpoint');
   state=initial();await page.locator('#refresh').click();await pause(200);
-  for (const width of [320,390,650,768,900,1024,1440]) {
+  for (const width of [320,390,650,768,900,1024,1440,1920,2560]) {
     await page.setViewportSize({width,height:900});
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow at '+width);
     check(await page.locator('button,summary,select,input[type=range],input[type=number]').evaluateAll(elements=>elements.filter(e=>e.getBoundingClientRect().height>0).every(e=>{const r=e.getBoundingClientRect();return r.height>=44 && r.width>=44;})),'44px touch targets for all visible controls at '+width);
@@ -720,6 +727,18 @@ try {
   await page.waitForFunction(()=>document.querySelector('#bass-offset').value==='-1.5' && !document.querySelector('#bass-offset-save').disabled);
   await populateMonitorHistory();
   await page.evaluate(()=>document.activeElement.blur());
+  check(await page.locator('.battery,.sub-caption,.bass-caption').evaluateAll(labels=>labels.filter(e=>e.getBoundingClientRect().height>0).every(e=>{const a=e.getBoundingClientRect(),b=e.closest('.visualization').getBoundingClientRect();return a.left>=b.left && a.right<=b.right && a.top>=b.top && a.bottom<=b.bottom;})),'larger speaker labels remain inside the illustration without clipping');
+  const supportingContrast=await page.locator('.render-meta p,.rear-caption,.bass-caption,.sound-note,#eq-scope,#eq-processing,.chart-caption,footer').evaluateAll(elements=>{
+    const linear=value=>{const x=value/255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;};
+    const luminance=rgb=>rgb.reduce((sum,value,index)=>sum+linear(value)*[.2126,.7152,.0722][index],0);
+    // Include the lightest panel gradient stops behind supporting copy.
+    const backgrounds=[[20,23,30],[29,34,43],[49,41,35],[43,41,59],[34,49,55]];
+    return elements.filter(e=>e.getBoundingClientRect().height>0).every(e=>{
+      const color=getComputedStyle(e).color.match(/[\d.]+/g).slice(0,3).map(Number);
+      return backgrounds.every(bg=>(luminance(color)+.05)/(luminance(bg)+.05)>=4.5);
+    });
+  });
+  check(supportingContrast,'supporting text maintains 4.5:1 contrast across panel backgrounds');
   await page.screenshot({path:fileURLToPath(new URL('build/readme-remote.png',root)),fullPage:true});
   await page.locator('#advanced').evaluate(el=>el.open=true);
   await page.locator('#bass-offset-panel').evaluate(el=>el.open=true);
