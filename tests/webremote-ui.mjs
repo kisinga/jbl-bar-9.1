@@ -523,6 +523,11 @@ try {
   await page.waitForFunction(()=>document.querySelector('#mode-select [aria-checked=true]').textContent==='Standard');
   check(lastPayload?.action==='standard' && state.mode==='Standard','mode control returns to Standard');
   const speakerBeforeBusy=await page.locator("#speaker-view").evaluate(el=>({docking:el.dataset.state,battery:el.querySelector("#rear-battery-left").textContent}));
+  // A short background control (a monitor's cleanup) does not flash the page.
+  const summaryBefore=await page.locator('#summary').textContent();
+  await page.evaluate(()=>{window.flashed=false;new MutationObserver(()=>{if(document.querySelector('#summary').textContent.includes('Another control')||document.querySelector('[data-action=volume_up]').disabled)window.flashed=true;}).observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['disabled']});});
+  state.control={busy:true,action:'eq_reset',since:1}; await pause(350); state.control={busy:false}; await pause(900);
+  check(!await page.evaluate(()=>window.flashed) && (await page.locator('#summary').textContent())===summaryBefore && await page.locator('[data-action=volume_up]').isEnabled(),'a control shorter than the delay neither changes the summary nor disables controls');
   state.control={busy:true,action:'av_sync_set',since:1}; await page.waitForFunction(()=>document.querySelector('#summary').textContent.includes('Another control is running'));
   check(await page.locator('[data-action=volume_up]').isDisabled() && await page.locator('#mode-select [data-mode=Smart]').isDisabled() && await page.locator('[data-level=bass] [data-value="2"]').isDisabled() && await page.locator('#night').isDisabled() && (await page.locator('#summary').textContent()).includes('Another control is running'),'a control running elsewhere disables the shell and components and says so');
   check(await page.locator("#speaker-view").evaluate((el,previous)=>el.dataset.state===previous.docking && el.querySelector("#rear-battery-left").textContent===previous.battery,speakerBeforeBusy),"other controls do not hide confirmed speaker telemetry");
