@@ -226,6 +226,13 @@ try {
   check(!state.eq.enabled && await page.locator('#eq-slider-2').inputValue()==='-1' && await page.locator('#eq-apply').isEnabled(),'refused EQ preserves the unapplied draft without claiming success');
   failure='';state.eq={...eqFixture(),enabled:true,gains_db:[-2,0,0,0,0],status:'custom'};await page.waitForFunction(()=>document.querySelector('#eq-slider-0').value==='-2');
   check(await page.locator('#eq-slider-2').inputValue()==='0','new committed soundbar EQ replaces an obsolete local draft');
+  state.bass_offset={offset_db:-1.5,status:'waiting',error:'WAITING_FOR_FRONT_EQ'};
+  await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.includes('Bass offset paused'));
+  check((await page.locator('#eq-state').textContent())==='Custom EQ active. Reset restores original processing. Bass offset paused meanwhile.','an applied EQ says it pauses a saved bass offset');
+  state.bass_offset={offset_db:0,status:'waiting',error:'WAITING_FOR_FRONT_EQ'};
+  await page.waitForFunction(()=>!document.querySelector('#eq-state').textContent.includes('Bass offset'));
+  check(true,'a zero bass offset is not reported as paused');
+  delete state.bass_offset;
   state.eq={available:false,enabled:true,gains_db:[-2,0,0,0,0],status:'reset_required'};await page.waitForFunction(()=>document.querySelector('#eq-slider-0').disabled);
   check(await page.locator('#eq-reset').isEnabled() && await page.locator('#eq-apply').isDisabled() && (await page.locator('#eq-state').textContent()).includes('Reset required'),'reset-required state permits recovery but blocks further tuning');
   state.eq={...eqFixture(),enabled:true,kept:true,gains_db:[0,0,0,-6,-6],status:'active'};await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.includes('stays through'));

@@ -39,7 +39,12 @@ func bassRead(d *device) (bassReading, error) {
 	if displayErr != nil || calibrationRunning(message) {
 		return s, errors.New("WAITING_FOR_CALIBRATION")
 	}
-	if d.eq.active || d.eq.needsReset || !d.idleKeys() || controlBusy() {
+	// The Front EQ owns the same native block while it is applied; the page
+	// says so instead of a generic wait.
+	if d.eq.active || d.eq.needsReset {
+		return s, errors.New("WAITING_FOR_FRONT_EQ")
+	}
+	if !d.idleKeys() || controlBusy() {
 		return s, errors.New("WAITING_FOR_NATIVE_CONTROLS")
 	}
 	n, e := d.readAudioNative(true)
