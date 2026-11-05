@@ -189,6 +189,7 @@ async function refresh() {
 }
 function success(action, s) {
   s=capabilities.state(s);
+  if (action === 'eq_apply' && s.eq?.status === 'waiting') return 'Front EQ saved. It is applied when Standard audio plays.';
   if (action === 'eq_reset' || (action === 'eq_apply' && s.eq?.enabled === false)) return 'Original tuning restored.';
   if (action === 'eq_apply') return 'Front EQ applied.';
 	if (action === 'night_toggle') return 'Night mode ' + (s.sound?.night ? 'on.' : 'off.');

@@ -25,7 +25,13 @@ export function createEqualizer(root) {
     const draftValid = validEQGains(eqDraft);
     const changed = valid && draftValid && eqDraft.some((value, index) => value !== eq.gains_db[index]);
     const pending = !!active || queued > 0;
-    const canAdjust = ready && awake && eq.available === true && valid && !pending && eq.status !== 'reset_required';
+    // A remote that keeps the EQ (eq.kept reported) also saves one it cannot
+    // apply now (standby, Smart Mode, another audio route) and applies it
+    // once Standard audio plays, so the EQ stays adjustable.
+    const keeps = typeof eq.kept === 'boolean' && eq.error !== 'EQ support is not installed';
+    const applyNow = awake && eq.available === true;
+    const saveLater = !applyNow && keeps;
+    const canAdjust = ready && (applyNow || saveLater) && valid && !pending && eq.status !== 'reset_required';
     $('eq-preset').disabled = !canAdjust;
     $('eq-preset').value = draftValid ? Object.keys(eqPresets).find(name => eqPresets[name].every((value, index) => value === eqDraft[index])) || 'custom' : 'custom';
     for (const [index, input] of eqSliders.entries()) {
@@ -35,13 +41,16 @@ export function createEqualizer(root) {
       $('eq-gain-' + index).textContent = draftValid ? eqGain(eqDraft[index]) : '—';
     }
     $('eq-apply').disabled = !canAdjust || !changed;
-    $('eq-apply').textContent = active === 'eq_apply' ? 'Applying…' : 'Apply EQ';
-    $('eq-reset').disabled = !ready || !awake || pending || !(eq.enabled === true || eq.status === 'reset_required' || eq.kept === true);
+    $('eq-apply').textContent = active === 'eq_apply' ? (saveLater ? 'Saving…' : 'Applying…') : saveLater ? 'Save EQ' : 'Apply EQ';
+    // Reset also forgets a kept EQ while the bar is in standby.
+    const forgetOnly = eq.kept === true && eq.enabled !== true && eq.status !== 'reset_required';
+    $('eq-reset').disabled = !ready || (!awake && !forgetOnly) || pending || !(eq.enabled === true || eq.status === 'reset_required' || eq.kept === true);
     $('eq-reset').textContent = active === 'eq_reset' ? 'Resetting…' : 'Reset';
-    $('eq-panel').dataset.state = !ready ? 'offline' : eq.status === 'reset_required' ? 'reset-required' : !eq.available || !valid ? 'unavailable' : changed ? 'draft' : eq.enabled ? 'custom' : 'original';
+    $('eq-panel').dataset.state = !ready ? 'offline' : eq.status === 'reset_required' ? 'reset-required' : saveLater && valid ? (changed ? 'draft' : 'waiting') : !eq.available || !valid ? 'unavailable' : changed ? 'draft' : eq.enabled ? 'custom' : 'original';
     // A saved non-zero bass offset does not run while an EQ is applied.
     const offsetPaused = s.bass_offset?.error === 'WAITING_FOR_FRONT_EQ' && s.bass_offset.offset_db !== 0 ? ' Bass offset paused meanwhile.' : '';
-    $('eq-state').textContent = !online ? 'Offline. Reconnect to adjust EQ.' : !ready ? 'Waiting for the soundbar.' : !awake ? (s.power === 'Standby' ? 'Turn on the bar to adjust EQ.' : 'Power state is unavailable.') : eq.status === 'reset_required' ? 'Reset required before making further changes.' : eq.error ? eq.error : !eq.available || !valid ? 'EQ is unavailable on this firmware or audio path.' : active === 'eq_apply' ? 'Applying your settings…' : active === 'eq_reset' ? 'Restoring original processing…' : changed ? 'Unapplied changes. Select Apply EQ to listen.' : eq.enabled ? (eq.kept ? 'Custom EQ active. It stays through sound, input and power changes until Reset.' : 'Custom EQ active. Reset restores original processing.') + offsetPaused : 'Original tuning. Adjust a band, then apply.';
+    const notNow = !awake ? (s.power === 'Standby' ? 'The bar is in standby.' : 'Power state is unavailable.') : s.mode === 'Smart' ? 'Smart Mode is on.' : 'The EQ does not apply on this audio route.';
+    $('eq-state').textContent = !online ? 'Offline. Reconnect to adjust EQ.' : !ready ? 'Waiting for the soundbar.' : saveLater && eq.status !== 'reset_required' ? (active === 'eq_apply' ? 'Saving your settings…' : changed ? 'Unsaved changes. Select Save EQ: it is applied when Standard audio plays.' : eq.status === 'waiting' && eq.error ? eq.error : notNow + ' Choose an EQ now: it is applied when Standard audio plays.') : !awake ? (s.power === 'Standby' ? 'Turn on the bar to adjust EQ.' : 'Power state is unavailable.') : eq.status === 'reset_required' ? 'Reset required before making further changes.' : eq.error ? eq.error : !eq.available || !valid ? 'EQ is unavailable on this firmware or audio path.' : active === 'eq_apply' ? 'Applying your settings…' : active === 'eq_reset' ? 'Restoring original processing…' : changed ? 'Unapplied changes. Select Apply EQ to listen.' : eq.enabled ? (eq.kept ? 'Custom EQ active. It stays through sound, input and power changes until Reset.' : 'Custom EQ active. Reset restores original processing.') + offsetPaused : 'Original tuning. Adjust a band, then apply.';
     $('eq-graph').hidden = !draftValid;
     if (draftValid) {
       const frequencies = Array.isArray(eq.frequencies_hz) && eq.frequencies_hz.length === 5 && eq.frequencies_hz.every(value => Number.isFinite(value) && value > 0) ? eq.frequencies_hz : [125,500,2000,4000,8000];
@@ -49,7 +58,7 @@ export function createEqualizer(root) {
       const line = 'M' + points.map(point => point.join(',')).join('L');
       $('eq-gain-line').setAttribute('d', line);
       $('eq-gain-area').setAttribute('d', line + 'L290,8L10,8Z');
-      $('eq-graph').querySelector('svg').setAttribute('aria-label', (changed ? 'Unapplied' : eq.enabled ? 'Applied' : 'Original') + ' EQ gain settings: ' + eqDraft.map(eqGain).join(', '));
+      $('eq-graph').querySelector('svg').setAttribute('aria-label', (changed ? 'Unapplied' : eq.enabled ? 'Applied' : eq.status === 'waiting' ? 'Saved' : 'Original') + ' EQ gain settings: ' + eqDraft.map(eqGain).join(', '));
     }
   }
   for (const [index, input] of eqSliders.entries()) input.addEventListener('input', () => {
