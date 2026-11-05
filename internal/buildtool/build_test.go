@@ -39,7 +39,12 @@ func TestProfileAndOutputGuards(t *testing.T) {
 	if _, e := b.Payload(context.Background(), filepath.Join(root, "dist/invalid-model"), "bar1300"); e == nil {
 		t.Fatal("unsupported model accepted")
 	}
-	temp := t.TempDir()
+	// New canonicalizes the repository root; do the same for this synthetic root.
+	// On macOS, temporary paths under /var resolve to /private/var.
+	temp, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	copy := &Builder{Root: temp}
 	if e := os.MkdirAll(filepath.Join(temp, "build"), 0700); e != nil {
 		t.Fatal(e)
