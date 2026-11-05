@@ -134,7 +134,7 @@ func run() error {
 		defer cancel()
 		httpServer.Shutdown(shutdown)
 	}()
-	fmt.Printf("JBL USB setup %s\n%s\nKeep this program running while using the interface. Ctrl+C closes it.\n", version, address)
+	fmt.Printf("JBL Bar setup %s\n%s\nKeep this program running while using the interface. Ctrl+C closes it.\n", version, address)
 	if !*noOpen {
 		if e = browser.OpenURL(address); e != nil {
 			fmt.Println("Open the local link above in your browser.")

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#161b24" />
-    <title>JBL USB setup</title>
+    <title>JBL Bar setup</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
     <script src="/setup.js" defer></script>
@@ -15,14 +15,24 @@
       <header>
         <b>JBL</b>
         <div>
-          <h1>Set up your USB.</h1>
+          <h1>Set up or update your bar.</h1>
           <p>Local setup · no installation needed</p>
         </div>
         <span id="version"></span>
       </header>
+      <nav class="setup-methods" aria-label="Setup method">
+        <button id="usb-method" type="button" aria-pressed="true">
+          <strong>USB setup</strong>
+          <span>Install, change settings or recover your bar.</span>
+        </button>
+        <button id="network-method" type="button" aria-pressed="false">
+          <strong>Network update <small>SSH</small></strong>
+          <span>Already enabled SSH? Update without a USB.</span>
+        </button>
+      </nav>
       <section>
         <div class="heading">
-          <h2>1. Toolkit files</h2>
+          <h2>Toolkit files</h2>
           <button id="update" type="button">Check for updates</button>
         </div>
         <p id="package-status">Looking for toolkit files…</p>
@@ -41,7 +51,7 @@
       <form id="wizard">
         <section>
           <div class="heading">
-            <h2>2. Choose your USB</h2>
+            <h2>Choose your USB</h2>
             <button id="refresh" type="button">Refresh drives</button>
           </div>
           <label for="drive">Removable drive</label
@@ -70,7 +80,7 @@
           </div>
         </section>
         <section>
-          <h2>3. Your settings</h2>
+          <h2>Your settings</h2>
           <label for="network-select">Home network</label
           ><select id="network-select">
             <option value="">Enter manually</option>
@@ -116,7 +126,7 @@
             ><input id="memory" type="checkbox" disabled /> Remember the mode
             chosen before standby</label
           >
-          <details>
+          <details id="usb-access">
             <summary>SSH and optional Wi-Fi</summary>
             <label class="check"
               ><input id="ssh" type="checkbox" /> Enable SSH access (port
@@ -169,13 +179,40 @@
           ><output id="result" role="status" aria-live="polite"></output>
         </section>
       </form>
+      <form id="network-form" hidden>
+        <section>
+          <h2>Update over your home network</h2>
+          <p>For a bar with toolkit-managed SSH already enabled. Keep the bar fully on. Your installed features, network settings, SSH keys and sound settings are kept.</p>
+          <label for="ssh-host">Soundbar address</label>
+          <input id="ssh-host" value="jbl.local" placeholder="jbl.local or 192.168.1.50" autocomplete="off" spellcheck="false" required />
+          <small>We’ll look for jbl.local automatically. Enter the bar’s IP if it can’t be found.</small>
+          <label for="ssh-login-password">SSH password</label>
+          <input id="ssh-login-password" type="password" autocomplete="current-password" maxlength="256" required />
+          <small>The password you chose when enabling SSH, not your Wi-Fi password. It isn’t saved. Connects as root on port 2222.</small>
+          <div id="ssh-trust" hidden>
+            <p>First connection to this speaker. Confirm its identity once; this computer will remember its public host key.</p>
+            <code id="ssh-fingerprint"></code>
+            <small>You can compare this fingerprint with a previous SSH connection or the host key saved by USB setup.</small>
+            <button id="ssh-trust-button" type="button">Trust this bar and continue</button>
+          </div>
+          <div class="actions">
+            <button id="ssh-check" type="submit">Check connection</button>
+            <button id="ssh-update" type="button" disabled>Update bar</button>
+          </div>
+          <output id="ssh-result" role="status" aria-live="polite">Enter your SSH password to check the connection.</output>
+          <details id="ssh-reports" hidden>
+            <summary>Update results</summary>
+            <pre id="ssh-reports-text"></pre>
+          </details>
+          <small>Initial installation, SSH enablement, settings changes and recovery use USB setup. Keep your original recovery ZIP.</small>
+        </section>
+      </form>
       <footer>
-        Only Bar 9.1 installation is currently included. Full combined hardware
+        Only Bar 9.1 is currently included. Full combined hardware
         qualification remains pending.
         <a href="/licenses" target="_blank" rel="noopener"
           >Third-party licenses</a
-        >. No formatting or USB changes happen until you select and confirm a
-        drive.
+        >. Changes start only when you choose Prepare selected USB or Update bar.
       </footer>
     </main>
   </body>

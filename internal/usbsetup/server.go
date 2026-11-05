@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -29,6 +30,8 @@ type Server struct {
 	Eject                              func(context.Context, Drive) error
 	RestartRequired                    bool
 	LocalSource                        bool
+	SSH                                *SSHUpdater
+	sshTicket                          *sshTicket
 	mu                                 sync.Mutex
 }
 
@@ -42,6 +45,11 @@ func NewServer(version, exe, pack string) (*Server, error) {
 		return nil, e
 	}
 	s := &Server{Token: hex.EncodeToString(b), Version: version, Executable: exe, PackagePath: pack, Downloads: d, List: Discover, Format: ElevatedPrepare, Eject: Eject}
+	configRoot, err := os.UserConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	s.SSH = &SSHUpdater{KnownHosts: filepath.Join(configRoot, "jbl-bar-toolkit", "known_hosts"), Resolve: resolveBar, Dial: (&net.Dialer{}).DialContext}
 	if pack != "" {
 		payload, err := LoadPackage(pack)
 		if err != nil {
@@ -100,6 +108,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			defer s.mu.Unlock()
 		}
 		switch r.URL.Path {
+		case "/api/ssh/check", "/api/ssh/update":
+			if r.Method != "POST" {
+				break
+			}
+			s.serveSSH(w, r)
+			return
 		case "/api/info":
 			if r.Method != "GET" {
 				break

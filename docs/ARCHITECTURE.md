@@ -7,24 +7,23 @@ while retaining its package format, runtime behavior and recovery contracts.
 ## Product goal and delivery order
 
 An owner should be able to install from one USB, open a usable web remote and
-enable optional features. Updating should eventually accept either the USB or
-one SSH command using the same release-application code. Model support can grow
+enable optional features. The setup tool accepts either USB or a network update
+over SSH using the same model update transaction. Model support can grow
 from read-only inspection to network controls and then on-bar installation;
 those capabilities do not have to arrive together.
 
 The current priorities are to finish Bar 9.1 combined-install/recovery hardware
-qualification and the shared USB/SSH updater, while using the original Bar 1300
+qualification and network-update qualification, while using the original Bar 1300
 as the first real extensibility test. A network remote hosted on another computer
 can deliver useful Bar 1300 controls before an installation route exists. Keep
 the product entry points simple and use real responses to drive any further
-abstractions. The updater is still unimplemented; neither architecture documents
-nor a research catalog entry substitute for that work.
+abstractions. Host fixtures do not substitute for physical qualification.
 
 ## Boundaries
 
 ```text
 apps/usbsetup/                   portable computer-side executable (root Go module)
-internal/usbsetup/               USB discovery, verification, formatting and self-update
+internal/usbsetup/               USB, mDNS/SSH updates, verification and self-update
 apps/remote/                     Go application, native control code and browser UI
   internal/server/               shared HTTP/security/state delivery
   internal/extension/            typed feature registry and joined workers
@@ -219,9 +218,11 @@ bounded action budgets; it does not know native action names. Native files keep 
 existing structure; further path moves should be isolated from behavior changes.
 
 Bootstrap, release application and owner configuration are distinct responsibilities.
-The shared USB/SSH update transaction is still a separate milestone. It must
-remain usable when the remote is broken, validate staging/rollback space before
-mutation and preserve owner state. The existing different-package guard remains;
-this refactor does not provide a software-update path or qualify hardware boot
+USB and SSH use the same guarded Bar 9.1 manager. SSH authenticates against a
+confirmed public host key, checks the installed runtime, and transfers verified
+files to a private RAM directory. Only managed-installation updates can use this
+entry; installation, migration and recovery use USB. Network updates retain the verified SSH listener while updating its support files.
+The detached worker survives connection loss and reports its result for host readback. Timeouts preserve evidence
+and report an uncertain outcome, never success. Neither route qualifies hardware boot
 and recovery. New model work can progress through normalized replay and verified
 network control independently of a jailbreak/bootstrap implementation.

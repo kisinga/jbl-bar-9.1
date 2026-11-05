@@ -6,7 +6,9 @@ require (
 	github.com/diskfs/go-diskfs v1.8.0
 	github.com/minio/selfupdate v0.6.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
+	golang.org/x/crypto v0.48.0
 	golang.org/x/mod v0.32.0
+	golang.org/x/net v0.49.0
 	howett.net/plist v1.0.1
 )
 
@@ -21,6 +23,5 @@ require (
 	github.com/pkg/xattr v0.4.12 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 )

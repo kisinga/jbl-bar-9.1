@@ -32,6 +32,9 @@ regular "$USB/config.txt" || finish CONFIG_MISSING_OR_UNSAFE 1
 "$BB" awk -f "$USB/parse-config.awk" "$USB/config.txt" > "$LOCK/plan" || finish CONFIG_INVALID 1
 . "$LOCK/plan" || finish CONFIG_INVALID 1
 "$BB" rm "$LOCK/plan"
+if [ "${JBL_TOOLKIT_TRANSPORT:-usb}" = ssh ]; then
+    [ "$ACTION" = update ] && owned || finish SSH_UPDATE_REQUIRES_MANAGED_INSTALLATION 1
+fi
 if [ "$ACTION" = uninstall ]; then
     /bin/sh "$USB/recover.sh"
     result=$?

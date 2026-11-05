@@ -6,7 +6,8 @@ unset LD_LIBRARY_PATH LD_PRELOAD
 ulimit -c 0
 USB=${JBL_SSH_USB:-/mnt/sda1/JBLLocalSSH}
 MANAGED=0
-case "${1-}" in '' ) ;; --managed) MANAGED=1;; *) exit 1;; esac
+REQUIRE_RUNNING=0
+case "${1-}" in '' ) ;; --managed) MANAGED=1;; --managed-network-update) MANAGED=1; REQUIRE_RUNNING=1;; *) exit 1;; esac
 exec </dev/null >/dev/null 2>&1
 . "$USB/common.sh" || exit 1
 release_sockets || exit 1
@@ -61,10 +62,14 @@ export_info() {
 if daemon_running; then
     "$BB" grep -qx "AllowUsers root@$ALLOWED_PC" "$STORE/sshd_config" || finish RUNNING_ALLOWED_PC_DIFFERS 1
     support_files || finish COPY_FAILED 1
+    # These scripts are read on new sessions/boots. Updating them atomically
+    # keeps the current authenticated listener and its account mounts intact.
+    for name in namespace.sh session.sh; do copy_file "$name" || finish COPY_FAILED 1; done
     install_hook || finish BOOT_HOOK_CONFLICT 1
     export_info
     finish ALREADY_RUNNING_PASSWORD_UNCHANGED 0
 fi
+[ "$REQUIRE_RUNNING" != 1 ] || finish SSH_LISTENER_CHANGED_NO_RESTART 1
 # A live, unrelated process must never be replaced on the strength of a PID.
 if [ -f "$STORE/sshd.pid" ]; then
     saved=$("$BB" cat "$STORE/sshd.pid")

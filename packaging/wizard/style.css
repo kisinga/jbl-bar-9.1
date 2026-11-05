@@ -49,6 +49,18 @@ header p {
   color: var(--muted);
   font-size: 11px;
 }
+.setup-methods {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.setup-methods button {text-align:left;padding:18px;background:#1d222b}
+.setup-methods strong {display:block;font-size:15px;font-weight:550}
+.setup-methods span {display:block;color:var(--muted);margin-top:5px;font-size:12px}
+.setup-methods small {display:inline;font-size:10px;margin-left:5px;color:var(--teal)}
+.setup-methods [aria-pressed=true] {border-color:var(--orange);background:#f1ab8510}
+#network-form h2 {color:var(--teal)}
+#ssh-trust {margin-top:20px;padding:16px;border:1px solid #8ecfc64a;border-radius:10px}
+#ssh-fingerprint {display:block;overflow-wrap:anywhere;color:var(--teal);font-size:12px}
+#ssh-trust-button {margin-top:14px}
+#ssh-update {border-color:#8ecfc660;color:#b8e2db;background:#8ecfc610}
+@media(max-width:500px){.setup-methods{grid-template-columns:1fr}header h1{font-size:23px}}
 section {
   padding: 24px;
   border: 1px solid #ffffff12;
@@ -252,7 +264,7 @@ select {
   overflow-wrap: anywhere;
 }
 
-#result[data-busy="true"]::before {
+output[data-busy="true"]::before {
   content: "";
   display: inline-block;
   width: 12px;
@@ -268,7 +280,7 @@ select {
   to { transform: rotate(360deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #result[data-busy="true"]::before { animation: none; }
+  output[data-busy="true"]::before { animation: none; }
 }
 
 body{background:radial-gradient(ellipse at 40% 0,#f1ab850c,transparent 60%)}
@@ -283,3 +295,6 @@ main>section h2{color:#b8e0dc}
 .check:has(input:checked){color:#ffe0ca}
 #reports[open]>summary{color:var(--teal)}
 #result[data-error="true"]{color:#ffc0c0}
+
+#ssh-result[data-busy="true"]::before {border-top-color:var(--teal)}
+#ssh-result[data-error="true"] {color:#ffc0c0}
