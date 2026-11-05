@@ -6,6 +6,10 @@ Use the [toolkit overview](../README.md), [model status](../models/README.md), a
 caller-supplied text path and a temporary-message candidate for installer/action
 feedback. External integration and hardware qualification remain pending.
 
+[Bar 9.1 rear-speaker Bluetooth research](bar91-rear-bluetooth.md) records the
+appended MCU/TX/RX firmware sections and the separate DARR83 wireless audio path.
+No independent rear Bluetooth mode or software unlock has been established.
+
 ## Other JBL bars
 
 [Bar 800/1000/1300 research](bar-family/README.md) contains the historical firmware
