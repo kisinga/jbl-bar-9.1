@@ -168,6 +168,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Standard selected for this wake');
 
   check(await page.locator('#eq-panel h2').textContent()==='Front EQ','front-channel equalizer is explicit');
+  check((await page.locator('#eq-scope').textContent()).endsWith('kept until Reset'),'the EQ scope says it is kept until Reset, not reset on restart');
   check((await page.locator('#eq-panel').textContent()).includes('Experimental') && (await page.locator('#eq-processing').textContent()).includes('custom DSP mode'),'EQ experimental processing mode is disclosed');
   check(await page.locator('#eq-panel input[type=range]').count()===5 && await page.locator('#eq-panel input').evaluateAll(inputs=>inputs.every(input=>input.min==='-6'&&input.max==='0'&&input.step==='0.5')),'five real cuts-only half-decibel sliders');
   check(await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-reset').isDisabled(),'unchanged original tuning offers no unnecessary write');
