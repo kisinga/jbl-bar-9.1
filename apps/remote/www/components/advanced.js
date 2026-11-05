@@ -1,8 +1,9 @@
 import {byId} from './dom.js';
 
 // Local audio-sync draft and setup rendering; the shell schedules and sends.
-export function createAdvanced(root) {
+export function createAdvanced(root, setupRoot=root) {
   const $ = id => byId(root,id);
+  const setupById = id => byId(setupRoot,id);
   const maxSync=250;
   let draft=null;
   return {
@@ -23,11 +24,12 @@ export function createAdvanced(root) {
       $('av-sync-up').disabled=!ready || !awake || !!active || sync==null || !tvInput || shown>=maxSync;
       const setup=s.setup, calibration=setup?.calibration || '';
       const measuring=/starting|Starting in|Measuring/.test(calibration);
-      for(const row of root.querySelectorAll('.setup-row')) row.hidden=!setup;
-      $('calibration-value').textContent=calibration || (sound.rear_docked===false?'Ready':'Undock both rear speakers first');
-      $('calibrate').disabled=!ready || !awake || !!active || !setup || measuring || setup.sub_pairing || sound.rear_docked!==false;
-      $('sub-value').textContent=setup?.sub_pairing?'Pairing… hold the subwoofer button':setup?.subwoofer || '—';
-      $('sub-pair').disabled=!ready || !awake || !!active || !setup || measuring || setup.sub_pairing;
+      if(setupRoot!==root) setupRoot.hidden=!setup;
+      for(const row of setupRoot.querySelectorAll('.setup-row')) row.hidden=!setup;
+      setupById('calibration-value').textContent=calibration || (sound.rear_docked===false?'Ready':'Undock both rear speakers first');
+      setupById('calibrate').disabled=!ready || !awake || !!active || !setup || measuring || setup.sub_pairing || sound.rear_docked!==false;
+      setupById('sub-value').textContent=setup?.sub_pairing?'Pairing… hold the subwoofer button':setup?.subwoofer || '—';
+      setupById('sub-pair').disabled=!ready || !awake || !!active || !setup || measuring || setup.sub_pairing;
     }
   };
 }

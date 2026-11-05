@@ -9,6 +9,7 @@ node tests/webremote-ui.mjs
 node tests/setup-ui.mjs
 node tests/component-ui.mjs
 node tests/bass-offset-ui.mjs
+python3 tests/check_remote_ui.py
 python3 research/bar-family/test_workspace.py
 ```
 
@@ -61,10 +62,21 @@ layout using synthetic state. It never contacts a soundbar.
 
 `check_release.py` checks changelog validation, complete target/checksum coverage,
 source provenance, immutable publication, retry guards and upload failures without
-writing to GitHub. `webremote-ui.mjs` also produces sample README screenshots at
+writing to GitHub.
+
+`check_remote_ui.py` checks the frozen pre-redesign IDs, actions, capability
+markers, level options and EQ ranges against the production scaffold. Browser
+checks additionally cover speaker state, disclosure defaults and persistence,
+and independent EQ/offset inclusion.
+
+`webremote-ui.mjs` also produces sample README screenshots at
 `build/readme-remote.png` and `build/readme-advanced.png`. To refresh the public
 images after reviewing them, copy those to `docs/web-remote.png` and
-`docs/web-remote-advanced.png` respectively.
+`docs/web-remote-advanced.png` respectively. The first is a full-page 1200px desktop
+view with default-expanded
+Audio sync, Bass offset and System monitor. The second crops both sound columns
+and expanded Room setup. Images use deterministic fixture data and production
+modules; they do not capture a live soundbar.
 
 The USB fixtures also cover automatic clean installation and legacy migration,
 updates with public packages that preserve private settings/SSH keys/tuning,

@@ -4,7 +4,7 @@
 choose what is playing, and adjust the sound in a browser on your home network.
 No cloud account or app to install.
 
-![Browser remote showing example sound and bass controls](docs/web-remote.png)
+![Browser remote with speaker batteries, source controls, sound levels, Front EQ and System monitor](docs/web-remote.png)
 
 *Screenshot uses sample data, not a connection to a real soundbar.*
 
@@ -104,15 +104,18 @@ Bass offset is saved for restarts and applied during supported, stable
 at a comfortable volume; extra bass or center gain can distort at high volume.
 [How bass offset works](docs/BASS_OFFSET.md).
 
-Open **Advanced** for audio delay (lip sync), rear speaker calibration,
-and subwoofer pairing. The separate **Front EQ** panel offers experimental
-front-speaker tuning. Controls appear or become available
-according to the device, firmware and included helpers; some advanced controls
-need a separately prepared build. Front EQ is limited to supported Standard
-playback routes. The system monitor shows device health and rear speaker battery
-levels when available. [Feature and setup details](docs/models/bar91/USB-TOOLKIT.md).
+The listening room keeps source controls and volume beside a view of the speakers,
+with last-reported rear battery levels next to each speaker. **Sound** and
+**Front EQ** sit side by side on larger screens. **Audio sync** (lip sync),
+**Bass offset**, and **System monitor** start expanded; **Room setup** contains
+rear speaker calibration and subwoofer pairing.
 
-![Advanced controls with sample data](docs/web-remote-advanced.png)
+Controls appear or become available according to the device, firmware and included
+helpers; some advanced controls need a separately prepared build. Front EQ is
+limited to supported Standard playback routes. System monitor shows device health
+and network information when available. [Feature and setup details](docs/models/bar91/USB-TOOLKIT.md).
+
+![Sound levels, five-band Front EQ, bass offset, audio sync and expanded Room setup using sample data](docs/web-remote-advanced.png)
 
 ## Need help?
 

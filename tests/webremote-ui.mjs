@@ -98,7 +98,9 @@ try {
   await page.waitForFunction(()=>document.querySelector('#connection').dataset.state==='online');
   check(stateGets===0 && streamGets===1,'initial state uses one push connection');
   check(await page.locator('h1').count()===1,'one clear page heading');
-  check(await page.locator('#system-panel .rear-battery-panel').count()===1 && await page.locator('.mode-panel .rear-battery-panel').count()===0,'rear battery indicators belong to System monitor');
+  check(await page.locator('#speaker-view #rear-battery-left').count()===1 && await page.locator('#system-panel #rear-battery-left').count()===0,'rear batteries belong beside the rendered speakers');
+  check(await page.locator('#system-panel').getAttribute('open')!==null && await page.locator('#advanced').getAttribute('open')!==null,'monitor and audio sync start expanded');
+  check(await page.locator('#bass-offset-panel').getAttribute('open')!==null,'bass offset starts expanded when included');
   check(await page.locator('#rear-battery-left').textContent()==='Left: 80%' && await page.locator('#rear-battery-right-meter').getAttribute('value')==='90','independent rear battery levels render with meters');
   for (const [value,level,color] of [[19,'critical','#ed8585'],[20,'low','#e7c66a'],[39,'low','#e7c66a'],[40,'normal','#b6dba9']]) {
     state.sound.rear_battery_left=value;
@@ -110,6 +112,39 @@ try {
   check(await page.locator('#rear-battery-right').textContent()==='Right: Unavailable' && await page.locator('#rear-battery-right-meter').isHidden(),'zero is a real reading and missing side has no misleading meter');
   state.sound.rear_battery_left=80;state.sound.rear_battery_right=90;
   await page.waitForFunction(()=>document.querySelector('#rear-battery-left').textContent==='Left: 80%');
+  // Speaker presentation follows reported state without inventing telemetry.
+  check(await page.locator('#speaker-view').getAttribute('data-state')==='docked','known docked state joins the speakers');
+  state.sound.rear_docked=false;
+  await page.waitForFunction(()=>document.querySelector('#speaker-view').dataset.state==='detached');
+  check(await page.locator('#speaker-view .bass-rings').isVisible(),'confirmed bass has a subtle setting accent');
+  state.muted=true;
+  await page.waitForFunction(()=>document.querySelector('#speaker-view .bass-rings').hidden);
+  state.muted=null;
+  await pause(100);
+  check(await page.locator('#speaker-view .bass-rings').isHidden(),'unknown mute does not imply audible bass');
+  state.muted=false;delete state.sound.bass;delete state.sound.rear_docked;
+  await page.waitForFunction(()=>document.querySelector('#speaker-view').dataset.state==='unknown');
+  check(await page.locator('#speaker-view .bass-rings').isHidden(),'unknown bass has no setting accent');
+  state.sound.bass=0;state.sound.rear_docked=true;
+  state.setup={subwoofer:'Not connected',sub_pairing:false};
+  await page.waitForFunction(()=>document.querySelector('#sub-render-status').textContent==='Subwoofer · not connected');
+  check(await page.locator('#speaker-view .bass-rings').isHidden(),'explicitly disconnected sub suppresses bass accent');
+  state.setup={subwoofer:'Connected',sub_pairing:false};
+  await page.waitForFunction(()=>document.querySelector('#sub-render-status').textContent==='Subwoofer · connected');
+  state.setup={sub_pairing:true};
+  await page.waitForFunction(()=>document.querySelector('#sub-render-status').textContent==='Subwoofer · pairing');
+  check(await page.locator('#speaker-view .bass-rings').isHidden(),'pairing suppresses bass accent');
+  delete state.setup;
+  await page.waitForFunction(()=>document.querySelector('#sub-render-status').textContent==='Subwoofer');
+  check(await page.locator('#sub-render-status i').count()===0,'transient subwoofer messages never become persistent green status');
+  await page.locator('#advanced').evaluate(el=>el.open=false);
+  await page.locator('#system-panel').evaluate(el=>el.open=false);
+  state.volume=13;
+  await page.waitForFunction(()=>document.querySelector('#volume').textContent==='13');
+  check(await page.locator('#advanced').getAttribute('open')===null && await page.locator('#system-panel').getAttribute('open')===null,'SSE updates preserve manual collapse');
+  state.volume=12;
+  await page.locator('#advanced').evaluate(el=>el.open=true);
+  await page.locator('#system-panel').evaluate(el=>el.open=true);
   state.automation={enabled:true,engine:'go',status:'WAITING_FOR_POWER_ON'};
   await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Go · Waiting for power-on');
   check(true,'Go automation engine and state appear in device details');
@@ -438,7 +473,7 @@ try {
   await page.locator('[data-level=center] [data-value="1"]').click();
   await page.waitForFunction(()=>document.querySelector('#center-value').textContent==='Level 2 of 6 · +2.4 dB');
   check(state.sound.center===1 && lastPayload?.action==='center_next','center cycle sends center_next and shows the level');
-  await page.locator('#advanced summary').click();
+  await page.locator('#advanced').evaluate(el=>el.open=true);
   check(await page.locator('#av-sync-value').textContent()==='20 ms','audio sync value shown in Advanced');
   await page.locator('#av-sync-up').click();
   await page.waitForFunction(()=>document.querySelector('#av-sync-value').textContent==='30 ms');
@@ -472,6 +507,7 @@ try {
   check(await page.locator('#calibrate').isHidden() && await page.locator('#audio-format-row').isHidden(),'setup controls and audio format stay hidden on older remotes');
   state.setup={sub_pairing:false}; state.sound.audio_format='DOLBY SURROUND DD+'; await page.locator('#refresh').click(); await pause(200);
   check(await page.locator('#audio-format').textContent()==='DOLBY SURROUND DD+','audio format shown in Sound');
+  await page.locator('#room-setup').evaluate(el=>el.open=true);
   check(await page.locator('#calibrate').isDisabled() && (await page.locator('#calibration-value').textContent()).includes('Undock'),'calibration needs undocked rear speakers');
   state.sound.rear_docked=false; await page.locator('#refresh').click(); await pause(200);
   check(!(await page.locator('#calibrate').isDisabled()) && await page.locator('#calibration-value').textContent()==='Ready','calibration ready with rear speakers undocked');
@@ -551,9 +587,9 @@ try {
   check(await page.locator('#playback-progress').getAttribute('value')==='75','timeline uses receiver position');
   await page.locator('.device-details summary').click();
   check((await page.locator('#cast-eq').textContent())==='Low 0 dB · High -2 dB (read only)','Cast tone readback shown without unsafe controls');
-  for (const width of [320,390,1024]) {
+  for (const width of [320,390,650,768,900,1024,1440]) {
     await page.setViewportSize({width,height:900});
-    check(await page.locator('#rear-battery-left-meter').evaluate(e=>{const a=e.getBoundingClientRect(),b=document.querySelector('#storage-progress').getBoundingClientRect();return a.height===b.height && Math.abs(a.width-b.width)<1;}),'battery bar matches Storage dimensions at '+width);
+    check(await page.locator('#rear-battery-left-meter').evaluate(e=>{const a=e.getBoundingClientRect(),b=e.closest('.rear').getBoundingClientRect();return a.height>=3 && a.width>0 && a.left>=b.left-1 && a.right<=b.right+1;}),'compact battery meter stays beside its speaker at '+width);
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'long media metadata fits at '+width);
     check(await page.locator('.transport button').evaluateAll(buttons=>buttons.every(button=>{const r=button.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.left>=0 && r.right<=innerWidth;})),'four 44px transport targets fit at '+width);
   }
@@ -561,11 +597,15 @@ try {
   const beforeIdle=stateGets;await pause(1200);
   check(stateGets===beforeIdle,'idle browser never polls the state endpoint');
   state=initial();await page.locator('#refresh').click();await pause(200);
-  for (const width of [320,390,1024]) {
+  for (const width of [320,390,650,768,900,1024,1440]) {
     await page.setViewportSize({width,height:900});
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow at '+width);
-    check(await page.locator('button,summary').evaluateAll(elements=>elements.filter(e=>e.getBoundingClientRect().height>0).every(e=>e.getBoundingClientRect().height>=44)),'44px touch height for all visible controls at '+width);
-    if(width>=1000) check(await page.locator('.primary').evaluate(e=>e.getBoundingClientRect().right)<=await page.locator('.secondary').evaluate(e=>e.getBoundingClientRect().left),'listening and sound controls form separate desktop columns');
+    check(await page.locator('button,summary,select,input[type=range]').evaluateAll(elements=>elements.filter(e=>e.getBoundingClientRect().height>0).every(e=>{const r=e.getBoundingClientRect();return r.height>=44 && r.width>=44;})),'44px touch targets for all visible controls at '+width);
+    if(width>=900) check(await page.locator('.mode-panel').evaluate(e=>e.getBoundingClientRect().right)<=await page.locator('.tuning-column').evaluate(e=>e.getBoundingClientRect().left),'sound and tuning form separate desktop columns');
+    const leftBox=await page.locator('.mode-panel').boundingBox();
+    const rightBox=await page.locator('.tuning-column').boundingBox();
+    if(width>=900) check(Math.abs(leftBox.width-rightBox.width)<1,'sound columns have equal width');
+    else check(leftBox.y+leftBox.height<=rightBox.y,'sound columns stack at compact widths');
 
   }
   await page.setViewportSize({width:320,height:920});
@@ -574,7 +614,7 @@ try {
   await mkdir(new URL('build/',root),{recursive:true});
   check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Bluetooth transport fits at 320px');
   // Public screenshots contain explicit sample fixtures, never live device captures.
-  await page.evaluate(async current=>{
+  const populateMonitorHistory=()=>page.evaluate(async current=>{
     const {createSystem}=await import('/components/system.js');
     const monitor=createSystem(document.querySelector('#system-panel'));
     const renderSystem=(state,online)=>monitor.render({state,online});
@@ -587,6 +627,7 @@ try {
       }
     } finally {Date.now=realNow;}
   },state);
+  await populateMonitorHistory();
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-320.png',root)),fullPage:true});
   await page.setViewportSize({width:390,height:920});
   await page.screenshot({path:fileURLToPath(new URL('build/webremote-mobile-new.png',root)),fullPage:true});
@@ -607,9 +648,16 @@ try {
   await page.setViewportSize({width:1200,height:1050});
   await page.reload();
   await page.waitForFunction(()=>document.querySelector('#bass-offset').value==='-1.5' && !document.querySelector('#bass-offset-save').disabled);
-  await page.screenshot({path:fileURLToPath(new URL('build/readme-remote.png',root))});
-  await page.locator('#advanced summary').click();
-  await page.locator('#advanced').screenshot({path:fileURLToPath(new URL('build/readme-advanced.png',root))});
+  await populateMonitorHistory();
+  await page.evaluate(()=>document.activeElement.blur());
+  await page.screenshot({path:fileURLToPath(new URL('build/readme-remote.png',root)),fullPage:true});
+  await page.locator('#advanced').evaluate(el=>el.open=true);
+  await page.locator('#bass-offset-panel').evaluate(el=>el.open=true);
+  await page.locator('#room-setup').evaluate(el=>el.open=true);
+  await page.evaluate(()=>document.activeElement.blur());
+  const soundBox=await page.locator('.sound-grid').boundingBox();
+  const setupBox=await page.locator('#room-setup').boundingBox();
+  await page.screenshot({path:fileURLToPath(new URL('build/readme-advanced.png',root)),fullPage:true,clip:{x:soundBox.x,y:soundBox.y+await page.evaluate(()=>scrollY),width:soundBox.width,height:setupBox.y+setupBox.height-soundBox.y}});
   await page.emulateMedia({reducedMotion:'no-preference'});
   check(await page.locator('.panel').first().evaluate(e=>getComputedStyle(e).animationName)==='arrive','motion enabled only when preference permits');
   check(errors.length===0,'no browser exceptions: '+errors.join(', '));

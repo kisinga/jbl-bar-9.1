@@ -90,7 +90,8 @@ older servers keep the control hidden. Its monitor shares the model action gate
 and is joined by the extension lifecycle before native helper cleanup.
 
 `advanced.js` owns the contributed audio-sync draft and calibration/subwoofer
-display. The shell debounces taps into one legacy `av_sync_set` request with
+display through separate scoped roots for Audio sync and Room setup. The shell
+debounces taps into one legacy `av_sync_set` request with
 `value`, cancels unsent drafts on disconnect/session changes, and keeps one action
 queue. The Bar 9.1 composition supplies longer setup/audio-sync budgets through
 `Options.ActionTimeout`; the server caps these at 60 seconds and extends that
@@ -100,7 +101,12 @@ reply's write deadline for bounded restoration. Other backends retain the defaul
 HTML remains a readable static scaffold with existing IDs, accessibility labels
 and CSS. This keeps contributors' UI changes straightforward and requires no
 Node build step. Component ownership follows existing panels instead of creating
-a separate abstraction for every label or button.
+a separate abstraction for every label or button. The speaker-view component owns
+collective docking presentation and independent last-reported battery readings;
+System owns only diagnostics and connection status. Front EQ and bass offset have
+independent capability roots within the right tuning column. Audio sync, Bass
+offset, and System monitor start expanded; live rendering never resets disclosures.
+See [UI feature mapping](REMOTE-UI.md) for the retained control surface.
 
 `GET /api/features` selects optional panels through known bundled `component`
 identifiers. Metadata never supplies executable code or script URLs. Unsupported

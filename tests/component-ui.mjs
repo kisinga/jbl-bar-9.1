@@ -43,6 +43,7 @@ try {
   const fixture={available:true,power:'On',mode:'Unknown',input:'Fixture',volume:9,muted:false,source_state:0,sound:{av_sync_ms:20},extensions:{
     'fixture.eq':{available:true,enabled:false,gains_db:[0,0,0,0,0],frequencies_hz:[125,500,2000,4000,8000],status:'original'},
     'fixture.center':{level:2},
+    'fixture.bass':{offset_db:0,status:'original'},
   }};
   const fixtureURL=await start(fixture);
   const fixtureProcess=children.at(-1);
@@ -89,7 +90,27 @@ try {
   check(requests[0].action==='fixture.eq.apply' && requests[0].parameters.gains_db[0]===-2 && !('gains_db' in requests[0]),'EQ emits the declared typed extension action');
   await composition.locator('[data-level=center] [data-value="4"]').click();await composition.waitForFunction(()=>document.querySelector('#center-value').textContent.includes('Level 5 of 6'));
   check(requests[1].action==='fixture.center.next' && requests[2].action==='fixture.center.next' && requests.length===3,'center level choice steps through the declared namespaced action');
-  await composition.locator('#advanced summary').click();
+  // EQ and bass offset are independent capabilities, even in one visual column.
+  for(const [eqIncluded,bassIncluded] of [[true,true],[true,false],[false,true],[false,false]]) {
+    const matrix=await browser.newPage();matrix.on('pageerror',error=>errors.push(error.message));
+    await matrix.route('**/api/features',route=>route.fulfill({json:{...features,extensions:[
+      {id:'fixture.eq',component:'front-eq',included:eqIncluded,actions:['fixture.eq.apply','fixture.eq.reset']},
+      {id:'fixture.bass',component:'bass-offset',included:bassIncluded,actions:['fixture.bass.set']}
+    ]}}));
+    await matrix.goto(fixtureURL);await matrix.waitForFunction(()=>document.querySelector('#connection').dataset.state==='online');
+    check(await matrix.locator('#eq-panel').isVisible()===eqIncluded,'EQ capability inclusion '+eqIncluded+'/'+bassIncluded);
+    check(await matrix.locator('#bass-offset-panel').isVisible()===bassIncluded,'offset independent of EQ '+eqIncluded+'/'+bassIncluded);
+    check(await matrix.locator('.tuning-column').isVisible()===(eqIncluded||bassIncluded),'no empty tuning column '+eqIncluded+'/'+bassIncluded);
+    check(await matrix.locator('[data-component=center-level]').isHidden(),'omitted center component stays hidden');
+    if(bassIncluded){
+      check(await matrix.locator('#bass-offset-panel').getAttribute('open')!==null,'supported offset starts expanded');
+      await matrix.locator('#bass-offset-panel').evaluate(el=>el.open=false);
+      await matrix.locator('#refresh').click();
+      check(await matrix.locator('#bass-offset-panel').getAttribute('open')===null,'refresh preserves offset disclosure');
+    }
+    await matrix.close();
+  }
+  await composition.locator('#advanced').evaluate(el=>el.open=true);
   check(!(await composition.locator('#av-sync-up').isDisabled()),'advertised audio-sync setter enables local stepper intents');
   await composition.locator('#av-sync-up').click();await composition.locator('#av-sync-up').click();await composition.locator('#av-sync-up').click();
   await composition.waitForFunction(()=>document.querySelector('#av-sync-value').textContent==='50 ms');

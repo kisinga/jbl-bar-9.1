@@ -82,17 +82,6 @@ export function createSystem(root) {
     $('system-temperature-row').hidden = !Number.isFinite(data.temperature_c);
     $('system-temperature').textContent = Number.isFinite(data.temperature_c) ? data.temperature_c.toFixed(1) + ' °C' : '—';
     $('system-note').textContent = !connected ? 'Connection lost. Vitals will resume with fresh samples.' : stale ? 'These readings have stopped updating. Waiting for a fresh sample.' : valid ? 'Real device samples. History builds while this page is open.' : 'System vitals are not available from this version of the remote.';
-    const ready=connected && s.available;
-    const sound=s.sound || {};
-    for (const [side,label] of [['left','Left'],['right','Right']]) {
-      const value = sound['rear_battery_' + side];
-      const available = ready && Number.isInteger(value) && value >= 0 && value <= 100;
-      $('rear-battery-' + side).textContent = label + ': ' + (available ? value + '%' : 'Unavailable');
-      const meter = $('rear-battery-' + side + '-meter');
-      meter.hidden = !available;
-      meter.value = available ? value : 0;
-      meter.dataset.level = !available ? 'unknown' : value < 20 ? 'critical' : value < 40 ? 'low' : 'normal';
-    }
     const wifi=s.wifi || {};
     $('wifi-name').textContent=wifi.available ? wifi.connected ? wifi.ssid || 'Connected network' : 'Not connected' : 'Status unavailable';
     const signal = wifi.signal_dbm;

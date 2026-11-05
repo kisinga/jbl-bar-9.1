@@ -7,6 +7,7 @@ import {createDetails} from './components/details.js';
 import {createCapabilities} from './components/capabilities.js';
 import {createBassOffset} from './components/bass-offset.js';
 import {createAdvanced} from './components/advanced.js';
+import {createSpeakers} from './components/speakers.js';
 
 const $ = id => document.getElementById(id);
 const buttons = [...document.querySelectorAll('[data-action]')];
@@ -21,9 +22,10 @@ const sound=createSound(document.querySelector('.mode-panel'));
 const bluetooth=createBluetooth($('bluetooth-panel'));
 const details=createDetails(document.querySelector('.more-details'));
 const capabilities=createCapabilities(document);
-const bassOffset=createBassOffset(document.querySelector('.mode-panel'));
-const advanced=createAdvanced($('advanced'));
-const components=[bluetooth,sound,playback,system,equalizer,details,advanced,bassOffset];
+const bassOffset=createBassOffset($('bass-offset-panel'));
+const advanced=createAdvanced($('advanced'),$('room-setup'));
+const speakers=createSpeakers($('speaker-view'));
+const components=[bluetooth,sound,playback,system,equalizer,details,advanced,bassOffset,speakers];
 let syncTimer=null;
 const context=()=>({state:capabilities.state(current),deviceName:capabilities.name(),online,ready:online && !!current?.available,awake:current?.power==='On',active,queued:queue.length,pending:active?[active,...queue]:[...queue],csrf});
 function feedback(text, kind = '') {
