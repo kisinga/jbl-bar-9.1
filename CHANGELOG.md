@@ -6,6 +6,7 @@ generated from that section plus the installation and recovery instructions.
 
 ## 0.3.0-dev.10
 
+- Credit verified, unchanged SSH support files in update storage checks while retaining the full 2 MiB safety reserve.
 - Add Network update (SSH) to repository and standalone setup: discover jbl.local or enter a private IP, authenticate with your SSH password, and update a managed bar without USB while retaining settings and keys.
 - Run repository setup directly with Go; local runs and CI share the builder. Downloaded platform executables use verified published files without developer tools.
 - Fix large-FAT32 readback and storage estimates; eject verified USBs automatically and include detailed setup failures in returned reports.

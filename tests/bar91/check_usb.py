@@ -706,6 +706,37 @@ with tempfile.TemporaryDirectory(prefix='jbl-space-budget-') as temp:
     assert subprocess.run(['/bin/sh', '-c', command, 'fixture', str(ROOT / 'models/bar91/usb/preflight.sh')], env=env, capture_output=True).returncode != 0
     passed('native_space_budget_uses_file_bytes_not_fat_allocation')
 
+# Reproduce the returned USB's 8,888 KiB estimate against 8,848 KiB free.
+# Identical SSH staging files are reused by atomic_copy, without reducing the
+# reserve. Modified, symlinked or unowned files must never receive this credit.
+for kind in ('identical', 'changed', 'symlink', 'unowned', 'still_full'):
+    with tempfile.TemporaryDirectory(prefix='jbl-support-space-') as temp:
+        folder = Path(temp)
+        usb, store, remote = folder/'usb', folder/'store', folder/'remote'
+        (usb/'files/ssh').mkdir(parents=True)
+        (store/'ssh-input').mkdir(parents=True)
+        (store/'OWNER.txt').write_text('JBL_TOOLKIT_REV1\n' if kind != 'unowned' else 'unknown\n')
+        (usb/'files/remote').write_bytes(b'x' * (6788 * 1024))
+        for i in range(13):
+            source = usb/'files/ssh'/f'file{i}.sh'
+            source.write_bytes(b'unchanged script\n')
+            target = store/'ssh-input'/source.name
+            if kind == 'symlink': target.symlink_to(source)
+            else: target.write_bytes(source.read_bytes() if kind != 'changed' else b'modified\n')
+        wrapper = folder/'busybox'
+        free = 8835 if kind == 'still_full' else 8848
+        wrapper.write_text('#!/bin/sh\nif [ "$1" = df ]; then echo "Filesystem 1024-blocks Used Available Capacity Mounted"; echo "ubi 34976 26128 '+str(free)+' 75% /var"; else exec '+BB+' "$@"; fi\n')
+        wrapper.chmod(0o700)
+        command = '. "$1"; . "$2"; preflight_space'
+        env = dict(os.environ, JBL_BUSYBOX=str(wrapper), JBL_TOOLKIT_USB=str(usb),
+                   JBL_TOOLKIT_STORE=str(store), JBL_REMOTE_STORE=str(remote), JBL_TOOLKIT_LOCK=str(folder))
+        result = subprocess.run(['/bin/sh','-c',command,'fixture',str(ROOT/'models/bar91/usb/common.sh'),str(ROOT/'models/bar91/usb/preflight.sh')], env=env, capture_output=True, check=False)
+        assert (result.returncode == 0) == (kind == 'identical'), (kind,result.stdout,result.stderr)
+        assert not result.stderr, result.stderr
+        expected = 8836 if kind in ('identical','still_full') else 8888
+        assert f'SPACE_REQUIRED_KIB={expected}' in result.stdout.decode(), result.stdout
+        passed('support_file_space_' + kind)
+
 # Native preflight with synthetic mounts/process identities and a command wrapper.
 # No global /var, networking or vendor executable is accessed by these cases.
 for label in ('supported', 'wrong_var', 'read_only', 'nested_mount', 'wrong_firmware',
@@ -764,7 +795,7 @@ esac
             (folder / 'files/remote').write_bytes(b'unchanged remote')
             if label == 'managed_reuse_space':
                 (remote_store / 'TOOLKIT').write_text('JBL_TOOLKIT_REV1\n')
-        command = '. "$1"; regular() { [ -f "$1" ] && [ ! -L "$1" ]; }; boot_id() { [ "$JBL_PREFLIGHT_CASE" != no_boot_id ] && echo fixture-boot; }; probe_native() { [ "$JBL_PREFLIGHT_CASE" != native_probe_failure ]; }; publish_directory() { [ "$JBL_PREFLIGHT_CASE" != publish_unsupported ] && [ ! -e "$2" ] && "$BB" mv "$1" "$2"; }; preflight'
+        command = '. "$1"; regular() { [ -f "$1" ] && [ ! -L "$1" ]; }; directory() { [ -d "$1" ] && [ ! -L "$1" ]; }; owned() { return 1; }; boot_id() { [ "$JBL_PREFLIGHT_CASE" != no_boot_id ] && echo fixture-boot; }; probe_native() { [ "$JBL_PREFLIGHT_CASE" != native_probe_failure ]; }; publish_directory() { [ "$JBL_PREFLIGHT_CASE" != publish_unsupported ] && [ ! -e "$2" ] && "$BB" mv "$1" "$2"; }; preflight'
         env = dict(os.environ, BB=str(wrapper), USB=str(folder), SSH='true' if label=='unsupported_ssh' else 'false',
                    LOCK=str(folder), SSH_STORE=str(folder / 'ssh'), REMOTE_STORE=str(remote_store), WEB_REMOTE='true', AUTO_STANDARD='true', JBL_PREFLIGHT_CASE=label)
         result = subprocess.run(['/bin/sh', '-c', command, 'fixture', str(folder / 'preflight.sh')],

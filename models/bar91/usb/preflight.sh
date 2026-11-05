@@ -102,17 +102,38 @@ preflight_space() {
     payload_kib=$(payload_size_kib "$USB/files") || return 1
     required_kib=$((payload_kib+2048))
     reuse_remote=false
+    reused_kib=0
     if { [ "${WEB_REMOTE:-true}" != true ] && [ "${AUTO_STANDARD:-true}" != true ]; } ||
-       { regular "$REMOTE_STORE/TOOLKIT" && [ "$("$BB" cat "$REMOTE_STORE/TOOLKIT")" = JBL_TOOLKIT_REV1 ] &&
+       { directory "$REMOTE_STORE" && regular "$REMOTE_STORE/TOOLKIT" && [ "$("$BB" cat "$REMOTE_STORE/TOOLKIT")" = JBL_TOOLKIT_REV1 ] &&
          regular "$REMOTE_STORE/remote" && regular "$USB/files/remote" && "$BB" cmp -s "$REMOTE_STORE/remote" "$USB/files/remote"; }; then
         remote_kib=$(payload_size_kib "$USB/files/remote") || return 1
         [ "$remote_kib" -le "$payload_kib" ] || return 1
-        required_kib=$((payload_kib-remote_kib+2048))
+        reused_kib=$remote_kib
         reuse_remote=true
     fi
+    # atomic_copy reuses identical staging/support files too. Credit only
+    # verified regular files in our managed stores; retain the full reserve
+    # for SSH's second copy, account files, scripts and filesystem overhead.
+    if owned && directory "$STORE/ssh-input"; then
+        for source in "$USB"/files/ssh/*.sh; do
+            target=$STORE/ssh-input/${source##*/}
+            if regular "$source" && regular "$target" && "$BB" cmp -s "$source" "$target"; then
+                file_kib=$(payload_size_kib "$source") || return 1
+                reused_kib=$((reused_kib+file_kib))
+            fi
+        done
+    fi
+    if directory "$REMOTE_STORE" && regular "$REMOTE_STORE/TOOLKIT" && [ "$("$BB" cat "$REMOTE_STORE/TOOLKIT")" = JBL_TOOLKIT_REV1 ] &&
+       regular "$USB/files/remote-start.sh" && regular "$REMOTE_STORE/start.sh" &&
+       "$BB" cmp -s "$USB/files/remote-start.sh" "$REMOTE_STORE/start.sh"; then
+        file_kib=$(payload_size_kib "$USB/files/remote-start.sh") || return 1
+        reused_kib=$((reused_kib+file_kib))
+    fi
+    [ "$reused_kib" -le "$payload_kib" ] || return 1
+    required_kib=$((payload_kib-reused_kib+2048))
     available=$("$BB" df -Pk /var | "$BB" awk 'NR==2 {print $4}') || return 1
     case "$available" in ''|*[!0-9]*) return 1;; esac
-    printf 'SPACE_PAYLOAD_KIB=%s SPACE_REQUIRED_KIB=%s SPACE_AVAILABLE_KIB=%s REUSE_REMOTE=%s\n' "$payload_kib" "$required_kib" "$available" "$reuse_remote"
+    printf 'SPACE_PAYLOAD_KIB=%s SPACE_REQUIRED_KIB=%s SPACE_AVAILABLE_KIB=%s REUSE_REMOTE=%s SPACE_REUSED_KIB=%s\n' "$payload_kib" "$required_kib" "$available" "$reuse_remote" "$reused_kib"
     [ "$available" -ge "$required_kib" ] || return 1
 }
 
