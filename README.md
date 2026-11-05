@@ -68,7 +68,8 @@ to this tool rather than generating a file for you to move manually.
 **No toolkit release available yet?** Development packages are under **Artifacts** on a
 successful [Test and package toolkit run](https://github.com/kisinga/jbl-bar-toolkit/actions/workflows/package.yml).
 Sign in to GitHub and download **jbl-bar-toolkit-usb-development**. Extract
-GitHub's outer ZIP first, then run the setup executable for your platform inside. These downloads expire after 30 days.
+GitHub's outer ZIP, then extract the matching `…-setup-OS-ARCH.zip` offline bundle.
+Run its executable beside the included toolkit/recovery ZIPs. These downloads expire after 30 days.
 
 ## Update later
 

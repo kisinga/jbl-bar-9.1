@@ -246,6 +246,28 @@ func TestReconnectAndSavedSSH(t *testing.T) {
 		t.Fatal("drive listing leaked saved credentials")
 	}
 }
+func TestDriveListingPreservesCustomWebPort(t *testing.T) {
+	s, d := testServer(t)
+	p, err := LoadPackage(s.PackagePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(d.Mount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	if err := p.Apply(root, strings.Replace(testConfig, "web_port=80", "web_port=8080", 1)); err != nil {
+		t.Fatal(err)
+	}
+	w := call(s, "GET", "/api/drives", nil, true)
+	var rows []struct {
+		Config map[string]string `json:"config"`
+	}
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &rows) != nil || len(rows) != 1 || rows[0].Config["web_port"] != "8080" {
+		t.Fatalf("custom port missing from drive listing: %s", w.Body.String())
+	}
+}
 func TestLinuxDiscovery(t *testing.T) {
 	data := []byte(`{"blockdevices":[{"name":"/dev/sda","type":"disk","tran":"usb","rm":true,"ro":false,"size":8000000000,"serial":"one","pttype":"dos","log-sec":512,"children":[{"name":"/dev/sda1","type":"part","partn":1,"fstype":"vfat","fsver":"FAT32","mountpoints":["/media/user/USB"]}]},{"name":"/dev/sdb","type":"disk","tran":"usb","rm":true,"size":8000000000,"log-sec":512,"children":[{"mountpoints":["/"]}]},{"name":"/dev/nvme0n1","type":"disk","tran":"nvme","rm":false}]}`)
 	ds, e := linuxDrives(data)

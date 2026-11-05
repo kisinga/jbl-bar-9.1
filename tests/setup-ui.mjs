@@ -52,6 +52,7 @@ const server = createServer(async (req, res) => {
                       auto_standard: "true",
                       smart_mode_memory: "true",
                       allowed_cidr: "192.168.9.128/27",
+                      web_port: "8080",
                     },
                   }
                 : {}),
@@ -180,6 +181,7 @@ try {
   assert.equal(first.ID, "fixture");
   assert.equal(first.Format, false);
   assert.match(first.Config, /^action=check$/m);
+  assert.match(first.Config, /^web_port=80$/m);
   assert.match(first.Config, /^ssh_password_hash=\$6\$/m);
   assert.match(first.Config, /^smart_mode_memory=true$/m);
   assert.match(first.Config, /^wifi_psk_hex=[a-f0-9]{64}$/m);
@@ -199,6 +201,7 @@ try {
   );
   const second = requests.filter((r) => r.path === "/api/prepare")[1].body;
   assert.equal(second.KeepSSH, true);
+  assert.match(second.Config, /^web_port=8080$/m);
   assert(!second.Config.includes("ssh_password_hash="));
   // Erasure is never implicit, and the selected identifier must match exactly.
   await page.locator("#format").check();

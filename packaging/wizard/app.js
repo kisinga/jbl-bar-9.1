@@ -254,6 +254,7 @@
       let config = await JBLSetup.configuration({
         address: $("address").value,
         prefix: $("prefix").value,
+        port: selected.config?.web_port ?? 80,
         action: $("action").value,
         web: $("web").checked,
         ssh: $("ssh").checked && !keepSSH,

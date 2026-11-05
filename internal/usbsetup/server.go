@@ -138,7 +138,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						if b, e := readConfig(root); e == nil {
 							if cfg, e := ParseConfig(string(b)); e == nil {
 								pub := map[string]string{}
-								for _, key := range []string{"action", "ssh", "web_remote", "auto_standard", "smart_mode_memory", "allowed_cidr"} {
+								for _, key := range []string{"action", "ssh", "web_remote", "auto_standard", "smart_mode_memory", "allowed_cidr", "web_port"} {
 									pub[key] = cfg[key]
 								}
 								row["config"] = pub

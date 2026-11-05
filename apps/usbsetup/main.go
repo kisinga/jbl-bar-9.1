@@ -1,4 +1,4 @@
-// Portable local USB setup. Run from the repo: go run ./apps/usbsetup
+// Portable local USB setup. Run from the repo: go run ./apps/usbsetup --repo .
 package main
 
 import (

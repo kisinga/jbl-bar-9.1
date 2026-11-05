@@ -67,11 +67,13 @@
   }
   async function configuration(settings) {
     const allowed = subnet(settings.address, settings.prefix);
+    const port = Number(settings.port ?? 80);
+    if (!Number.isInteger(port) || !(port === 80 || port >= 1024 && port <= 65535 && port !== 2222)) throw Error("Web port must be 80 or 1024–65535, excluding SSH port 2222.");
     if (!["check","install","verify","configure","uninstall","migrate","update"].includes(settings.action)) throw Error("Unknown action.");
     const lines = ["# Private local JBL Bar 9.1 configuration", "format=1", "action=" + settings.action,
       "ssh=" + !!settings.ssh, "web_remote=" + !!settings.web, "auto_standard=" + !!settings.standard,
       "smart_mode_memory=" + !!(settings.standard && settings.memory),
-      "allowed_cidr=" + allowed, "web_port=80"];
+      "allowed_cidr=" + allowed, "web_port=" + port];
     if (settings.ssh) lines.push("ssh_password_hash=" + await passwordHash(settings.password));
     if (settings.ssid || settings.wifiPassword) {
       const wifi = await wifiCredentials(settings.ssid, settings.wifiPassword);

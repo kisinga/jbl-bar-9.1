@@ -172,7 +172,7 @@ jobs:
         env:
           ARTIFACT_NAME: ${{ matrix.artifact }}
         run: |
-          printf 'Download **%s** from Artifacts. Extract the wrapper, then run **jbl-setup** for your OS/architecture, or extract the matching **-setup-OS-ARCH.zip** for offline use. Keep **-recovery.zip**.\n\nHardware selection is automatic; only included, reviewed implementations can run. Combined hardware qualification remains pending.\n' "$ARTIFACT_NAME" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Download **%s** from Artifacts. Extract the wrapper, then extract the matching **-setup-OS-ARCH.zip** offline bundle and run its executable beside the included toolkit/recovery ZIPs. Keep **-recovery.zip**.\n\nHardware selection is automatic; only included, reviewed implementations can run. Combined hardware qualification remains pending.\n' "$ARTIFACT_NAME" >> "$GITHUB_STEP_SUMMARY"
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main')

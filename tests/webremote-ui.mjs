@@ -622,7 +622,7 @@ try {
   for (const width of [320,390,650,768,900,1024,1440]) {
     await page.setViewportSize({width,height:900});
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow at '+width);
-    check(await page.locator('button,summary,select,input[type=range]').evaluateAll(elements=>elements.filter(e=>e.getBoundingClientRect().height>0).every(e=>{const r=e.getBoundingClientRect();return r.height>=44 && r.width>=44;})),'44px touch targets for all visible controls at '+width);
+    check(await page.locator('button,summary,select,input[type=range],input[type=number]').evaluateAll(elements=>elements.filter(e=>e.getBoundingClientRect().height>0).every(e=>{const r=e.getBoundingClientRect();return r.height>=44 && r.width>=44;})),'44px touch targets for all visible controls at '+width);
     if(width>=900) check(await page.locator('.mode-panel').evaluate(e=>e.getBoundingClientRect().right)<=await page.locator('.tuning-column').evaluate(e=>e.getBoundingClientRect().left),'sound and tuning form separate desktop columns');
     const leftBox=await page.locator('.mode-panel').boundingBox();
     const rightBox=await page.locator('.tuning-column').boundingBox();
