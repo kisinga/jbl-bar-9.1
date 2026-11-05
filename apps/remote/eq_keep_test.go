@@ -132,3 +132,35 @@ func TestKeptEQStatusShowsTheWaitingEQ(t *testing.T) {
 		t.Fatalf("%+v", out)
 	}
 }
+
+// A failed reset used to be retried, and reported as a control, every
+// monitor tick: the page flashed "Another control is running" every two
+// seconds. It is retried only once the native state changes.
+func TestEQFollowRetryOnlyOnANewNativeState(t *testing.T) {
+	a := eqNativeState{Block: []byte{1, 2, 3}, Mode: 0, Cache: 0, Element: 0x840000, SampleRate: 48000}
+	b := a
+	b.Block = []byte{1, 2, 4}
+	c := a
+	c.Mode = 5
+	keyA, keyB, keyC := eqFollowKey(a, nil), eqFollowKey(b, nil), eqFollowKey(c, nil)
+	keyErr := eqFollowKey(eqNativeState{}, errors.New("native EQ is not ready on this audio route"))
+	if keyA == keyB || keyA == keyC || keyA == keyErr || keyA != eqFollowKey(a, nil) {
+		t.Fatalf("keys must follow the native state: %q %q %q %q", keyA, keyB, keyC, keyErr)
+	}
+	for _, d := range []eqFollow{eqFollowDropped, eqFollowReset} {
+		if !eqFollowRetry(d, "", keyA) {
+			t.Errorf("decision %d: first attempt skipped", d)
+		}
+		if eqFollowRetry(d, keyA, keyA) {
+			t.Errorf("decision %d: retried on the state where it failed", d)
+		}
+		if !eqFollowRetry(d, keyA, keyB) || !eqFollowRetry(d, keyErr, keyA) {
+			t.Errorf("decision %d: not retried after the native state changed", d)
+		}
+	}
+	for _, d := range []eqFollow{eqFollowOK, eqFollowLevels, eqFollowSmart} {
+		if !eqFollowRetry(d, keyA, keyA) {
+			t.Errorf("decision %d: blocked although it does not reset", d)
+		}
+	}
+}

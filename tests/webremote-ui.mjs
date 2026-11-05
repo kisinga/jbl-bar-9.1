@@ -176,6 +176,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('#device-automation').textContent==='Standard selected after wake');
 
   check(await page.locator('#eq-panel h2').textContent()==='Front EQ','front-channel equalizer is explicit');
+  check((await page.locator('#eq-scope').textContent()).endsWith('kept until Reset'),'the EQ scope says it is kept until Reset, not reset on restart');
   check((await page.locator('#eq-panel').textContent()).includes('Experimental') && (await page.locator('#eq-processing').textContent()).includes('custom DSP mode'),'EQ experimental processing mode is disclosed');
   check(await page.locator('#eq-panel input[type=range]').count()===5 && await page.locator('#eq-panel input').evaluateAll(inputs=>inputs.every(input=>input.min==='-6'&&input.max==='0'&&input.step==='0.5')),'five real cuts-only half-decibel sliders');
   check(await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-reset').isDisabled(),'unchanged original tuning offers no unnecessary write');
@@ -530,6 +531,11 @@ try {
   await page.waitForFunction(()=>document.querySelector('#mode-select [aria-checked=true]').textContent==='Standard');
   check(lastPayload?.action==='standard' && state.mode==='Standard','mode control returns to Standard');
   const speakerBeforeBusy=await page.locator("#speaker-view").evaluate(el=>({docking:el.dataset.state,battery:el.querySelector("#rear-battery-left").textContent}));
+  // A short background control (a monitor's cleanup) does not flash the page.
+  const summaryBefore=await page.locator('#summary').textContent();
+  await page.evaluate(()=>{window.flashed=false;new MutationObserver(()=>{if(document.querySelector('#summary').textContent.includes('Another control')||document.querySelector('[data-action=volume_up]').disabled)window.flashed=true;}).observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['disabled']});});
+  state.control={busy:true,action:'eq_reset',since:1}; await pause(350); state.control={busy:false}; await pause(900);
+  check(!await page.evaluate(()=>window.flashed) && (await page.locator('#summary').textContent())===summaryBefore && await page.locator('[data-action=volume_up]').isEnabled(),'a control shorter than the delay neither changes the summary nor disables controls');
   state.control={busy:true,action:'av_sync_set',since:1}; await page.waitForFunction(()=>document.querySelector('#summary').textContent.includes('Another control is running'));
   check(await page.locator('[data-action=volume_up]').isDisabled() && await page.locator('#mode-select [data-mode=Smart]').isDisabled() && await page.locator('[data-level=bass] [data-value="2"]').isDisabled() && await page.locator('#night').isDisabled() && (await page.locator('#summary').textContent()).includes('Another control is running'),'a control running elsewhere disables the shell and components and says so');
   check(await page.locator("#speaker-view").evaluate((el,previous)=>el.dataset.state===previous.docking && el.querySelector("#rear-battery-left").textContent===previous.battery,speakerBeforeBusy),"other controls do not hide confirmed speaker telemetry");

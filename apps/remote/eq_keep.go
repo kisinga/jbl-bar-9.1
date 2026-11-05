@@ -111,12 +111,22 @@ func (d *device) smartModeNow() bool {
 }
 
 // followFrontEQ handles an applied EQ for one monitor tick. Callers hold d.mu.
-func (d *device) followFrontEQ(ctx context.Context) {
+// report names a reset while it runs (seconds, muted), so clients wait for
+// it as for any control instead of seeing an unexplained refusal.
+func (d *device) followFrontEQ(ctx context.Context, report func(string)) {
 	m := &d.eq
 	n, readErr := d.readEQNative()
 	levels, known := d.eqLevels()
 	changed := known && m.levelsKnown && levels != m.levels
-	switch eqFollowDecision(n, readErr, m.native, m.expected, d.smartModeNow(), changed) {
+	decision := eqFollowDecision(n, readErr, m.native, m.expected, d.smartModeNow(), changed)
+	// A reset that failed is retried only once the native state changes:
+	// retrying it every tick reported a control every two seconds, and the
+	// page flashed "Another control is running" with its controls disabled.
+	key := eqFollowKey(n, readErr)
+	if !eqFollowRetry(decision, m.followBlocked, key) {
+		return
+	}
+	switch decision {
 	case eqFollowOK:
 		return
 	case eqFollowLevels:
@@ -132,22 +142,39 @@ func (d *device) followFrontEQ(ctx context.Context) {
 		// Source change, Standard after Smart, wake: the native preset is
 		// already back. Finish the reset without muting; the keeper applies
 		// the chosen EQ again.
+		report("eq_reset")
 		if e := d.resetFrontEQ(ctx); e != nil {
-			m.problem = eqPendingProblem(e, d.readHPPMode)
+			m.problem, m.followBlocked = eqPendingProblem(e, d.readHPPMode), key
 			m.note("Front EQ cleanup pending: %v", e)
 			return
 		}
 		m.note("Front EQ removed by the bar; it is applied again when Standard audio plays")
 	default:
+		report("eq_reset")
 		if e := d.resetFrontEQ(ctx); e != nil {
-			m.problem = eqPendingProblem(e, d.readHPPMode)
+			m.problem, m.followBlocked = eqPendingProblem(e, d.readHPPMode), key
+			m.note("Front EQ reset pending: %v", e)
 		}
 	}
 }
 
+// eqFollowRetry reports whether the monitor acts on decision: a reset is not
+// tried again on the native state where it last failed.
+func eqFollowRetry(decision eqFollow, blocked, key string) bool {
+	return (decision != eqFollowDropped && decision != eqFollowReset) || blocked == "" || blocked != key
+}
+
+// eqFollowKey identifies the native state a reset decision was made on.
+func eqFollowKey(n eqNativeState, readErr error) string {
+	if readErr != nil {
+		return "error: " + readErr.Error()
+	}
+	return fmt.Sprintf("mode %d cache %d element %#x rate %d %s", n.Mode, n.Cache, n.Element, n.SampleRate, eqDigest(n.Block))
+}
+
 // keepFrontEQ applies the kept EQ again once it is not applied, for one
-// monitor tick. Callers hold d.mu.
-func (d *device) keepFrontEQ(ctx context.Context) {
+// monitor tick. Callers hold d.mu; report names the re-apply while it runs.
+func (d *device) keepFrontEQ(ctx context.Context, report func(string)) {
 	m := &d.eq
 	if !m.keep || m.active || m.problem != "" || !d.powerOn() || controlBusy() || !d.idleKeys() || d.smartModeNow() {
 		m.keepStable = 0
@@ -167,6 +194,7 @@ func (d *device) keepFrontEQ(ctx context.Context) {
 	}
 	m.keepStable = 0
 	gains := m.kept
+	report("eq_apply")
 	if e := d.applyFrontEQ(ctx, gains); e != nil {
 		m.keepBlocked = eqDigest(n.Block)
 		m.note("Front EQ could not be applied again: %v", e)

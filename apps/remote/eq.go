@@ -93,6 +93,9 @@ type eqController struct {
 	levels                                       eqLevels
 	keepStable                                   int
 	keepBlocked, lastNote                        string
+	// followBlocked is the native state on which the monitor's last reset
+	// failed: it is not retried (nor reported) until that state changes.
+	followBlocked string
 }
 
 func eqDigest(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
@@ -346,7 +349,7 @@ func (d *device) resetFrontEQ(ctx context.Context) (err error) {
 	m.baselineStale, m.levelsKnown = false, false
 	m.gains = [5]float64{}
 	m.expected = nil
-	m.problem = ""
+	m.problem, m.followBlocked = "", ""
 	_ = os.Remove(eqRecoveryPath)
 	_ = os.Remove(eqBackupPath)
 	if m.directory != "" {
@@ -476,7 +479,7 @@ func (d *device) applyFrontEQ(ctx context.Context, gains [5]float64) (err error)
 			m.expected = expected
 			m.gains = gains
 			m.needsReset = false
-			m.problem = ""
+			m.problem, m.followBlocked = "", ""
 			return nil
 		}
 		time.Sleep(50 * time.Millisecond)
@@ -566,7 +569,7 @@ func (r *remote) monitorFrontEQ(ctx context.Context) {
 		if eqParserPayload == "" {
 			continue
 		}
-		release, _, held := r.hold("")
+		release, report, held := r.hold("")
 		if !held {
 			continue
 		}
@@ -581,9 +584,9 @@ func (r *remote) monitorFrontEQ(ctx context.Context) {
 				d.loadKeptFrontEQ()
 			}
 			if d.eq.active {
-				d.followFrontEQ(c)
+				d.followFrontEQ(c, report)
 			} else {
-				d.keepFrontEQ(c)
+				d.keepFrontEQ(c, report)
 			}
 			cancel()
 		}

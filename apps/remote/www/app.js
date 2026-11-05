@@ -29,10 +29,22 @@ const components=[bluetooth,sound,playback,system,equalizer,details,advanced,bas
 let syncTimer=null;
 // Readiness shared by the shell and every component. A control sent from
 // elsewhere (another page, Home Assistant, the wake automation) holds the bar:
-// wait for it like for one of ours.
+// wait for it like for one of ours. Background work that ends within
+// BUSY_DELAY (a monitor's quick cleanup) is not shown, so the page does not
+// flash "Another control is running" and disable every control for a moment.
+const BUSY_DELAY = 800;
+let busySince = null, busyTimer = null;
 function readiness() {
   const reachable = online && !!current?.available;
-  const elsewhere = reachable && !!current?.control?.busy && active === null;
+  const busy = reachable && !!current?.control?.busy && active === null;
+  if (!busy) {
+    busySince = null;
+    if (busyTimer) { clearTimeout(busyTimer); busyTimer = null; }
+  } else if (busySince === null) {
+    busySince = performance.now();
+    busyTimer = setTimeout(() => { busyTimer = null; render(); }, BUSY_DELAY);
+  }
+  const elsewhere = busy && performance.now() - busySince >= BUSY_DELAY;
   return {reachable, elsewhere, ready: reachable && !elsewhere};
 }
 const context=()=>{
