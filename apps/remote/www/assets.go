@@ -3,5 +3,5 @@ package webui
 
 import "embed"
 
-//go:embed *.html *.css *.js components/*.js
+//go:embed *.html *.css *.js *.svg components/*.js
 var Files embed.FS

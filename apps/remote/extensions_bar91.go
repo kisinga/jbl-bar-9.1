@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 
+	"jbl-bar-toolkit/remote/internal/display"
 	"jbl-bar-toolkit/remote/internal/extension"
 )
 
@@ -20,6 +21,9 @@ var bar91ActionAliases = map[string]string{
 // Model composition is explicit. A future family backend registers only the
 // features it has qualified; it does not reuse 9.1 native actions or EQ tuning.
 func (r *remote) registerBar91Extensions() error {
+	if err := r.extensions.Register(extension.Module[state]{Descriptor: extension.Descriptor{ID: "bar91.display-feedback", Name: "Front display feedback", Model: "bar91", Included: false, Experimental: true, Reason: display.UnavailableReason}}); err != nil {
+		return err
+	}
 	r.actionAliases = bar91ActionAliases
 	eq := func(action string) extension.Handler[state] {
 		return func(ctx context.Context, data json.RawMessage) (state, error) {

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Local soundbar toolkit</title>
+  <rect width="64" height="64" rx="16" fill="#192029"/>
+  <rect x="9" y="30" width="7" height="15" rx="3" fill="#f1ab85"/>
+  <rect x="19" y="30" width="26" height="15" rx="3" fill="#f1ab85"/>
+  <rect x="48" y="30" width="7" height="15" rx="3" fill="#f1ab85"/>
+  <rect x="26" y="35" width="12" height="3" rx="1.5" fill="#192029"/>
+  <path d="M24 23a12 12 0 0 1 16 0M28 18a7 7 0 0 1 8 0" fill="none" stroke="#8ecfc6" stroke-width="3" stroke-linecap="round"/>
+</svg>

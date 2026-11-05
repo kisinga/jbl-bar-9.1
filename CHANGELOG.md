@@ -1,8 +1,19 @@
 # Changelog
 
-User-facing changes go here. Before publishing another release, change `VERSION`
-in `tools/build_usb.py` and add a matching `## <version>` section. Release notes
-are generated from that section plus the installation and recovery instructions.
+User-facing changes go here. Before publishing another release, change the root
+`VERSION` file and add a matching `## <version>` section. Release notes are
+generated from that section plus the installation and recovery instructions.
+
+## 0.3.0-dev.10
+
+- Run repository setup directly with Go; local runs and CI share the builder. Downloaded platform executables use verified published files without developer tools.
+- Fix large-FAT32 readback and storage estimates; eject verified USBs automatically and include detailed setup failures in returned reports.
+- Add a portable USB setup app for Windows, macOS and Linux: select a removable drive, optionally format FAT32/MBR, configure features and verify written files without installing software.
+- Download verified toolkit and recovery files, read returned soundbar reports, and update the setup executable itself. Offline platform bundles include all toolkit files.
+- Include verified project-owned Front EQ and Bluetooth helpers in default Go packages; retain native route and library checks.
+- Add host-tested front-display notification contracts and explicitly report the native integration as unavailable pending qualification.
+- Add a soundbar favicon, section tints and clearer selected/status colors to the remote and setup interface; respect reduced motion for setup progress.
+- Reorganize the remote around the speaker illustration, nearby battery readings, visible sources and two sound columns. Audio sync, bass offset and System monitor start expanded; refresh GitHub screenshots.
 
 ## 0.3.0-dev.9
 

@@ -4,16 +4,10 @@ Keep scripts readable, packages reproducible and recovery working. Preserve firm
 
 ## Build and test
 
-Install Python 3.10+, BusyBox at `/usr/bin/busybox` and Go 1.22+ on Linux (`python3 busybox golang-go` on Debian/Ubuntu, or a compatible Go toolchain). These are developer requirements; users of the historical Smart Mode release only need its release ZIPs.
-
-```sh
-python3 tools/build_release.py
-python3 tools/test.py
-```
-
-Find reproducible ZIPs and `SHA256SUMS` in `dist/`. The builder checks pinned device files, payload/embedded hashes and shell syntax; modified or stale payloads fail the baseline check. No firmware image or external Python package is required.
-
-The suite includes the existing 121 core fixtures and 20 CLI checks plus the combined USB toolkit checks. It uses isolated temporary state and a local HTTP server, without a soundbar or USB. Toolkit tests build the real ARM executable and exercise service readiness/shutdown with a host fixture; native firmware, Wi-Fi and SSH authentication remain hardware boundaries. Results and exact counts stay in `build/test-results/`. The original Smart Mode release's historical result is 102 checks.
+The [root README](../../../README.md#run-from-this-repository) and
+[contributor guide](../../../CONTRIBUTING.md) define the current Go setup/build
+commands and test requirements. The commands below are retained for standalone
+maintenance, private helper builds and historical fixture verification.
 
 For optional extracted ARM BusyBox descriptor checks, install `qemu-arm` and registered ARM binfmt, then run:
 
@@ -40,18 +34,14 @@ Preserve the confirmed revision 5 download at `v0.1.0`. New payloads require che
 
 ## Combined USB toolkit
 
-Follow the [owner setup/configuration guide](USB-TOOLKIT.md). `tools/build_usb.py` builds the ARM remote and packages one private USB installer plus credential-free recovery. The device manager uses a strict shared parser, exact firmware/storage checks, one startup dispatcher and explicit configure/recovery actions. SSH's managed mode reuses the guarded native installer while leaving hook ownership to the toolkit. Automation-only mode runs the same Go wake engine without HTTP or discovery.
+Use the [root setup guide](../../../README.md) for the supported workflow.
+The device manager shares strict parsing, firmware/storage checks, one startup
+dispatcher and independent recovery. SSH's managed mode preserves toolkit hook
+ownership; automation-only mode runs without HTTP or discovery.
 
-```sh
-mkdir -p dist
-cp models/bar91/usb/config.example.txt dist/toolkit-config.txt
-# Edit the trusted LAN and desired features, then build interactively:
-python3 tools/build_usb.py --config dist/toolkit-config.txt
-python3 tests/bar91/check_usb.py
-(cd apps/remote && go test -race ./... && go vet ./...)
-```
-
-The builder intentionally refuses overwrite and differing-package adoption. Configuration is editable without changing the immutable manifest; credential rotation/cross-version migration are outside this first version. Keep original packages for recovery. Run the hardware qualification cases in the [architecture notes](USB-TOOLKIT.md#architecture) before publishing a combined release; a passing host suite is insufficient.
+`tools/build_usb.py` remains the independent private builder used by host fixtures
+and native helper development. It is not required by setup or CI packaging.
+Run physical qualification before publishing; passing host checks is insufficient.
 
 ## SSH package
 

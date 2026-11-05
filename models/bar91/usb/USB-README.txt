@@ -5,10 +5,12 @@ Supported firmware identities and the full guide: docs/models/bar91/USB-TOOLKIT.
 https://github.com/kisinga/jbl-bar-toolkit
 
 CHECK FIRST
-Open SETUP.html in your browser. Choose the home network and features, download
-config.txt and use it to REPLACE JBLToolkit/config.txt. No Go or Python needed
-for a prebuilt release. SSH and optional Wi-Fi credentials can be in this config;
-the page derives them locally. Keep the configured USB private.
+Run the portable jbl-setup executable on your computer (jbl-setup.exe on Windows).
+It downloads verified files, lists USB drives and writes your configuration.
+Choose your home network/features and keep Check compatibility first selected.
+Optional formatting erases the selected USB and requests administrator permission.
+No installation or Go/Python is needed. Keep the recovery ZIP and configured USB
+private. SETUP.html points to this tool; offline bundles include all files.
 Set action=check in JBLToolkit/config.txt. Insert with the bar fully on and wait
 FIVE MINUTES. Read CHECKS.txt, PREFLIGHT.txt, DIAGNOSTICS.txt, native-check.json and STATUS.txt on the computer.
 Require CHECK_PASSED_READY_FOR_INSTALL_OR_CONFIGURE. Recognized installations
@@ -17,11 +19,11 @@ The check does not install services, change networking or press controls.
 
 INSTALL / UPDATE
 1. Keep the matching recovery ZIP on your computer.
-2. Extract the install ZIP directly to a clean FAT32 USB root.
-   Expect AutoScript/AutoScript and JBLToolkit/config.txt (no enclosing folder).
-3. In config.txt set the actual trusted LAN subnet and selected features.
-   Choose Install / update everything (action=update). SETUP.html can prepare
-   credentials locally in config.txt; private builds can bundle them separately.
+2. In the setup app select your USB. Use a clean USB or explicitly format it
+   for a new package. Run the app from the computer, outside that USB.
+3. Choose Install / update everything (action=update), then Prepare selected USB.
+   For an already prepared stick, leave formatting off. Advanced/manual staging
+   still uses AutoScript/AutoScript and JBLToolkit/config.txt at the USB root.
 4. Turn the bar fully on and wait for normal playback. Insert USB, leave controls
    alone and wait FIVE MINUTES. Audio may briefly mute if auto_standard=true.
 5. Return USB to the computer. Require JBLToolkit/STATUS.txt to say

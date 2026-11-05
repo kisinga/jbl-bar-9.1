@@ -1,7 +1,7 @@
 # Components and compiled extensions
 
-The starting point is one Go module, one on-bar remote executable and plain
-browser modules. Shared code is extracted where there is an actual consumer;
+The remote uses its own Go module and plain browser modules. A separate root
+Go module builds the portable computer-side USB setup executable. Shared code is extracted where there is an actual consumer;
 the loopback preview is the second consumer of the server and UI. There is no
 dynamic plugin loader, generated UI framework or runtime package manager.
 
@@ -9,6 +9,8 @@ dynamic plugin loader, generated UI framework or runtime package manager.
 
 | Location | Owns | Dependencies |
 | --- | --- | --- |
+| `internal/buildtool/`, `apps/build/` | Shared source builds, public packaging and target binaries | Go standard library and host-side USB package validation |
+| `apps/usbsetup/`, `internal/usbsetup/`, `packaging/wizard/` | Portable loopback USB setup, verified downloads/self-update, drive discovery, elevation and formatting | Root Go module; no remote/device API changes |
 | `apps/remote/internal/server/` | HTTP protection, bounded requests, serialization, public assets and SSE | Standard library and feature metadata; no device paths or model code |
 | `apps/remote/internal/extension/` | Typed action registry, snapshot projections, optional workers | Standard library; no HTTP routes or native policy |
 | `apps/remote/backend_bar91.go` | Existing v1 aliases, feature composition and native action dispatch | Bar 9.1 device implementation and shared contracts |

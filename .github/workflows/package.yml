@@ -74,12 +74,16 @@ jobs:
           python-version: '3.13'
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: '1.25.5'
+          go-version: '1.25.7'
           cache: false
       - name: Install host fixture dependencies
-        run: sudo apt-get update && sudo apt-get install -y busybox
+        run: sudo apt-get update && sudo apt-get install -y busybox dosfstools
       - name: Host fixtures and immutable standalone baseline
         run: python3 tools/test.py
+      - name: Portable setup race checks and vet
+        run: |
+          go test -race ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
+          go vet ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
       - name: Go race checks and vet
         working-directory: apps/remote
         run: |
@@ -92,26 +96,48 @@ jobs:
         run: |
           npm install --prefix build/ui-tools --no-save --package-lock=false playwright@1.63.0
           build/ui-tools/node_modules/.bin/playwright install --with-deps chromium
-      - name: Browser, component and offline setup regressions
+      - name: Browser, component and portable setup regressions
         env:
           PLAYWRIGHT_MODULE: ${{ github.workspace }}/build/ui-tools/node_modules/playwright/index.mjs
         run: |
           node tests/webremote-ui.mjs
           node tests/component-ui.mjs
           node tests/setup-ui.mjs
+          node tests/setup-local.mjs
           node tests/bass-offset-ui.mjs
       - name: Select reviewed package implementations
         id: targets
         run: |
           python3 - <<'PY'
           import os, subprocess
-          matrix = subprocess.check_output(['python3', 'tools/build_distribution.py', '--matrix'], text=True).strip()
+          matrix = subprocess.check_output(['go', 'run', './apps/build', '--matrix'], text=True).strip()
           with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
               stream.write('matrix=' + matrix + '\n')
           PY
 
+  setup-native:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.25.7'
+          cache: false
+      - name: Portable setup fixtures (temporary directories only)
+        run: |
+          go test ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
+          go vet ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
+
   package:
-    needs: test
+    needs: [test, setup-native]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -121,18 +147,14 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: '3.13'
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: '1.25.5'
+          go-version: '1.25.7'
           cache: false
-      - run: sudo apt-get update && sudo apt-get install -y busybox
       - name: Build public USB and independent recovery ZIPs
         env:
           PACKAGE_MODEL: ${{ matrix.model }}
-        run: python3 tools/build_distribution.py --model "$PACKAGE_MODEL"
+        run: go run ./apps/build --model "$PACKAGE_MODEL"
       # Explicit public files only. Never upload dist/, private configs or blobs.
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
@@ -140,6 +162,8 @@ jobs:
           path: |
             dist/release/*-usb.zip
             dist/release/*-recovery.zip
+            dist/release/jbl-setup-*
+            dist/release/*-setup-*.zip
             dist/release/*SHA256SUMS
             dist/release/*release.json
           if-no-files-found: error
@@ -148,7 +172,7 @@ jobs:
         env:
           ARTIFACT_NAME: ${{ matrix.artifact }}
         run: |
-          printf 'Download **%s** from Artifacts. Extract the wrapper, then extract **-usb.zip** to FAT32 and open **SETUP.html**. Keep **-recovery.zip**.\n\nHardware selection is automatic; only included, reviewed implementations can run. Combined hardware qualification remains pending.\n' "$ARTIFACT_NAME" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Download **%s** from Artifacts. Extract the wrapper, then run **jbl-setup** for your OS/architecture, or extract the matching **-setup-OS-ARCH.zip** for offline use. Keep **-recovery.zip**.\n\nHardware selection is automatic; only included, reviewed implementations can run. Combined hardware qualification remains pending.\n' "$ARTIFACT_NAME" >> "$GITHUB_STEP_SUMMARY"
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main')

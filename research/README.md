@@ -2,6 +2,10 @@
 
 Use the [toolkit overview](../README.md), [model status](../models/README.md), and [Bar 9.1 build guide](../docs/models/bar91/DEVELOPMENT.md) for implemented workflows. Keep experimental findings separate from hardware confirmation. Preserve the confirmed release, recovery paths and firmware guards while extending sound controls.
 
+[Bar 9.1 custom display research](bar91-display.md) identifies the native
+caller-supplied text path and a temporary-message candidate for installer/action
+feedback. External integration and hardware qualification remain pending.
+
 ## Other JBL bars
 
 [Bar 800/1000/1300 research](bar-family/README.md) contains the historical firmware

@@ -1,4 +1,4 @@
-/* Offline setup: no network, dependencies, telemetry or browser storage. */
+/* Local credential derivation shared by portable setup and known-vector tests. */
 "use strict";
 (() => {
   const encoder = new TextEncoder();
@@ -82,27 +82,5 @@
   // Pure entry points also support independent known-vector and browser tests.
   const api = {passwordHash, wifiCredentials, subnet, configuration};
   if (typeof module !== "undefined") module.exports = api;
-  if (typeof document === "undefined") return;
-  const $ = id => document.getElementById(id);
-  $("ssh").addEventListener("change", () => { $("password").disabled = !$("ssh").checked; $("password").required = $("ssh").checked; });
-  // Remembering the mode needs automatic Standard Mode.
-  $("standard").addEventListener("change", () => { $("memory").disabled = !$("standard").checked; if (!$("standard").checked) $("memory").checked = false; });
-  const showNetwork = () => { try { $("network").textContent = "Allowed home network: " + subnet($("address").value, $("prefix").value); } catch { $("network").textContent = "Only devices on this network can use the remote."; } };
-  $("address").addEventListener("input", showNetwork);
-  $("prefix").addEventListener("change", showNetwork);
-  $("setup").addEventListener("submit", async event => {
-    event.preventDefault(); $("download").disabled = true;
-    $("result").textContent = "Preparing your local configuration…";
-    try {
-      const config = await configuration({address:$("address").value, prefix:$("prefix").value,
-        action:$("action").value, web:$("web").checked, ssh:$("ssh").checked, standard:$("standard").checked, memory:$("memory").checked,
-        password:$("password").value, ssid:$("ssid").value, wifiPassword:$("wifiPassword").value});
-      const url = URL.createObjectURL(new Blob([config], {type:"text/plain;charset=utf-8"}));
-      const link = document.createElement("a"); link.href = url; link.download = "config.txt"; link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      $("result").textContent = "Move config.txt into JBLToolkit on your USB and replace the existing file. Keep the name exactly config.txt. Safely eject before inserting into the bar.";
-      $("password").value = ""; $("wifiPassword").value = "";
-    } catch (error) { $("result").textContent = error.message; }
-    finally { $("download").disabled = false; }
-  });
+  globalThis.JBLSetup = api;
 })();

@@ -91,7 +91,7 @@ func New[S State](backend Backend[S], options Options[S]) (*Server[S], error) {
 		return nil, err
 	}
 	r := &Server[S]{backend: backend, network: network, hostname: options.Hostname, csrf: hex.EncodeToString(token), assets: options.Assets,
-		publicAssets: map[string]bool{"index.html": true, "app.js": true, "style.css": true}, actionMu: options.Gate, feed: options.Feed, hotspot: options.Hotspot, done: options.Done, actionTimeout: options.ActionTimeout}
+		publicAssets: map[string]bool{"index.html": true, "app.js": true, "style.css": true, "favicon.svg": true}, actionMu: options.Gate, feed: options.Feed, hotspot: options.Hotspot, done: options.Done, actionTimeout: options.ActionTimeout}
 	if r.actionMu == nil {
 		r.actionMu = &sync.Mutex{}
 	}
@@ -233,6 +233,8 @@ func (r *Server[S]) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 	}
 	if strings.HasSuffix(path, ".html") {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	} else if strings.HasSuffix(path, ".svg") {
+		w.Header().Set("Content-Type", "image/svg+xml")
 	} else if strings.HasSuffix(path, ".js") {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	} else {

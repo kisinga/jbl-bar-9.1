@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory() as temp:
         rejects(lambda: release.release_notes(changelog))
     changelog.write_text(f'## {build_usb.VERSION}\n- A useful change.\n\n## 0.0.1\n- Old change.\n')
     notes = release.release_notes(changelog)
-    assert 'A useful change.' in notes and 'Old change.' not in notes and 'SETUP.html' in notes
+    assert 'A useful change.' in notes and 'Old change.' not in notes and 'jbl-setup' in notes
 cases.append('changelog_requires_unique_current_version_and_real_notes')
 
 with tempfile.TemporaryDirectory() as temp:
@@ -44,6 +44,7 @@ with tempfile.TemporaryDirectory() as temp:
         prefix = '' if model == 'auto' else model + '-'
         stem = f'jbl-{"bar-toolkit" if model == "auto" else model}-v{build_usb.VERSION}'
         assets = [stem + suffix for suffix in ('-usb.zip', '-recovery.zip')]
+        if model == 'auto': assets += release.setup_asset_names(build_usb.VERSION)
         for asset in assets:
             (root / asset).write_bytes(b'fixture archive')
         report = prefix + 'release.json'
@@ -52,7 +53,7 @@ with tempfile.TemporaryDirectory() as temp:
         (root / (prefix + 'SHA256SUMS')).write_text(''.join(
             hashlib.sha256((root / name).read_bytes()).hexdigest() + '  ' + name + '\n'
             for name in [*assets, report]))
-    assert len(release.verify_assets(root, commit)) == 8
+    assert len(release.verify_assets(root, commit)) == 8+len(release.setup_asset_names(build_usb.VERSION))
     rejects(lambda: release.verify_assets(root, 'b' * 40))
     cases.append('all_reviewed_targets_and_exact_source_commit_required')
     manifest = root / 'SHA256SUMS'
@@ -99,7 +100,7 @@ with patch.object(release, 'source_commit', return_value=commit), \
             if command[:3] == ['gh', 'release', 'view']:
                 return subprocess.CompletedProcess(command, 1, '')
             if '--notes-file' in command:
-                assert 'SETUP.html' in Path(command[command.index('--notes-file') + 1]).read_text()
+                assert 'jbl-setup' in Path(command[command.index('--notes-file') + 1]).read_text()
             return subprocess.CompletedProcess(command, 0, '')
         with patch.object(release.subprocess, 'run', side_effect=gh_run):
             release.publish(Path('unused'), draft=draft)

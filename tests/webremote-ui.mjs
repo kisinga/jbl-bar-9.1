@@ -81,9 +81,9 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET') {stateGets++;await pause(getDelay);}
     res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify(result)); return;
   }
-  const name = {'/':'index.html','/style.css':'style.css','/app.js':'app.js'}[req.url] || (/^\/components\/[a-z][a-z0-9-]*\.js$/.test(req.url)?req.url.slice(1):null);
+  const name = {'/':'index.html','/style.css':'style.css','/app.js':'app.js','/favicon.svg':'favicon.svg'}[req.url] || (/^\/components\/[a-z][a-z0-9-]*\.js$/.test(req.url)?req.url.slice(1):null);
   if (!name) {res.writeHead(404);res.end();return;}
-  res.setHeader('Content-Type', name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');
+  res.setHeader('Content-Type', name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.svg')?'image/svg+xml':'text/html');
   res.end(await readFile(new URL('apps/remote/www/'+name,root)));
 });
 await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));

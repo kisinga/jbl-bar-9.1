@@ -13,6 +13,20 @@ import hardware
 from repo_layout import ROOT
 
 
+# Independent publication inventory; the shared Go builder owns production output.
+SETUP_TARGETS = (("linux", "amd64"), ("linux", "arm64"), ("darwin", "amd64"),
+                 ("darwin", "arm64"), ("windows", "amd64"), ("windows", "arm64"))
+
+
+def setup_binary_name(system, arch):
+    return f'jbl-setup-{system}-{arch}' + ('.exe' if system == 'windows' else '')
+
+
+def setup_asset_names(version):
+    return [name for system, arch in SETUP_TARGETS for name in
+            (setup_binary_name(system, arch), f'jbl-bar-toolkit-v{version}-setup-{system}-{arch}.zip')]
+
+
 def source_commit():
     return subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
 
@@ -21,7 +35,7 @@ def release_notes(changelog=None):
     text = (changelog or ROOT / 'CHANGELOG.md').read_text()
     version = build_usb.VERSION
     if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?', version):
-        raise ValueError('Invalid release version in tools/build_usb.py')
+        raise ValueError('Invalid release version in VERSION')
     sections = re.split(r'^## ', text, flags=re.M)[1:]
     matches = [section for section in sections if section.splitlines()[0] == version]
     if len(matches) != 1:
@@ -39,6 +53,7 @@ def verify_assets(root, commit):
         prefix = '' if model == 'auto' else model + '-'
         stem = f'jbl-{"bar-toolkit" if model == "auto" else model}-v{build_usb.VERSION}'
         names = {stem + '-usb.zip', stem + '-recovery.zip', prefix + 'release.json'}
+        if model == 'auto': names.update(setup_asset_names(build_usb.VERSION))
         manifest = prefix + 'SHA256SUMS'
         expected.update(names | {manifest})
         report = json.loads((root / (prefix + 'release.json')).read_text())

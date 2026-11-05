@@ -6,9 +6,9 @@ when a maintainer requests it. There is no timer, release bot or extra secret.
 
 ## Publish when ready
 
-1. Edit `VERSION` in `tools/build_usb.py` and add a matching `## <version>`
+1. Edit the root `VERSION` file and add a matching `## <version>`
    section to [CHANGELOG.md](../CHANGELOG.md), with plain-language bullet points.
-   Use a new version for each release, for example `0.3.0-dev.9`.
+   Use a new version for each release, for example `0.3.0-dev.10`.
 2. Merge the changes to `main` after CI passes.
 3. Open [Test and package toolkit](https://github.com/kisinga/jbl-bar-toolkit/actions/workflows/package.yml)
    → **Run workflow** → choose **main** → check **Publish this version** → **Run workflow**.
@@ -30,12 +30,24 @@ review and promote an appropriate release in GitHub.
 
 ## What users download
 
-- `jbl-bar-toolkit-v<VERSION>-usb.zip`: the normal installation package; extract
-  to a clean FAT32 USB and open `SETUP.html`.
-- `jbl-bar-toolkit-v<VERSION>-recovery.zip`: independent emergency recovery;
-  keep this with the original installation package.
-- `SHA256SUMS` and `release.json`: checksums and package details, including the
-  source commit, version and supported hardware.
+- `jbl-setup-OS-ARCH` (`.exe` on Windows): one portable executable for Linux,
+  macOS or Windows, Intel/AMD or ARM64. Downloads verified toolkit/recovery files
+  and supports explicit self-update. No installer or runtime is required.
+- `jbl-bar-toolkit-v<VERSION>-setup-OS-ARCH.zip`: offline bundle containing that
+  executable plus `toolkit-usb.zip` and `toolkit-recovery.zip`.
+- `jbl-bar-toolkit-v<VERSION>-usb.zip` and `…-recovery.zip`: raw installation and
+  independent recovery packages for advanced/manual use. `SETUP.html` directs
+  users to the portable app; it no longer generates configuration downloads.
+- `SHA256SUMS` and `release.json`: all public asset checksums and package details,
+  including source commit, version and supported hardware.
+
+The setup app selects the newest published release containing automatic toolkit
+assets, including development prereleases, then checks the manifest, metadata,
+package contents and recovery match. Self-update accepts only a higher semantic
+version and the matching OS/architecture binary. Downloads use this repository's
+public GitHub endpoints; checksums verify integrity, not an independent signature.
+Self-update and first-run downloads require publishing these assets; CI artifacts
+alone are not an update source. macOS/Windows binaries are unsigned.
 
 Model-specific packages have distinct filenames, metadata and checksum files.
 The default automatic package is the normal user download. Bar 9.1 is currently
@@ -63,14 +75,34 @@ release job; all other jobs use read-only permissions.
 ## Build locally
 
 ```sh
-./jbl build
-./jbl build --model bar91
+go run ./apps/build
+go run ./apps/build --model bar91
 python3 tools/release.py check
-python3 tools/build_distribution.py --matrix
+go run ./apps/build --matrix
 ```
 
-`tools/hardware.py` defines reviewed executable targets; `models/catalog.json`
-only describes support and research. Adding a model requires a reviewed profile,
+The shared Go builder in `internal/buildtool/` creates USB/recovery ZIPs,
+cross-compiles six binaries without CGO, and produces their offline bundles.
+CI and local builds invoke `go run ./apps/build`; obsolete Python packaging
+entry points have been removed. Independent legacy payload fixtures remain.
+Dependency licenses are embedded (`--licenses` or the interface footer); after dependency changes,
+regenerate them with `go run ./apps/build --write-licenses`. Linux raw
+formatting uses go-diskfs; keep its version pinned unless the disk-image/fsck
+regression passes. Windows and macOS use native formatters. Windows limits its
+FAT32 partition to 30 GiB, leaving any remaining space unallocated. OS privilege
+prompts and physical USB installation still need qualification on each platform.
+
+Default packages include both project-owned ARM helpers from
+`models/bar91/remote/native/bin/`. Go verifies their source, builder, dependency
+and binary hashes before embedding them; vendor libraries are never bundled.
+After native source changes, rebuild and review with
+`python3 tools/check_native.py --write --cc <ARM-GCC> --rootfs <private-rootfs>`.
+The existing native build instructions describe those maintainer-only inputs.
+`python3 tools/check_native.py` checks the recorded inventory without compiling.
+
+`internal/buildtool/` defines public package targets and guards;
+`tools/hardware.py` retains the independent legacy implementation used by fixtures.
+`models/catalog.json` only describes support and research. Adding a model requires a reviewed profile,
 bootstrap/detector, payload builder, recovery and tests. Auto mode refuses to
 silently choose among multiple implementations without bundle composition review.
 Historical v0.1.0 standalone bytes, filenames and recovery remain unchanged.

@@ -2,70 +2,16 @@
 
 [Toolkit overview](../../README.md) · [Architecture](../../docs/ARCHITECTURE.md)
 
-Build commands below run from the repository root.
+Bar 9.1 is the only included installation target. Use the [root setup guide](../../README.md#get-started)
+for the portable executable and local Go workflow. It configures the browser
+remote, automatic Standard Mode, SSH and optional Wi-Fi from one USB.
 
-A local browser remote, automatic Smart Mode off, and root SSH for the **JBL Bar 9.1 True Wireless Surround**. The canonical process installs selected features from one FAT32 USB drive, then removes it. Everything runs on the soundbar; no ongoing computer service is needed.
+The combined install/restart/recovery flow still needs physical qualification.
+Preserve existing recovery files. Install/update recognizes managed toolkits and
+the reviewed standalone chain; unknown installations are refused.
 
-![JBL Bar 9.1 browser remote with example settings](../../docs/web-remote.png)
-
-**Experimental · exact firmware checks · reversible startup changes · no firmware flashing**
-
-The combined USB toolkit is a **development build with host integration tests**. Its native inspection and bundled helper-library checks passed on one bar; the complete installation and recovery flow still needs hardware qualification. Individual features have been tested on one Bar 9.1. Other JBL models are unsupported.
-
-[Set up the USB toolkit](../../docs/models/bar91/USB-TOOLKIT.md) · [Configuration](#configuration) · [Compatibility](#compatibility) · [Recovery](#recovery)
-
-## What you get
-
-| Feature | What it does | Optional? |
-| --- | --- | --- |
-| Browser remote | Volume, mute, source, playback, sound controls, rear battery readings and system status at `http://jbl.local`. | Yes |
-| Automatic Standard Mode | Selects Standard Mode after wake, using the normal Smart Mode off gesture. Works with the browser interface disabled. | Yes |
-| Root SSH and SFTP | Terminal access on port `2222`, restricted to your configured LAN and protected by your own password. | Yes |
-| Wi-Fi provisioning | Optionally joins a WPA2 network during installation; otherwise reuses the bar's configured Wi-Fi. | Yes |
-| Bluetooth playback / Front EQ | Additional controls when the package is built with the optional native helpers. | Build option |
-
-The browser remote also provides Night Mode, bass, height, rear level/mute and an experimental center level. Some controls depend on the active source or undocked speakers. [Control details and limitations](../../docs/models/bar91/STANDALONE.md#local-browser-remote).
-
-## Canonical installation and legacy recovery
-
-| Path | Status | Start here |
-| --- | --- | --- |
-| **Combined USB toolkit** | Build locally; complete device qualification pending. One config selects all three features. | [USB setup guide](../../docs/models/bar91/USB-TOOLKIT.md) |
-| **Published Smart Mode only** | Historical `v0.1.0` release; its recorded cold-boot test was on one bar. Installs neither SSH nor the browser remote. | [Install ZIP](https://github.com/kisinga/jbl-bar-toolkit/releases/download/v0.1.0/jbl-bar9-standard-mode-v0.1.0-install.zip) · [Matching uninstall ZIP](https://github.com/kisinga/jbl-bar-toolkit/releases/download/v0.1.0/jbl-bar9-standard-mode-v0.1.0-uninstall.zip) |
-| **Existing standalone installation** | Keep using its matching installers and recovery instructions. Install / update migrates the exact reviewed standalone chain; unknown setups are preserved and refused. | [Standalone guide](../../docs/models/bar91/STANDALONE.md) |
-
-There is no published combined toolkit ZIP yet. GitHub's **Download ZIP** is source code, not an installation USB. Keep the published Smart Mode release and its recovery package separate from toolkit builds.
-
-## Configuration
-
-Copy [`models/bar91/usb/config.example.txt`](usb/config.example.txt) to a private working file, set your actual LAN subnet, and choose the features:
-
-```ini
-format=1
-action=install
-ssh=true
-web_remote=true
-auto_standard=true
-allowed_cidr=192.168.1.0/24
-web_port=80
-```
-
-Build the package on Linux with Python 3.10+, BusyBox and Go 1.22+:
-
-```sh
-mkdir -p dist
-cp models/bar91/usb/config.example.txt dist/toolkit-config.txt
-# Edit dist/toolkit-config.txt before building.
-python3 tools/build_usb.py --config dist/toolkit-config.txt
-```
-
-If SSH is selected, the builder privately prompts for a new password. Add `--wifi` to provision WPA2 Wi-Fi. The output includes a private install ZIP, a credential-free recovery ZIP and checksums under `dist/toolkit-private/`.
-
-Use `tools/prepare_usb.py` to stage and verify the package on a clean FAT32 USB root. First run `action=check` on the fully powered-on bar and inspect its blockers/native report, then use `action=install` and leave controls alone for **five minutes**. Return USB to the computer and require `JBLToolkit/STATUS.txt` to say `INSTALLED_PENDING_REBOOT_TEST`. Follow the [full guide](../../docs/models/bar91/USB-TOOLKIT.md) to verify the SSH fingerprint, test a USB-free mains restart, collect `action=verify` evidence and exercise recovery.
-
-To change features later, edit `JBLToolkit/config.txt` on the **same installation USB** and set `action=configure`. Reinserting with `action=install` only exports logs; it does not reapply settings or restart services. See the [configuration reference](../../docs/models/bar91/USB-TOOLKIT.md#configuration-reference) for supported combinations and customization limits.
-
-Anyone on the configured trusted LAN can use the web remote without a web login. SSH has its separate password. Keep the private install ZIP and USB secure: they can contain a password hash and a derived Wi-Fi key.
+[Configuration and installation reference](../../docs/models/bar91/USB-TOOLKIT.md) ·
+[Standalone and historical Smart Mode releases](../../docs/models/bar91/STANDALONE.md)
 
 ## Compatibility
 

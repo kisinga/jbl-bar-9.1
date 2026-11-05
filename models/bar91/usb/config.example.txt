@@ -18,7 +18,7 @@ auto_standard=true
 allowed_cidr=192.168.1.0/24
 # 80, 8080, or 1024–65535 except SSH's reserved port 2222.
 web_port=80
-# Optional credentials can live in this file. SETUP.html creates these values
+# Optional credentials can live in this file. The portable setup app creates these values
 # locally from your passwords. Treat this config and USB as private afterwards.
 # ssh_password_hash=$6$<salt>$<86-character SHA-512 crypt digest>
 # wifi_ssid_hex=<SSID as lowercase UTF-8 hex>

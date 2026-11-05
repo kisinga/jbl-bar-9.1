@@ -154,3 +154,26 @@ func TestEQMuteRestoreHoldsTheActionGate(t *testing.T) {
 		t.Fatal("restore did not finish", code, muted)
 	}
 }
+
+func TestDisplayFeedbackRemainsUnavailableWithoutNativeEntry(t *testing.T) {
+	r := testRemote(t)
+	w := request(r, "GET", "/api/features", "", "192.168.50.2", false, "")
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
+	var result struct {
+		Extensions []extension.Descriptor `json:"extensions"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	for _, feature := range result.Extensions {
+		if feature.ID == "bar91.display-feedback" {
+			if feature.Included || len(feature.Actions) != 0 || !strings.Contains(feature.Reason, "not qualified") {
+				t.Fatal("unqualified native display enabled", feature)
+			}
+			return
+		}
+	}
+	t.Fatal("missing display qualification status")
+}
