@@ -302,6 +302,7 @@ try {
   await page.locator('.device-details summary').click();
   check((await page.locator('#device-uptime').textContent())==='1d 1h 5m','uptime shown in readable units');
   check((await page.locator('#device-automation').textContent())==='Standard selected after wake','automation status explained');
+  check(await page.locator('#manual-row').isHidden(),'no manual link without feature discovery');
   await page.locator('.device-details summary').click();
   check(await page.locator('[data-level=rear] button').evaluateAll(bs=>bs.length===4&&bs.every(b=>b.disabled)),'docked rear control disabled');
   check(await page.locator('[data-level=rear] [aria-checked=true]').textContent()==='High','rear level selected in its segmented control');
@@ -687,7 +688,8 @@ try {
       {id:'bar91.bass-offset',component:'bass-offset',included:true,actions:['bar91.bass-offset.set']},
       {id:'bar91.front-eq',component:'front-eq',included:true,actions:['bar91.front-eq.apply','bar91.front-eq.reset']},
       {id:'bar91.center',component:'center-level',included:true,actions:['bar91.center.next']}
-    ]};
+    ],
+    manuals:{en:'https://example.test/manual_EN.pdf',fr:'https://example.test/manual_FR.pdf',de:'http://example.test/insecure.pdf'}};
   state=initial();state.sound.bass=2;state.sound.rear_docked=false;
   state.sound.audio_format='DOLBY SURROUND DD+';
   state.setup={sub_pairing:false,subwoofer:'Connected'};
@@ -705,6 +707,19 @@ try {
   const soundBox=await page.locator('.sound-grid').boundingBox();
   const setupBox=await page.locator('#room-setup').boundingBox();
   await page.screenshot({path:fileURLToPath(new URL('build/readme-advanced.png',root)),fullPage:true,clip:{x:soundBox.x,y:soundBox.y+await page.evaluate(()=>scrollY),width:soundBox.width,height:setupBox.y+setupBox.height-soundBox.y}});
+  await page.locator('.device-details summary').click();
+  check(await page.locator('#manual-row').isVisible(),'manual link shown for the declared model');
+  check(await page.locator('#manual-link').getAttribute('href')==='https://example.test/manual_EN.pdf','English manual for an English browser');
+  check((await page.locator('#manual-link').textContent()).trim()==='PDF · English ↗','manual link names its language');
+  check(await page.locator('#manual-link').evaluate(a=>a.target==='_blank' && a.rel.includes('noopener') && a.getBoundingClientRect().height>=44),'manual opens in a new tab with a 44px target');
+  for(const [locale,href] of [['fr-FR','https://example.test/manual_FR.pdf'],['de-DE','https://example.test/manual_EN.pdf']]){
+    const other=await browser.newPage({locale});
+    await other.goto(page.url());
+    await other.waitForFunction(()=>!document.querySelector('#manual-row').hidden);
+    check(await other.locator('#manual-link').getAttribute('href')===href,'manual for '+locale+(locale==='de-DE'?' falls back to English (non-https link ignored)':''));
+    await other.close();
+  }
+  await page.locator('.device-details summary').click();
   await page.emulateMedia({reducedMotion:'no-preference'});
   check(await page.locator('.panel').first().evaluate(e=>getComputedStyle(e).animationName)==='arrive','motion enabled only when preference permits');
   check(errors.length===0,'no browser exceptions: '+errors.join(', '));

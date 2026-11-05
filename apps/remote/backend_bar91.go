@@ -30,7 +30,7 @@ func (b bar91Backend) Features() server.Features {
 	}
 	sort.Strings(aliases)
 	actions = append(actions, aliases...)
-	return server.Features{Schema: 1, Model: "bar91", Name: "JBL Bar 9.1", Actions: actions, Extensions: b.remote.extensions.List()}
+	return server.Features{Schema: 1, Model: "bar91", Name: "JBL Bar 9.1", Actions: actions, Extensions: b.remote.extensions.List(), Manuals: bar91Manuals}
 }
 
 // hold takes the shared action gate for a native background writer. action
