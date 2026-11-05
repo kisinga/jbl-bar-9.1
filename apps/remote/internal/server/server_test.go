@@ -22,7 +22,7 @@ func TestForeignBackendUsesSharedSecurityAndAssets(t *testing.T) {
 	}
 	var gate sync.Mutex
 	app, err := server.New[preview.State](b, server.Options[preview.State]{AllowedCIDR: "192.168.50.0/24", Gate: &gate, Assets: fstest.MapFS{
-		"index.html": {Data: []byte("preview")}, "app.js": {Data: []byte("app")}, "style.css": {Data: []byte("css")},
+		"favicon.svg": {Data: []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`)}, "index.html": {Data: []byte("preview")}, "app.js": {Data: []byte("app")}, "style.css": {Data: []byte("css")},
 		"components/sound.js": {Data: []byte("component")}, "private.json": {Data: []byte("SECRET")},
 	}})
 	if err != nil {
@@ -49,6 +49,7 @@ func TestForeignBackendUsesSharedSecurityAndAssets(t *testing.T) {
 		{"POST", "/api/action", `{"action":"mute"} {}`, "192.168.50.2", app.Token(), "", 400},
 		{"POST", "/api/action", `{"action":"mute","exec":"id"}`, "192.168.50.2", app.Token(), "", 400},
 		{"POST", "/api/action", `{"action":"mute","value":1}`, "192.168.50.2", app.Token(), "", 409},
+		{"GET", "/favicon.svg", "", "192.168.50.2", "", "", 200},
 		{"GET", "/components/sound.js", "", "192.168.50.2", "", "", 200},
 		{"GET", "/components/../private.json", "", "192.168.50.2", "", "", 404},
 		{"GET", "/private.json", "", "192.168.50.2", "", "", 404},
@@ -57,6 +58,9 @@ func TestForeignBackendUsesSharedSecurityAndAssets(t *testing.T) {
 		if w.Code != test.status {
 			t.Fatalf("%s %s: %d %s", test.method, test.path, w.Code, w.Body.String())
 		}
+	}
+	if w := request("GET", "/favicon.svg", "", "192.168.50.2", "", ""); w.Header().Get("Content-Type") != "image/svg+xml" {
+		t.Fatal("favicon MIME", w.Header())
 	}
 	if b.Snapshot()["muted"] != false {
 		t.Fatal("rejected command mutated the backend")

@@ -59,25 +59,35 @@ preflight_ssh() {
     fi
 }
 
+# Source FAT allocation units can be 64 KiB; they do not describe UBIFS cost.
+# Budget file bytes rounded up to 4 KiB, plus the existing staging/state reserve.
+payload_size_kib() (
+    trap '"$BB" rm -f "$LOCK/space-files" "$LOCK/space-sizes"' EXIT
+    "$BB" find "$1" -type f > "$LOCK/space-files" || return 1
+    while IFS= read -r file; do
+        "$BB" stat -c %s "$file" || return 1
+    done < "$LOCK/space-files" > "$LOCK/space-sizes" || return 1
+    "$BB" awk '
+      /^[0-9]+$/ {total += int(($0+4095)/4096)*4; next}
+      {bad=1}
+      END {if (bad || NR==0) exit 1; print total}
+    ' "$LOCK/space-sizes"
+)
+
 preflight_space() {
     # One new persistent payload copy plus 2 MiB for manager/SSH staging, keys
     # and runtime state. Existing files are already counted as used by df;
     # publication/inspection executables run from the private /tmp lock in RAM.
     PREFLIGHT_REASON=FREE_SPACE_UNREADABLE_OR_INSUFFICIENT
-    need=$("$BB" du -sk "$USB/files") || return 1
-    set -- $need
-    case "$1" in ''|*[!0-9]*) return 1;; esac
-    payload_kib=$1
+    payload_kib=$(payload_size_kib "$USB/files") || return 1
     required_kib=$((payload_kib+2048))
     reuse_remote=false
     if { [ "${WEB_REMOTE:-true}" != true ] && [ "${AUTO_STANDARD:-true}" != true ]; } ||
        { regular "$REMOTE_STORE/TOOLKIT" && [ "$("$BB" cat "$REMOTE_STORE/TOOLKIT")" = JBL_TOOLKIT_REV1 ] &&
          regular "$REMOTE_STORE/remote" && regular "$USB/files/remote" && "$BB" cmp -s "$REMOTE_STORE/remote" "$USB/files/remote"; }; then
-        remote_size=$("$BB" du -sk "$USB/files/remote") || return 1
-        set -- $remote_size
-        case "$1" in ''|*[!0-9]*) return 1;; esac
-        [ "$1" -le "$payload_kib" ] || return 1
-        required_kib=$((payload_kib-$1+2048))
+        remote_kib=$(payload_size_kib "$USB/files/remote") || return 1
+        [ "$remote_kib" -le "$payload_kib" ] || return 1
+        required_kib=$((payload_kib-remote_kib+2048))
         reuse_remote=true
     fi
     available=$("$BB" df -Pk /var | "$BB" awk 'NR==2 {print $4}') || return 1

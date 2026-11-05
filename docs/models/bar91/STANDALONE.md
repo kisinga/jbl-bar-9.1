@@ -16,7 +16,7 @@ Install **Smart Mode → SSH → browser remote**; remove in reverse order. Each
 
 ## Local browser remote
 
-![JBL Bar 9.1 browser remote with example settings](../../web-remote.png)
+![JBL Bar 9.1 remote with speaker batteries, sound tuning and System monitor](../../web-remote.png)
 
 Open **[http://jbl.local](http://jbl.local)** on the configured LAN, or **`http://<bar-ip-address>`** if mDNS is unavailable or the name conflicts. Port `8080` also works. No web login is required; SSH keeps its separate password. [Build and install the remote](DEVELOPMENT.md#browser-remote).
 

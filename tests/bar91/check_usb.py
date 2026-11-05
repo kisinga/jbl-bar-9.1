@@ -663,6 +663,23 @@ exit 0
         finally:
             unrelated.terminate(); unrelated.wait(timeout=10)
 
+# File-byte estimates must be independent of FAT cluster allocation and must
+# retain the reserve, rounding and unreadable/empty input refusals.
+with tempfile.TemporaryDirectory(prefix='jbl-space-budget-') as temp:
+    folder = Path(temp)
+    files = folder / 'files'; files.mkdir()
+    (files / 'remote').write_bytes(b'x' * 6750356)
+    (files / 'small').write_bytes(b'x' * 29243)
+    command = '. "$1"; payload_size_kib "$USB/files"'
+    env = dict(os.environ, BB=BB, USB=str(folder), LOCK=str(folder))
+    result = subprocess.run(['/bin/sh', '-c', command, 'fixture', str(ROOT / 'models/bar91/usb/preflight.sh')], env=env, capture_output=True, check=True)
+    budget = int(result.stdout)
+    assert budget == sum((p.stat().st_size + 4095)//4096*4 for p in files.iterdir())
+    assert budget + 2048 < 8856
+    (files / 'remote').unlink(); (files / 'small').unlink()
+    assert subprocess.run(['/bin/sh', '-c', command, 'fixture', str(ROOT / 'models/bar91/usb/preflight.sh')], env=env, capture_output=True).returncode != 0
+    passed('native_space_budget_uses_file_bytes_not_fat_allocation')
+
 # Native preflight with synthetic mounts/process identities and a command wrapper.
 # No global /var, networking or vendor executable is accessed by these cases.
 for label in ('supported', 'wrong_var', 'read_only', 'nested_mount', 'wrong_firmware',
@@ -693,7 +710,13 @@ case "$1" in
      /bin/cli) if [ "$JBL_PREFLIGHT_CASE" = wrong_cli ]; then echo 'bad  cli'; else echo '8910fb852d2f994a519615fede404fbb036e3a8f5264cc69cdff57038af3c78f  cli'; fi;;
      *) exit 1;;
    esac;;
- du) case "$JBL_PREFLIGHT_CASE" in observed_device_space|managed_reuse_space|unmanaged_no_credit) case "$3" in */files/remote) echo '6000 remote';; *) echo '6340 files';; esac;; *) echo '2048 files';; esac;;
+ stat) if [ "$2" = -c ] && [ "$3" = %s ]; then
+   case "$JBL_PREFLIGHT_CASE" in
+     observed_device_space) echo 6492160;;
+     managed_reuse_space|unmanaged_no_credit) case "$4" in */files/remote) echo 6144000;; *) echo 348160;; esac;;
+     *) echo 2097152;;
+   esac
+   else exec ' + BB + ' "$@"; fi;;
  df) echo 'Filesystem 1024-blocks Used Available Capacity Mounted'; if [ "$JBL_PREFLIGHT_CASE" = no_space ]; then echo 'ubi 32768 32768 0 100% /var'; elif [ "$JBL_PREFLIGHT_CASE" = observed_device_space ]; then echo 'ubi 34976 19924 13224 60% /var'; elif [ "$JBL_PREFLIGHT_CASE" = managed_reuse_space ] || [ "$JBL_PREFLIGHT_CASE" = unmanaged_no_credit ]; then echo 'ubi 34976 30000 4096 90% /var'; else echo 'ubi 32768 0 32768 0% /var'; fi;;
  *) exec ''' + BB + ''' "$@";;
 esac
@@ -717,7 +740,7 @@ esac
                 (remote_store / 'TOOLKIT').write_text('JBL_TOOLKIT_REV1\n')
         command = '. "$1"; regular() { [ -f "$1" ] && [ ! -L "$1" ]; }; boot_id() { [ "$JBL_PREFLIGHT_CASE" != no_boot_id ] && echo fixture-boot; }; probe_native() { [ "$JBL_PREFLIGHT_CASE" != native_probe_failure ]; }; publish_directory() { [ "$JBL_PREFLIGHT_CASE" != publish_unsupported ] && [ ! -e "$2" ] && "$BB" mv "$1" "$2"; }; preflight'
         env = dict(os.environ, BB=str(wrapper), USB=str(folder), SSH='true' if label=='unsupported_ssh' else 'false',
-                   SSH_STORE=str(folder / 'ssh'), REMOTE_STORE=str(remote_store), WEB_REMOTE='true', AUTO_STANDARD='true', JBL_PREFLIGHT_CASE=label)
+                   LOCK=str(folder), SSH_STORE=str(folder / 'ssh'), REMOTE_STORE=str(remote_store), WEB_REMOTE='true', AUTO_STANDARD='true', JBL_PREFLIGHT_CASE=label)
         result = subprocess.run(['/bin/sh', '-c', command, 'fixture', str(folder / 'preflight.sh')],
                                 env=env, capture_output=True, timeout=15)
         assert (result.returncode == 0) == (label in ('supported', 'firmware_mv_without_T', 'usb_block_alias', 'observed_device_space', 'managed_reuse_space')), (label, result.stderr.decode())

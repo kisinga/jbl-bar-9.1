@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#161b24" />
+    <title>JBL USB setup</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/setup.js" defer></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <b>JBL</b>
+        <div>
+          <h1>Set up your USB.</h1>
+          <p>Local setup · no installation needed</p>
+        </div>
+        <span id="version"></span>
+      </header>
+      <section>
+        <div class="heading">
+          <h2>1. Toolkit files</h2>
+          <button id="update" type="button">Check for updates</button>
+        </div>
+        <p id="package-status">Looking for toolkit files…</p>
+        <div class="actions">
+          <button id="self-update" type="button" hidden>
+            Update this setup app</button
+          ><button id="recovery" type="button" hidden>Save recovery ZIP</button>
+        </div>
+        <small
+          ><span id="files-origin"
+            >Downloads come from this project’s public GitHub releases and are
+            checksum-verified. Downloads include a local recovery copy.</span
+          ></small
+        >
+      </section>
+      <form id="wizard">
+        <section>
+          <div class="heading">
+            <h2>2. Choose your USB</h2>
+            <button id="refresh" type="button">Refresh drives</button>
+          </div>
+          <label for="drive">Removable drive</label
+          ><select id="drive" required>
+            <option value="">Select a USB drive…</option>
+          </select>
+          <p id="drive-status">Insert your USB, then refresh.</p>
+          <details id="reports" hidden>
+            <summary>Soundbar check results</summary>
+            <pre id="reports-text"></pre>
+          </details>
+          <label class="check"
+            ><input id="format" type="checkbox" /> Format this USB as FAT32 /
+            MBR first</label
+          >
+          <div id="erase-warning" hidden>
+            <p class="warning">
+              Formatting erases all files and partitions on the selected USB.
+              Windows uses up to 30 GiB for the FAT32 partition.
+            </p>
+            <label for="confirm"
+              >Type the drive identifier shown below to confirm erasing
+              it</label
+            ><strong id="erase-device"></strong
+            ><input id="confirm" autocomplete="off" spellcheck="false" />
+          </div>
+        </section>
+        <section>
+          <h2>3. Your settings</h2>
+          <label for="network-select">Home network</label
+          ><select id="network-select">
+            <option value="">Enter manually</option>
+          </select>
+          <div class="columns">
+            <div>
+              <label for="address">Computer’s private IPv4 address</label
+              ><input
+                id="address"
+                required
+                autocomplete="off"
+                placeholder="192.168.1.20"
+              />
+            </div>
+            <div>
+              <label for="prefix">Network size</label
+              ><select id="prefix">
+                <option value="16">/16</option>
+                <option value="17">/17</option>
+                <option value="18">/18</option>
+                <option value="19">/19</option>
+                <option value="20">/20</option>
+                <option value="21">/21</option>
+                <option value="22">/22</option>
+                <option value="23">/23</option>
+                <option value="24" selected>/24 · typical home network</option>
+                <option value="25">/25</option>
+                <option value="26">/26</option>
+                <option value="27">/27</option>
+                <option value="28">/28</option>
+                <option value="29">/29</option>
+                <option value="30">/30</option>
+              </select>
+            </div>
+          </div>
+          <small id="network">Use the same network as the soundbar.</small>
+          <label class="check"
+            ><input id="web" type="checkbox" checked /> Browser remote</label
+          ><label class="check"
+            ><input id="standard" type="checkbox" /> Automatically select
+            Standard Mode after wake</label
+          ><label class="check"
+            ><input id="memory" type="checkbox" disabled /> Remember the mode
+            chosen before standby</label
+          >
+          <details>
+            <summary>SSH and optional Wi-Fi</summary>
+            <label class="check"
+              ><input id="ssh" type="checkbox" /> Enable SSH access (port
+              2222)</label
+            ><label for="password">SSH password</label
+            ><input
+              id="password"
+              type="password"
+              minlength="8"
+              maxlength="256"
+              autocomplete="new-password"
+              disabled
+            /><small id="saved-password" hidden
+              >Leave blank to keep the password already saved on this
+              USB.</small
+            >
+            <p>Leave Wi-Fi blank if the bar is already connected.</p>
+            <label for="ssid">Wi-Fi name</label
+            ><input id="ssid" autocomplete="off" /><label for="wifiPassword"
+              >WPA2 Wi-Fi password</label
+            ><input
+              id="wifiPassword"
+              type="password"
+              autocomplete="new-password"
+            />
+          </details>
+          <label for="action">Soundbar action</label
+          ><select id="action">
+            <option value="check">Check compatibility first</option>
+            <option value="update">Install / update everything</option>
+            <option value="configure">Apply configuration changes</option>
+            <option value="verify">Verify after a restart without USB</option>
+            <option value="uninstall">Uninstall</option>
+            <option value="install">First installation only (advanced)</option>
+            <option value="migrate">
+              Migrate reviewed legacy installation (advanced)
+            </option></select
+          ><small
+            >Start with Check. Reconnect the USB after the bar finishes to read
+            its results, then choose Install / update. Hardware compatibility is
+            checked on the bar.</small
+          >
+        </section>
+        <section class="finish">
+          <p id="review">
+            Select a drive to review where files will be written.
+          </p>
+          <button id="prepare" type="submit" disabled>
+            Prepare selected USB</button
+          ><output id="result" role="status" aria-live="polite"></output>
+        </section>
+      </form>
+      <footer>
+        Only Bar 9.1 installation is currently included. Full combined hardware
+        qualification remains pending.
+        <a href="/licenses" target="_blank" rel="noopener"
+          >Third-party licenses</a
+        >. No formatting or USB changes happen until you select and confirm a
+        drive.
+      </footer>
+    </main>
+  </body>
+</html>

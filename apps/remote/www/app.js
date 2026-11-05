@@ -7,6 +7,7 @@ import {createDetails} from './components/details.js';
 import {createCapabilities} from './components/capabilities.js';
 import {createBassOffset} from './components/bass-offset.js';
 import {createAdvanced} from './components/advanced.js';
+import {createSpeakers} from './components/speakers.js';
 
 const $ = id => document.getElementById(id);
 const buttons = [...document.querySelectorAll('[data-action]')];
@@ -21,9 +22,10 @@ const sound=createSound(document.querySelector('.mode-panel'));
 const bluetooth=createBluetooth($('bluetooth-panel'));
 const details=createDetails(document.querySelector('.more-details'));
 const capabilities=createCapabilities(document);
-const bassOffset=createBassOffset(document.querySelector('.mode-panel'));
-const advanced=createAdvanced($('advanced'));
-const components=[bluetooth,sound,playback,system,equalizer,details,advanced,bassOffset];
+const bassOffset=createBassOffset($('bass-offset-panel'));
+const advanced=createAdvanced($('advanced'),$('room-setup'));
+const speakers=createSpeakers($('speaker-view'));
+const components=[bluetooth,sound,playback,system,equalizer,details,advanced,bassOffset,speakers];
 let syncTimer=null;
 // Readiness shared by the shell and every component. A control sent from
 // elsewhere (another page, Home Assistant, the wake automation) holds the bar:
@@ -33,7 +35,10 @@ function readiness() {
   const elsewhere = reachable && !!current?.control?.busy && active === null;
   return {reachable, elsewhere, ready: reachable && !elsewhere};
 }
-const context=()=>({state:capabilities.state(current),deviceName:capabilities.name(),online,ready:readiness().ready,busy:readiness().elsewhere ? current.control : null,awake:current?.power==='On',active,queued:queue.length,pending:active?[active,...queue]:[...queue],csrf});
+const context=()=>{
+  const status=readiness();
+  return {state:capabilities.state(current),deviceName:capabilities.name(),online,reachable:status.reachable,ready:status.ready,busy:status.elsewhere ? current.control : null,awake:current?.power==='On',active,queued:queue.length,pending:active?[active,...queue]:[...queue],csrf};
+};
 function feedback(text, kind = '') {
   $('message-text').textContent = text;
   $('message').dataset.kind = kind;

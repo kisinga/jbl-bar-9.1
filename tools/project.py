@@ -175,8 +175,11 @@ def main(argv=None) -> int:
                 command += ['--fixture', str(args.fixture.resolve(strict=True))]
             return subprocess.run(command, cwd=ROOT / 'apps/remote').returncode
         if args.command == 'test':
+            subprocess.run(['go', 'test', './apps/build', './apps/usbsetup', './internal/buildtool', './internal/usbsetup', './packaging'], cwd=ROOT, check=True)
             subprocess.run(['go', 'test', './...'], cwd=ROOT / 'apps/remote', check=True)
             if args.full:
+                subprocess.run(['go', 'test', '-race', './apps/build', './apps/usbsetup', './internal/buildtool', './internal/usbsetup', './packaging'], cwd=ROOT, check=True)
+                subprocess.run(['go', 'vet', './apps/build', './apps/usbsetup', './internal/buildtool', './internal/usbsetup', './packaging'], cwd=ROOT, check=True)
                 subprocess.run([sys.executable, str(ROOT / 'tools/test.py')], cwd=ROOT, check=True)
                 subprocess.run(['go', 'test', '-race', './...'], cwd=ROOT / 'apps/remote', check=True)
                 subprocess.run(['go', 'vet', './...'], cwd=ROOT / 'apps/remote', check=True)
@@ -184,12 +187,10 @@ def main(argv=None) -> int:
         if args.command == 'build':
             if args.model != 'auto':
                 require_installer(args.model)
-            import build_distribution
             (ROOT / 'dist').mkdir(exist_ok=True)
             output = args.output_dir or Path(tempfile.mkdtemp(prefix='jbl-public-', dir=ROOT / 'dist'))
-            for path in build_distribution.build(output, args.model):
-                print(path)
-            return 0
+            return subprocess.run(['go', 'run', './apps/build', '--repo', str(ROOT),
+                                   '--output-dir', str(output), '--model', args.model], cwd=ROOT).returncode
         if args.command == 'models':
             items = catalog()
             if args.json:

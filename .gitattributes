@@ -4,3 +4,21 @@
 *.sh.in text eol=lf
 models/bar91/smart-mode/AutoScript/AutoScript -text whitespace=cr-at-eol
 models/bar91/smart-mode/JBLInstall/payload/hook.expected -text whitespace=cr-at-eol
+# Keep source-built USB payloads identical on Windows and Unix checkouts.
+*.c text eol=lf
+*.h text eol=lf
+*.go text eol=lf
+*.mod text eol=lf
+*.sum text eol=lf
+*.awk text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+LICENSE text eol=lf
+VERSION text eol=lf
+jbl text eol=lf
+models/bar91/remote/native/bin/bt-remote -text
+models/bar91/remote/native/bin/eq-parser -text

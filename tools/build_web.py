@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 
 from repo_layout import ROOT, REMOTE, REMOTE_DEVICE, bar91_profile
 from check_profiles import check as check_profiles
@@ -26,19 +27,34 @@ def build(output, allowed_cidr, bluetooth_helper=None, eq_parser=None, auto_stan
     output.mkdir(parents=True, exist_ok=True, mode=0o700)
     env = dict(os.environ, CGO_ENABLED="0", GOOS=profile["architecture"]["goos"],
                GOARCH=profile["architecture"]["goarch"], GOARM=profile["architecture"]["goarm"])
-    ldflags = "-s -w -buildid="
-    if bluetooth_helper:
-        helper = Path(bluetooth_helper).read_bytes()
-        if not 52 <= len(helper) <= 65536 or helper[:7] != b"\x7fELF\x01\x01\x01" or helper[18:20] != b"\x28\x00":
-            raise ValueError("Bluetooth helper must be the owner-built 32-bit ARM ELF")
-        ldflags += " -X main.bluetoothPayload=" + base64.b64encode(helper).decode("ascii")
-    if eq_parser:
-        helper = Path(eq_parser).read_bytes()
-        if not 52 <= len(helper) <= 65536 or helper[:7] != b"\x7fELF\x01\x01\x01" or helper[18:20] != b"\x28\x00":
-            raise ValueError("EQ parser must be the owner-built 32-bit ARM ELF")
-        ldflags += " -X main.eqParserPayload=" + base64.b64encode(helper).decode("ascii")
-    subprocess.run(["go", "build", "-buildvcs=false", "-trimpath", "-ldflags=" + ldflags, "-o", str(output / "remote"), "."],
-                   cwd=REMOTE, env=env, check=True)
+    # Embed helpers through a compiler overlay, keeping source clean and the
+    # Go command line below Windows' 32 KiB process limit.
+    with tempfile.TemporaryDirectory(prefix="jbl-native-overlay-") as folder:
+        replacements = {}
+        for helper_path, filename, variable, label in (
+            (bluetooth_helper, "bt_rpc.go", "bluetoothPayload", "Bluetooth helper"),
+            (eq_parser, "eq.go", "eqParserPayload", "EQ parser"),
+        ):
+            if helper_path is None:
+                continue
+            helper = Path(helper_path).read_bytes()
+            if not 52 <= len(helper) <= 65536 or helper[:7] != b"\x7fELF\x01\x01\x01" or helper[18:20] != b"\x28\x00":
+                raise ValueError(label + " must be the owner-built 32-bit ARM ELF")
+            source = REMOTE / filename
+            code = source.read_text()
+            declaration = "var " + variable + " string"
+            if code.count(declaration) != 1:
+                raise ValueError("Native payload declaration changed: " + filename)
+            target = Path(folder) / filename
+            value = json.dumps(base64.b64encode(helper).decode("ascii"))
+            target.write_text(code.replace(declaration, "var " + variable + " = " + value, 1))
+            replacements[str(source)] = str(target)
+        arguments = ["go", "build", "-buildvcs=false", "-trimpath", "-ldflags=-s -w -buildid="]
+        if replacements:
+            overlay = Path(folder) / "native-overlay.json"
+            overlay.write_text(json.dumps({"Replace": replacements}))
+            arguments.append("-overlay=" + str(overlay))
+        subprocess.run([*arguments, "-o", str(output / "remote"), "."], cwd=REMOTE, env=env, check=True)
     (output / "config.json").write_text(json.dumps({
         "listen": ":80", "allowed_cidr": str(network), "auto_standard": bool(auto_standard),
         "smart_mode_memory": bool(smart_mode_memory),

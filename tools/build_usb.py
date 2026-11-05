@@ -18,7 +18,7 @@ import build_web
 import hardware
 
 from repo_layout import ROOT, USB as SOURCE, SSH, REMOTE_DEVICE
-VERSION = "0.3.0-dev.9"
+VERSION = (ROOT / "VERSION").read_text().strip()
 
 
 def parse_config(data: bytes) -> dict[str, str]:
@@ -103,6 +103,8 @@ def build(output: Path, config: bytes, *, password: str | None = None,
     archive["README.txt"] = (SOURCE / "USB-README.txt").read_bytes()
     archive["SETUP.html"] = (ROOT / "packaging/SETUP.html").read_bytes()
     archive["LICENSE.txt"] = (ROOT / "LICENSE").read_bytes()
+    if bluetooth_helper or eq_parser:
+        archive["LICENSE.txt"] += b"\n" + (ROOT / "models/bar91/remote/native/bin/NOTICE.txt").read_bytes()
     # No credentials or application binary are needed to disable/restore boot.
     rescue = {
         "AutoScript/AutoScript": entry,

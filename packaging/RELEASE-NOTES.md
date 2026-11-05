@@ -1,9 +1,18 @@
 Single-USB JBL Bar Toolkit with automatic hardware selection.
 
-1. Download **jbl-bar-toolkit-…-usb.zip** and its matching **-recovery.zip**.
-2. Extract the USB ZIP to FAT32 and open **SETUP.html**.
-3. Create the local config, replace `JBLToolkit/config.txt`, and run **Check**.
-4. Read `STATUS.txt` and `HARDWARE.txt`; install only after checks pass.
+1. Download **jbl-setup-OS-ARCH** for your computer (`.exe` on Windows) and run it.
+   No installation or Go runtime is required. Allow execution if your OS asks.
+2. The local interface downloads verified toolkit files. Select a USB, choose
+   settings and **Check compatibility first**, then **Prepare selected USB**.
+   Optional formatting erases that drive and requires administrator permission.
+3. Safely eject it, insert it into the powered-on bar and wait five minutes.
+   Reconnect it to your computer and refresh drives to read its check results.
+4. Install only after checks pass. Save the recovery ZIP on your computer.
+
+For offline use, download **…-setup-OS-ARCH.zip**, extract it outside the USB and
+run its included executable. **Check for updates** refreshes toolkit files;
+**Update this setup app** replaces the executable itself and requires a restart.
+The raw USB/recovery ZIPs remain available for advanced use.
 
 The current package contains Bar 9.1 only, selected by exact executable identity.
 Bar 800/1000/1300/1300X and MK2 installation is not implemented. Their USB startup

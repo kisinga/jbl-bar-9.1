@@ -1,7 +1,7 @@
 # Components and compiled extensions
 
-The starting point is one Go module, one on-bar remote executable and plain
-browser modules. Shared code is extracted where there is an actual consumer;
+The remote uses its own Go module and plain browser modules. A separate root
+Go module builds the portable computer-side USB setup executable. Shared code is extracted where there is an actual consumer;
 the loopback preview is the second consumer of the server and UI. There is no
 dynamic plugin loader, generated UI framework or runtime package manager.
 
@@ -9,6 +9,8 @@ dynamic plugin loader, generated UI framework or runtime package manager.
 
 | Location | Owns | Dependencies |
 | --- | --- | --- |
+| `internal/buildtool/`, `apps/build/` | Shared source builds, public packaging and target binaries | Go standard library and host-side USB package validation |
+| `apps/usbsetup/`, `internal/usbsetup/`, `packaging/wizard/` | Portable loopback USB setup, verified downloads/self-update, drive discovery, elevation and formatting | Root Go module; no remote/device API changes |
 | `apps/remote/internal/server/` | HTTP protection, bounded requests, serialization, public assets and SSE | Standard library and feature metadata; no device paths or model code |
 | `apps/remote/internal/extension/` | Typed action registry, snapshot projections, optional workers | Standard library; no HTTP routes or native policy |
 | `apps/remote/backend_bar91.go` | Existing v1 aliases, feature composition and native action dispatch | Bar 9.1 device implementation and shared contracts |
@@ -22,6 +24,12 @@ The existing native feature files remain in the application package to preserve
 contributor workflows. Extracting the shared server does not make those files
 generic. The local adapter uses their existing methods; a future backend can
 implement the public shared contract without importing them.
+
+The shared server reports the action gate holder in `state.control` for
+`server.ControlState` snapshots and serves cached reads/new streams during a
+control. Background writers use `TryHold`; Bar 9.1 reports its Standard Mode
+wake gesture as `auto_standard` and keeps short monitors unreported. Read-only
+speaker telemetry uses reachability separately from control availability.
 
 ## Backend contract
 
@@ -90,7 +98,8 @@ older servers keep the control hidden. Its monitor shares the model action gate
 and is joined by the extension lifecycle before native helper cleanup.
 
 `advanced.js` owns the contributed audio-sync draft and calibration/subwoofer
-display. The shell debounces taps into one legacy `av_sync_set` request with
+display through separate scoped roots for Audio sync and Room setup. The shell
+debounces taps into one legacy `av_sync_set` request with
 `value`, cancels unsent drafts on disconnect/session changes, and keeps one action
 queue. The Bar 9.1 composition supplies longer setup/audio-sync budgets through
 `Options.ActionTimeout`; the server caps these at 60 seconds and extends that
@@ -100,7 +109,12 @@ reply's write deadline for bounded restoration. Other backends retain the defaul
 HTML remains a readable static scaffold with existing IDs, accessibility labels
 and CSS. This keeps contributors' UI changes straightforward and requires no
 Node build step. Component ownership follows existing panels instead of creating
-a separate abstraction for every label or button.
+a separate abstraction for every label or button. The speaker-view component owns
+collective docking presentation and independent last-reported battery readings;
+System owns only diagnostics and connection status. Front EQ and bass offset have
+independent capability roots within the right tuning column. Audio sync, Bass
+offset, and System monitor start expanded; live rendering never resets disclosures.
+See [UI feature mapping](REMOTE-UI.md) for the retained control surface.
 
 `GET /api/features` selects optional panels through known bundled `component`
 identifiers. Metadata never supplies executable code or script URLs. Unsupported

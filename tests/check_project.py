@@ -4,6 +4,7 @@ from contextlib import redirect_stderr
 import hashlib
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -12,7 +13,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
-import build_distribution
+import build_helpers
+import release
 import build_ssh
 import build_usb
 import prepare_usb
@@ -96,7 +98,7 @@ assert settings['WIFI_PSK_HEX']==psk
 assert all(p not in browser['config'] for p in fixture['passwords']+[fixture['wifiPassword']])
 cases.append('offline_setup_crypt_wifi_and_network_known_vectors')
 
-base = build_distribution.CONFIG
+base = build_helpers.CONFIG
 for extra in ('ssh_password_hash=$(id)', 'ssh_password_hash=$6$abc$bad', 'wifi_ssid_hex=ff', 'wifi_ssid_hex=00\nwifi_psk_hex='+'a'*63, 'wifi_ssid_hex=$(id)\nwifi_psk_hex='+'a'*64):
     try:
         build_usb.parse_config(base+extra.encode()+b'\n')
@@ -109,11 +111,22 @@ cases.append('credential_alphabets_lengths_and_pairs_checked')
 (ROOT/'dist').mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='distribution-test-',dir=ROOT/'dist') as temp:
     output = Path(temp)/'public'
-    paths = build_distribution.build(output)
-    assert len(paths)==4
-    package, recovery, info, sums = paths
+    paths = build_helpers.build(output)
+    assert len(paths)==4+len(release.setup_asset_names(build_usb.VERSION))
+    package, recovery, info, sums = paths[:4]
+    for system, arch in release.SETUP_TARGETS:
+        binary=output/release.setup_binary_name(system, arch)
+        bundle=output/f"jbl-bar-toolkit-v{build_usb.VERSION}-setup-{system}-{arch}.zip"
+        with zipfile.ZipFile(bundle) as archive:
+            name="jbl-setup.exe" if system=="windows" else "jbl-setup"
+            assert archive.read(name)==binary.read_bytes()
+            assert archive.getinfo(name).external_attr>>16 & 0o777 == 0o755
+            assert archive.read("toolkit-usb.zip")==package.read_bytes()
+            assert archive.read("toolkit-recovery.zip")==recovery.read_bytes()
     files = prepare_usb.package_files(package)
     assert build_usb.parse_config(files['JBLToolkit/config.txt'])['SSH']=='false'
+    assert json.loads(files['JBLToolkit/package.json'])['front_eq_helper'] is True
+    assert json.loads(files['JBLToolkit/package.json'])['bluetooth_helper'] is True
     assert files['JBLToolkit/setup.js']==(ROOT/'packaging/setup.js').read_bytes()
     assert files['SETUP.html']==(ROOT/'packaging/SETUP.html').read_bytes()
     assert not any(name.endswith(('/password.hash', '/wifi.ssid.hex', '/wifi.psk.hex')) for name in files)
@@ -127,24 +140,33 @@ with tempfile.TemporaryDirectory(prefix='distribution-test-',dir=ROOT/'dist') as
     assert json.loads(info.read_text())['selection']=='automatic'
     assert json.loads(info.read_text())['included_models']==['bar91']
     assert files['AutoScript/AutoScript'].endswith(b'/dispatch.sh &)\r\n')
+    # Independent legacy builder: payload entry bytes must match under the same
+    # pinned compiler, including guards, manifests and the ARM remote itself.
+    with patch.dict(os.environ, {'GOTOOLCHAIN':'go'+(ROOT/'go.mod').read_text().split('\ngo ')[1].splitlines()[0]}):
+        legacy, legacy_recovery = build_usb.build(Path(temp)/'legacy', base, bluetooth_helper=ROOT/'models/bar91/remote/native/bin/bt-remote', eq_parser=ROOT/'models/bar91/remote/native/bin/eq-parser')
+    assert prepare_usb.package_files(legacy)==files
+    with zipfile.ZipFile(legacy_recovery) as old, zipfile.ZipFile(recovery) as new:
+        assert {n:old.read(n) for n in old.namelist()}=={n:new.read(n) for n in new.namelist()}
+
     with tempfile.TemporaryDirectory(prefix='distribution-extract-') as mount:
         prepare_usb.stage_files(Path(mount),files)
         (Path(mount)/'JBLToolkit/config.txt').write_text(browser['config'])
         prepare_usb.verify_files(Path(mount),files)
     try:
-        build_distribution.build(output)
+        build_helpers.build(output)
     except ValueError:
         pass
     else:
         raise AssertionError('public package overwritten')
-    specific = build_distribution.build(Path(temp)/'bar91', 'bar91')
+    specific = build_helpers.build(Path(temp)/'bar91', 'bar91')
     assert {p.name for p in paths}.isdisjoint(p.name for p in specific)
     assert json.loads(specific[2].read_text())['target']=='bar91'
     assert prepare_usb.package_files(specific[0])['AutoScript/AutoScript']==files['AutoScript/AutoScript']
 cases.append('public_arm_zip_setup_recovery_checksums_and_local_config')
 cases.append('automatic_and_model_specific_public_assets_do_not_collide')
+cases.append('native_and_independent_legacy_payload_entry_bytes_match')
 
-matrix = subprocess.run([sys.executable, str(ROOT/'tools/build_distribution.py'), '--matrix'],capture_output=True,text=True,check=True)
+matrix = subprocess.run(['go', 'run', './apps/build', '--matrix'],capture_output=True,text=True,check=True)
 assert {item['model'] for item in json.loads(matrix.stdout)['include']}=={'auto','bar91'}
 cases.append('ci_packages_only_reviewed_implementations_and_automatic_selection')
 

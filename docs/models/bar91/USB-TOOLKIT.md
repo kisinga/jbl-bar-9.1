@@ -1,78 +1,34 @@
-# Canonical single-USB installation
+# Bar 9.1 installation reference
 
-This is the canonical installation process for new Bar 9.1 setups. Install root SSH, the browser remote and automatic Standard Mode together, or select only the features you need. One manager owns the startup hook and recovery path.
+Use the [root README](../../../README.md) for the setup workflow. Install root SSH, the browser remote and automatic Standard Mode together, or select only the features you need. One manager owns the startup hook and recovery path.
 
 **Development build: host-tested; complete hardware installation and recovery are not yet qualified.** Existing per-feature device records do not validate this combined installer. No combined public release has been published.
 
-## Prepare a package
+## Prepare a USB
 
-### Prebuilt download
-
-The [package workflow](https://github.com/kisinga/jbl-bar-toolkit/actions/workflows/package.yml)
-builds model-specific public ZIPs. Once the workflow has run, download its
-artifact, extract the outer artifact ZIP, then extract the inner `-usb.zip`
-directly onto a clean FAT32 USB. Keep the matching `-recovery.zip` on the PC.
-Open **SETUP.html**, choose your home network/features and download the config.
-Replace `JBLToolkit/config.txt` with it, keeping that exact name. No Go or Python
-is needed for a prebuilt package. Default action is check-only.
-
-The page runs offline and can place a derived SSH password hash and Wi-Fi key
-in that config. Public ZIPs contain neither. Treat the configured USB as private.
-See [release packaging](../../RELEASING.md) for artifacts and draft prereleases.
-
-### Build from source
-
-Use Linux with Python 3.10+, BusyBox and Go 1.22+ (tested locally with Go 1.25.5). The soundbar needs no Go runtime or ongoing computer service. Use the exact firmware identities in the [compatibility table](../../../models/bar91/README.md#compatibility), a normally working bar and the first partition of a FAT32 USB drive (`/mnt/sda1`).
-
-Keep owner configuration under ignored `dist/`:
+Use the [root setup guide](../../../README.md#get-started) for downloads and
+configuration. For local development, install Go 1.25.7+ and run from the root:
 
 ```sh
-mkdir -p dist
-cp models/bar91/usb/config.example.txt dist/toolkit-config.txt
-# Edit dist/toolkit-config.txt: set your LAN subnet and selected features.
-./jbl prepare --model bar91 --config dist/toolkit-config.txt
-# Or generate settings and stage an empty USB in one command (check-only):
-./jbl prepare --model bar91 --allowed-cidr 192.168.1.0/24 \
-  --features web,ssh,auto-standard --mount /media/<owner>/<usb-label>
+go run ./apps/usbsetup --repo .
 ```
 
-With `ssh=true`, choose a new root SSH password when prompted. No shared default is supplied. Only its SHA-512 crypt hash enters the package. The native daemon and compatible libraries are reused from the bar.
+Setup uses current source in repository mode and verified public packages in a
+downloaded executable. It checks write/readback integrity and safely ejects the
+USB on success. Formatting requires explicit erase confirmation and an OS admin
+prompt. Never run setup from the USB you intend to format. Keep the matching
+recovery ZIP. Device-side firmware qualification still runs on the soundbar.
 
-Optional build arguments:
-
-| Argument | Purpose |
-| --- | --- |
-| `--ssh-password-hash-file <private-file>` | Reuse an existing private SHA-512 crypt password hash without changing its password. Mutually exclusive with a newly entered password. |
-| `--with-ssh` | Bundle credentials even when `ssh=false`, so SSH can be enabled later from the same USB. |
-| `--wifi` | Prompt for WPA2 SSID/passphrase and bundle the derived key. Provisioning works even with SSH disabled. Omit to preserve existing Wi-Fi. |
-| `--bluetooth-helper build/bt-remote` | Embed the project-owned ARM Bluetooth playback helper. |
-| `--eq-parser build/eq-parser` | Embed the project-owned ARM Front EQ parser helper. |
-| `--output-dir dist/another-private-build` | Keep an additional package without overwriting the first one. |
-
-Build optional helpers using the [Bluetooth](DEVELOPMENT.md#optional-bluetooth-helper) and [Front EQ](DEVELOPMENT.md#optional-front-eq-helper) instructions. Only project code is bundled; vendor libraries stay on the bar. Without these helpers the corresponding controls remain unavailable.
-
-The lower-level builder uses dist/toolkit-private/ by default; ./jbl chooses a fresh private directory unless --output-dir is given. A build produces:
-
-```text
- dist/toolkit-private/
-   jbl-bar9-toolkit-v0.3.0-dev.8-private.zip
-   jbl-bar9-toolkit-v0.3.0-dev.8-recovery.zip
-   SHA256SUMS
-```
-
-Keep the install ZIP and USB private, including password hashes and derived Wi-Fi keys. A derived WPA2 key is still a credential. The recovery ZIP contains neither credentials nor the web executable. Archives are created with private permissions on the computer; FAT32 does not preserve those permissions.
+This reference covers installation safeguards, reports, configuration and recovery.
+Optional helper development is documented in [development](DEVELOPMENT.md).
 
 ## Check, install, and verify
 
-1. Keep the matching recovery ZIP on the computer. Use an empty, writable FAT32 first partition on a DOS/MBR USB drive. The host preparation command checks the actual device, partition, filesystem, configuration, package manifest and ARM executable. It writes and reads back all payloads before activating AutoScript last:
+1. Keep the matching recovery ZIP. Use setup to prepare an empty writable FAT32
+   first partition on a DOS/MBR USB, or explicitly choose formatting. Setup
+   verifies the package, configuration and stored bytes before activating
+   AutoScript last. After successful eject, unplug the drive from your computer.
 
-   ```sh
-   python3 tools/prepare_usb.py \
-     --package dist/toolkit-private/jbl-bar9-toolkit-v0.3.0-dev.8-private.zip \
-     --mount /media/<owner>/<usb-label> --report build/usb-preparation.json
-   ```
-
-   The tool never formats or overwrites an occupied drive. After unmounting and remounting, repeat with `--verify` to verify the stored bytes. Configuration remains editable and is validated separately.
 2. Set `JBLToolkit/config.txt` to `action=check`. Turn the bar fully on, let playback settle, insert USB and wait **five minutes**. Return USB to the computer. Read `CHECKS.txt`, `PREFLIGHT.txt`, `DIAGNOSTICS.txt`, `native-check.json`, `STATUS.txt` and `setup.log`. Require `CHECK_PASSED_READY_FOR_INSTALL_OR_CONFIGURE`. This operation reads native state and makes temporary write/copy/rename checks; it does not install, change networking, stop services or press controls. Existing standalone stores/hooks are reported as blockers and preserved.
 3. With a passing check and a clean installation target, set `action=install` on the same USB. Reinsert with the bar fully on and leave controls alone for **five minutes**. Automatic Standard selection may briefly mute audio. Return USB and require `INSTALLED_PENDING_REBOOT_TEST`. Read `RESULT.txt`, `setup.log` and exported logs. A partial failure is not installation success.
 4. With SSH selected, inspect `logs/connection.txt` and `host_ed25519.pub`. Compare the host-key fingerprint with the SSH client's prompt before accepting it. Test `ssh -p 2222 root@<bar-ip-address>`, an interactive shell and SFTP. With the web remote selected, open `http://jbl.local` or the bar's local IP and configured port. Use the IP if mDNS is unavailable.
@@ -113,9 +69,9 @@ exFAT is **not qualified**. The second hardware check found no exFAT entry in th
 | `smart_mode_memory` | Optional `true`, `false` (default `false`) | With `auto_standard=true`: after wake, restores the mode chosen before standby instead of always selecting Standard. Rejected without `auto_standard=true`. |
 | `allowed_cidr` | Canonical private IPv4 CIDR, `/16` through `/30` | Shared trusted LAN for SSH/web. Network address required, e.g. `192.168.1.0/24`, not `192.168.1.20/24`. |
 | `web_port` | `80`, or `1024`–`65535` except `2222` | HTTP port. Ports 80/8080 retain the remote's mutual fallback; other ports are used alone. |
-| `ssh_password_hash` | Optional SHA-512 crypt `$6$…` value | Owner credential, generated by SETUP.html. Overrides a separately bundled hash on installation/configuration. |
+| `ssh_password_hash` | Optional SHA-512 crypt `$6$…` value | Owner credential, generated by the portable setup app. Overrides a separately bundled hash on installation/configuration. |
 | `wifi_ssid_hex` | Optional lowercase UTF-8 hex, 1–32 decoded bytes | Provision this Wi-Fi name. Requires `wifi_psk_hex`. |
-| `wifi_psk_hex` | Optional 64 lowercase hex characters | Derived WPA2 key, generated by SETUP.html. Requires `wifi_ssid_hex`. |
+| `wifi_psk_hex` | Optional 64 lowercase hex characters | Derived WPA2 key, generated by the portable setup app. Requires `wifi_ssid_hex`. |
 
 Enabling automatic Standard Mode uses the existing guarded button gesture, not a permanent firmware setting. Disabling automation leaves the current sound mode alone; it does not actively turn Smart Mode on. The existing browser button selects Standard Mode manually. A direct, symmetric Smart Mode on/off switch is not implemented.
 
@@ -150,7 +106,7 @@ To make changes, edit `JBLToolkit/config.txt`, set `action=configure`, and repea
 ## Update everything from USB
 
 Use the latest USB package and choose **Install / update everything** in
-`SETUP.html` (`action=update`). Insert it into the powered-on bar and wait five
+the portable setup app (`action=update`). Insert it into the powered-on bar and wait five
 minutes. Read `STATUS.txt`, remove the USB, restart and verify as above.
 
 The installer detects a clean bar, a recognized standalone migration source,
@@ -224,7 +180,7 @@ Read `JBLToolkit/STATUS.txt` and the newest `RESULT=... EXIT=...` entry in `setu
 | `PACKAGE_INTEGRITY_FAILED` | Immutable scripts/binary/credentials differ from the package manifest. Re-extract the original package. Config changes do not require checksum edits. Emergency recovery still works. |
 | `CONFIG_INVALID` | The parser explains the error in `setup.log`. Fix data; never insert shell code or edit the generated plan. |
 | `PREFLIGHT_FAILED_CHECK_FIRMWARE_STORAGE_AND_NATIVE_SSH` | No installation changes: read `PREFLIGHT_REASON` in `setup.log` for the failed firmware/CLI, UBIFS, BusyBox, free-space or native SSH guard. Preserve checks. |
-| `SSH_CREDENTIALS_NOT_BUNDLED` | Add your derived SSH credential through SETUP.html/config, or use the original bundled private hash. There is no shared/default password. |
+| `SSH_CREDENTIALS_NOT_BUNDLED` | Add your derived SSH credential through the setup app/config, or use the original bundled private hash. There is no shared/default password. |
 | `MIGRATION_SSH_CREDENTIALS_REQUIRED_NO_CHANGES` | Migration with SSH selected needs your config/bundled hash before any legacy service is disabled. |
 | `TOOLKIT_DISABLED_USE_CONFIGURE_OR_RECOVER` | A prior failure/recovery disabled startup. Read logs, then explicitly configure or recover. Passive reinsertion does not clear the guard. |
 | `REMOTE_NOT_READY` / `REMOTE_EXITED_DURING_STARTUP` | Read `setup.log` and retained `/var/JBLRemote/remote.log`. Startup is disabled on failure. |

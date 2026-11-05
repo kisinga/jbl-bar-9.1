@@ -23,6 +23,8 @@ nor a research catalog entry substitute for that work.
 ## Boundaries
 
 ```text
+apps/usbsetup/                   portable computer-side executable (root Go module)
+internal/usbsetup/               USB discovery, verification, formatting and self-update
 apps/remote/                     Go application, native control code and browser UI
   internal/server/               shared HTTP/security/state delivery
   internal/extension/            typed feature registry and joined workers
@@ -32,8 +34,8 @@ apps/remote/                     Go application, native control code and browser
   www/components/                scoped UI components, no build step
   backend_bar91.go                native composition and v1 compatibility
   lifecycle_bar91.go              native workers and restoration
-jbl                              prepare / models / usb / remote entry point
-packaging/                       offline setup and release notes
+jbl                              contributor prepare / models / usb / remote commands
+packaging/                       embedded setup interface and release notes
   usb/                          generated hardware dispatcher template
 models/
   catalog.json                   model discovery and honest support status
@@ -57,7 +59,7 @@ research/                       reviewed findings and reproducible research tool
 research/private/               ignored vendor artifacts, captures and raw analysis
 ```
 
-The Go app remains one module. `internal/server.Backend[S]` supplies snapshots,
+The device app remains one module; setup/build tools use a separate root module. `internal/server.Backend[S]` supplies snapshots,
 commands and model/feature metadata without importing native code. The HTTP/SSE
 implementation is shared with the loopback preview. Snapshot types retain the
 existing v1 JSON shape and implement pure publication/comparison methods.
@@ -180,8 +182,8 @@ implementation; they do not justify passing another model through this installer
 
 ## Release boundary
 
-The canonical product is a model-specific USB ZIP with a prebuilt remote,
-offline setup and independent recovery. Public assets start check-only and
+The portable setup executable downloads a USB ZIP with a prebuilt remote and
+independent recovery. Platform bundles include those ZIPs for offline use. Public assets start check-only and
 contain no owner credentials. Owners can put derived SSH/Wi-Fi credentials into
 the local config, which remains outside the immutable payload manifest and is
 strictly validated on both host and bar. Routine logs do not export that config.

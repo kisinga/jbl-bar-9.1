@@ -1,9 +1,12 @@
-#!/usr/bin/env python3
-"""Repository entry point: prepare a jailbreak USB and use the local remote."""
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parent / "tools"))
-from project import main
-
-raise SystemExit(main())
+#!/bin/sh
+# Public builds use installed Go; other contributor tools remain Python.
+set -eu
+repo_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
+if [ "$#" -eq 0 ]; then set -- --help; fi
+command_name=$1
+shift
+cd "$repo_dir"
+case "$command_name" in
+  build) exec go run ./apps/build --repo "$repo_dir" "$@" ;;
+  *) exec python3 "$repo_dir/tools/project.py" "$command_name" "$@" ;;
+esac
