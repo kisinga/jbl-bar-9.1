@@ -124,6 +124,9 @@ identifiers. Metadata never supplies executable code or script URLs. Unsupported
 components are hidden; unavailable supported components use their state-based
 disabled/error presentation. Older v1 servers without discovery retain existing
 behavior. Discovery refreshes when the session token changes after a restart.
+It can also name the model's owner's manuals (`manuals`, https links by ISO
+639-1 language); Soundbar details links the one for the browser's language,
+else English. Bar 9.1 links JBL's published PDFs rather than bundling them.
 
 The initial optional UI contracts are:
 

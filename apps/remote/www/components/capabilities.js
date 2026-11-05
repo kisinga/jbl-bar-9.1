@@ -35,6 +35,7 @@ export function createCapabilities(root) {
       element.hidden=!features.extensions.some(item=>item.component===component && item.included===true);
       if(element.hidden) for(const button of element.querySelectorAll('button')) button.disabled=true;
     }
+    manual();
     const label=root.querySelector('#model-name');
     if(label) label.textContent=features.name;
     root.title=features.name+' · Remote';
@@ -45,6 +46,22 @@ export function createCapabilities(root) {
     for(const button of root.querySelectorAll('[data-action]')) {
       if(!actions.has(command(button.dataset.action).action)) button.disabled=true;
     }
+  }
+  // The owner's manual the model declares, in the browser's language when
+  // available, otherwise English. Links are JBL's own https PDFs.
+  const languages={en:'English',fr:'Français',de:'Deutsch',es:'Español',nl:'Nederlands'};
+  function manual() {
+    const row=root.querySelector('#manual-row'), link=root.querySelector('#manual-link');
+    if(!row || !link) return;
+    const manuals=features.manuals && typeof features.manuals==='object' ? features.manuals : {};
+    const valid=code=>typeof manuals[code]==='string' && /^https:\/\/[^\s"<>]+$/.test(manuals[code]);
+    const preferred=[...(navigator.languages||[]),navigator.language,'en'].map(tag=>String(tag||'').slice(0,2).toLowerCase());
+    const code=preferred.find(valid) || Object.keys(manuals).sort().find(valid);
+    row.hidden=!code;
+    if(!code) return;
+    link.href=manuals[code];
+    link.firstChild.textContent='PDF · '+(languages[code]||code.toUpperCase())+' ';
+    link.title=features.name+' owner\'s manual (opens JBL\'s site)';
   }
   async function load() {
     try {

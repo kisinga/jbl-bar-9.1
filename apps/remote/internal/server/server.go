@@ -43,6 +43,9 @@ type Features struct {
 	Name       string                 `json:"name"`
 	Actions    []string               `json:"actions"`
 	Extensions []extension.Descriptor `json:"extensions"`
+	// Manuals links the model's owner's manual by ISO 639-1 language code
+	// (https only). The page opens the one matching the browser language.
+	Manuals map[string]string `json:"manuals,omitempty"`
 }
 type Backend[S State] interface {
 	Snapshot() S

@@ -140,7 +140,8 @@ already captured snapshot. Front EQ and center level are the first Bar 9.1
 modules. Their optional workers are registered alongside actions and joined on
 shutdown; model policy still owns hardware sequencing and cleanup. Actions such as `bar91.front-eq.apply` share the core HTTP guard,
 serialization lock and timeout. Legacy browser action names remain aliases.
-`GET /api/features` advertises build inclusion and omission reasons;
+`GET /api/features` advertises build inclusion and omission reasons, and the
+model's owner's manual links (`manuals`, by language, https only);
 `state.extensions` carries optional feature state. A bundled feature still needs
 valid current firmware and state. Extension state projections perform no I/O. The browser uses known local
 component IDs to bind namespaced state/actions; metadata cannot load scripts.
