@@ -53,7 +53,10 @@ const server = createServer(async (req, res) => {
       const payload = JSON.parse(body); lastPayload = payload; const {action} = payload; calls.push(action);
       await pause(delay);
       if (failure) { res.writeHead(409, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:failure,state})); return; }
-      if (action === 'eq_apply') {state.eq={...state.eq,enabled:payload.gains_db.some(value=>value!==0),gains_db:[...payload.gains_db],status:payload.gains_db.some(value=>value!==0)?'custom':'original'};}
+      if (action === 'eq_apply' && state.eq?.available===false && typeof state.eq.kept==='boolean' && payload.gains_db.some(value=>value!==0)) {
+        // A remote that keeps the EQ saves one it cannot apply now.
+        state.eq={...state.eq,enabled:false,kept:true,gains_db:[...payload.gains_db],status:'waiting',error:'Your EQ is re-applied automatically when Standard audio plays.'};
+      } else if (action === 'eq_apply') {state.eq={...state.eq,enabled:payload.gains_db.some(value=>value!==0),gains_db:[...payload.gains_db],status:payload.gains_db.some(value=>value!==0)?'custom':'original'};}
       if (action === 'eq_reset') state.eq={...eqFixture()};
       if (action === 'night_toggle') state.sound.night=!state.sound.night;
       // A2DP can remain Streaming while the app handles AVRCP Play/Pause.
@@ -239,6 +242,24 @@ try {
   check(await page.locator('#eq-reset').isEnabled(),'a kept EQ says it stays until Reset');
   state.eq={...eqFixture(),available:false,enabled:false,kept:true,gains_db:[0,0,0,-6,-6],status:'waiting',error:'Your EQ is re-applied automatically when Standard audio plays.'};await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.startsWith('Your EQ is re-applied'));
   check(await page.locator('#eq-reset').isEnabled() && await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-slider-3').inputValue()==='-6','a kept EQ waiting to be applied again shows its bands and can still be reset');
+  // The EQ stays adjustable while it cannot be applied: it is saved and applied later.
+  check(await page.locator('#eq-slider-0').isEnabled() && await page.locator('#eq-preset').isEnabled() && (await page.locator('#eq-apply').textContent())==='Save EQ','a waiting EQ can still be changed, with Save instead of Apply');
+  await page.locator('#eq-preset').selectOption('warm');
+  check(await page.locator('#eq-apply').isEnabled() && (await page.locator('#eq-state').textContent())==='Unsaved changes. Select Save EQ: it is applied when Standard audio plays.' && await page.locator('#eq-panel').getAttribute('data-state')==='draft','an unsaved change says when it will apply');
+  await page.locator('#eq-apply').click();
+  await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Front EQ saved. It is applied when Standard audio plays.');
+  check(lastPayload.action==='eq_apply' && JSON.stringify(lastPayload.gains_db)==='[0,0,-1,-2,-3]' && state.eq.status==='waiting' && await page.locator('#eq-preset').inputValue()==='warm' && await page.locator('#eq-panel').getAttribute('data-state')==='waiting','saving sends the curve once and shows it as waiting');
+  state.eq={...eqFixture(),available:false,enabled:false,kept:false,status:'unavailable',error:'native EQ is not ready on this audio route'};
+  await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.startsWith('The EQ does not apply on this audio route.'));
+  check((await page.locator('#eq-state').textContent())==='The EQ does not apply on this audio route. Choose an EQ now: it is applied when Standard audio plays.' && await page.locator('#eq-preset').isEnabled() && await page.locator('#eq-reset').isDisabled(),'with nothing kept, an unsupported route still lets the owner choose an EQ');
+  state.mode='Smart';
+  await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.startsWith('Smart Mode is on.'));
+  check(true,'Smart Mode explains why the EQ waits');
+  state.mode='Standard';
+  state.power='Standby';state.eq={...eqFixture(),available:false,enabled:false,kept:true,gains_db:[-3,-1,0,0,-1],status:'waiting',error:'Your EQ is re-applied automatically when Standard audio plays.'};
+  await page.waitForFunction(()=>document.querySelector('#power-label').textContent==='Turn on' && document.querySelector('#eq-slider-0').value==='-3');
+  check(await page.locator('#eq-slider-0').isEnabled() && await page.locator('#eq-reset').isEnabled() && (await page.locator('#eq-apply').textContent())==='Save EQ','in standby the kept EQ can be changed or forgotten');
+  state.power='On';
   state.eq={...eqFixture(),gains_db:[1,0,0,0,0]};await page.waitForFunction(()=>document.querySelector('#eq-gain-0').textContent==='—');
   check(await page.locator('#eq-slider-0').isDisabled() && await page.locator('#eq-preset').isDisabled() && await page.locator('#eq-graph').isHidden(),'invalid boost readback disables presets rather than showing a false setting');
   delete state.eq;await pause(100);

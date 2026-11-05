@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -161,6 +162,36 @@ func TestEQFollowRetryOnlyOnANewNativeState(t *testing.T) {
 	for _, d := range []eqFollow{eqFollowOK, eqFollowLevels, eqFollowSmart} {
 		if !eqFollowRetry(d, keyA, keyA) {
 			t.Errorf("decision %d: blocked although it does not reset", d)
+		}
+	}
+}
+
+// An EQ chosen while it cannot be applied (standby, Smart Mode, another
+// audio route) is kept and applied later; anything else is applied or
+// refused now, as before.
+func TestEQDeferFor(t *testing.T) {
+	other := errors.New("audio process changed")
+	for _, c := range []struct {
+		name        string
+		problem     string
+		available   bool
+		power, mode string
+		active      bool
+		routeErr    error
+		want        string
+	}{
+		{"standby", "", true, "Standby", "Smart", false, nil, "standby"},
+		{"smart", "", true, "On", "Smart", false, nil, "Smart Mode"},
+		{"unqualified route", "", true, "On", "Standard", false, errEQRoute, "this audio route"},
+		{"wrapped route error", "", true, "On", "Standard", false, fmt.Errorf("read: %w", errEQRoute), "this audio route"},
+		{"applicable now", "", true, "On", "Standard", false, nil, ""},
+		{"other read error", "", true, "On", "Standard", false, other, ""},
+		{"pending problem", "EQ reset pending: x", true, "Standby", "Smart", false, nil, ""},
+		{"applied EQ", "", true, "On", "Smart", true, nil, ""},
+		{"state unavailable", "", false, "", "", false, nil, ""},
+	} {
+		if got := eqDeferFor(c.problem, c.available, c.power, c.mode, c.active, c.routeErr); got != c.want {
+			t.Errorf("%s: %q, want %q", c.name, got, c.want)
 		}
 	}
 }

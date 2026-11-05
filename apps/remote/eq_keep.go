@@ -158,6 +158,37 @@ func (d *device) followFrontEQ(ctx context.Context, report func(string)) {
 	}
 }
 
+// eqDeferFor is why a new EQ cannot be applied now but can be kept for
+// later, or "" when it must be applied (or refused) now. Problems, a reset
+// pending on an applied EQ and unreadable states are never deferred.
+func eqDeferFor(problem string, available bool, power, mode string, active bool, routeErr error) string {
+	switch {
+	case problem != "" || !available || active:
+		return ""
+	case power != "On":
+		return "standby"
+	case mode != "Standard":
+		return "Smart Mode"
+	case errors.Is(routeErr, errEQRoute):
+		return "this audio route"
+	}
+	return ""
+}
+
+// eqDeferReason applies eqDeferFor to the bar now. Callers hold d.mu.
+func (d *device) eqDeferReason() string {
+	m := &d.eq
+	if m.problem != "" || m.active || eqParserPayload == "" {
+		return ""
+	}
+	s := d.snapshotCurrent()
+	var routeErr error
+	if s.Available && s.Power == "On" && s.Mode == "Standard" {
+		_, routeErr = d.readEQNative()
+	}
+	return eqDeferFor(m.problem, s.Available, s.Power, s.Mode, m.active, routeErr)
+}
+
 // eqFollowRetry reports whether the monitor acts on decision: a reset is not
 // tried again on the native state where it last failed.
 func eqFollowRetry(decision eqFollow, blocked, key string) bool {

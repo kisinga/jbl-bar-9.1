@@ -507,6 +507,15 @@ func (d *device) eqAction(ctx context.Context, action string, gains []float64) (
 	} else if action == "eq_apply" && len(gains) == 5 {
 		var bands [5]float64
 		copy(bands[:], gains)
+		// Not applicable now (standby, Smart Mode, another audio route): keep
+		// it and let the keeper apply it once Standard audio plays, instead
+		// of refusing an EQ the owner can always choose.
+		if reason := d.eqDeferReason(); reason != "" && bands != [5]float64{} && validKeptGains(bands) {
+			d.keepFrontEQGains(bands)
+			d.eq.keepStable = 0
+			d.eq.note("Front EQ saved (%s); it is applied when Standard audio plays", reason)
+			return d.snapshotCurrent(), nil
+		}
 		e = d.applyFrontEQ(ctx, bands)
 		if bands == [5]float64{} {
 			d.forgetKeptFrontEQ()
