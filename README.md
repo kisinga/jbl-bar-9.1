@@ -2,7 +2,7 @@
 
 **Control your JBL Bar 9.1 from your phone or computer.** Change the volume,
 choose what is playing, and adjust the sound in a browser on your home network.
-No cloud account or app to install.
+No cloud account or app to install. Disable automatic smart mode on power on.
 
 ![Browser remote with speaker batteries, source controls, sound levels, Front EQ and System monitor](docs/web-remote.png)
 
