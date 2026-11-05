@@ -23,32 +23,39 @@ The shared Go builder produces ARM USB/recovery ZIPs, six platform executables
 and offline bundles under `dist/`. Local setup retains its matching files under
 `build/setup-payload-…/`. Restart setup to include source edits.
 
-Contributor commands under `./jbl` require Python 3.10+. The independent host
-fixtures also need BusyBox; Linux FAT validation uses `fsck.fat` when available.
-Browser tests require Node, Playwright and Chromium. Set `PLAYWRIGHT_MODULE` to
-reuse an existing installation. None of these checks writes to attached USBs.
+Contributor commands under `./jbl` require Python 3.10+. Full checks also need
+Linux, BusyBox, dosfstools and Node 20+ (CI uses Node 24). Install browser tools
+once with `npm ci` and `npm run test:ui:install`; on Linux, install missing browser
+libraries with `npx playwright install-deps chromium`. `PLAYWRIGHT_MODULE` can
+reuse an existing Playwright installation. Checks never write to attached USBs.
 
 ```sh
-go test -race ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
-go vet ./apps/build ./apps/usbsetup ./internal/buildtool ./internal/usbsetup ./packaging
-(cd apps/remote && go test -race ./... && go vet ./...)
-python3 tools/test.py
-node tests/webremote-ui.mjs
-node tests/component-ui.mjs
-node tests/bass-offset-ui.mjs
-node tests/setup-ui.mjs
-node tests/setup-local.mjs
+./jbl test                                      # Fast Go checks; no build integration
+./jbl test --full                               # All host, race/vet and browser checks
+npm run test:ui -- --suite remote                # Remote browser checks only
+npm run test:ui -- --suite setup                 # Setup browser/source-launch checks
+python3 tools/test.py --suite usb --suite setup  # Selected host fixtures
 ```
 
-`./jbl dev` previews the remote with sample data; `./jbl test --full` runs the
-Go and host checks. The Python host runner discovers `tests/check_*.py` and
-model fixtures, writing reports to ignored `build/test-results/`. It independently
+`./jbl dev` previews the remote with sample data; `./jbl test --ui` runs all browser
+checks. Windows contributors can use `python tools/project.py test` or `npm run
+test:ui` directly; the full shell fixtures run on Linux. The host runner discovers
+`tests/check_*.py` and model fixtures, runs four at a time (`--jobs` overrides), and
+writes reports and suite timings to ignored `build/test-results/`. It independently
 compares Go-built payloads with the legacy builder. Setup tests use temporary
 folders, sparse disk images and mocked native commands. Browser fixtures check
 production assets, capabilities, drafts, disclosure defaults and device states.
 These checks do not qualify physical installation, sound, standby or recovery.
 SSH fixtures use a loopback server with real authentication and encrypted channels;
 device transaction fixtures test setting/key retention and failure handling without a bar.
+
+PR checks follow changed paths: documentation needs preflight only; interface
+changes run the relevant browser suites, with remote race/vet and an ARM build
+for remote assets. Shared, unknown and tooling paths run everything. Pushes to
+`main`, tags and manual runs always run the complete suite, including native
+Windows/macOS checks. CI uploads the exact public packages verified by the host
+fixtures, rather than rebuilding them. One `test` check gates all selected jobs.
+Preview routing locally with `python3 tools/ci.py --base origin/main`.
 
 ## Screenshots
 

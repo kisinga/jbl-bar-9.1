@@ -1,0 +1,11 @@
+{
+  "name": "jbl-bar-toolkit-dev",
+  "private": true,
+  "scripts": {
+    "test:ui": "node tools/test-ui.mjs",
+    "test:ui:install": "playwright install --only-shell chromium"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
