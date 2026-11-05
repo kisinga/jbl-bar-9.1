@@ -36,10 +36,10 @@ export function createEqualizer(root) {
     }
     $('eq-apply').disabled = !canAdjust || !changed;
     $('eq-apply').textContent = active === 'eq_apply' ? 'Applying…' : 'Apply EQ';
-    $('eq-reset').disabled = !ready || !awake || pending || !(eq.enabled === true || eq.status === 'reset_required');
+    $('eq-reset').disabled = !ready || !awake || pending || !(eq.enabled === true || eq.status === 'reset_required' || eq.kept === true);
     $('eq-reset').textContent = active === 'eq_reset' ? 'Resetting…' : 'Reset';
     $('eq-panel').dataset.state = !ready ? 'offline' : eq.status === 'reset_required' ? 'reset-required' : !eq.available || !valid ? 'unavailable' : changed ? 'draft' : eq.enabled ? 'custom' : 'original';
-    $('eq-state').textContent = !online ? 'Offline. Reconnect to adjust EQ.' : !ready ? 'Waiting for the soundbar.' : !awake ? (s.power === 'Standby' ? 'Turn on the bar to adjust EQ.' : 'Power state is unavailable.') : eq.status === 'reset_required' ? 'Reset required before making further changes.' : eq.error ? eq.error : !eq.available || !valid ? 'EQ is unavailable on this firmware or audio path.' : active === 'eq_apply' ? 'Applying your settings…' : active === 'eq_reset' ? 'Restoring original processing…' : changed ? 'Unapplied changes. Select Apply EQ to listen.' : eq.enabled ? 'Custom EQ active. Reset restores original processing.' : 'Original tuning. Adjust a band, then apply.';
+    $('eq-state').textContent = !online ? 'Offline. Reconnect to adjust EQ.' : !ready ? 'Waiting for the soundbar.' : !awake ? (s.power === 'Standby' ? 'Turn on the bar to adjust EQ.' : 'Power state is unavailable.') : eq.status === 'reset_required' ? 'Reset required before making further changes.' : eq.error ? eq.error : !eq.available || !valid ? 'EQ is unavailable on this firmware or audio path.' : active === 'eq_apply' ? 'Applying your settings…' : active === 'eq_reset' ? 'Restoring original processing…' : changed ? 'Unapplied changes. Select Apply EQ to listen.' : eq.enabled ? (eq.kept ? 'Custom EQ active. It stays through sound, input and power changes until Reset.' : 'Custom EQ active. Reset restores original processing.') : 'Original tuning. Adjust a band, then apply.';
     $('eq-graph').hidden = !draftValid;
     if (draftValid) {
       const frequencies = Array.isArray(eq.frequencies_hz) && eq.frequencies_hz.length === 5 && eq.frequencies_hz.every(value => Number.isFinite(value) && value > 0) ? eq.frequencies_hz : [125,500,2000,4000,8000];

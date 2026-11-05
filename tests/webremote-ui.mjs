@@ -219,6 +219,10 @@ try {
   check(await page.locator('#eq-slider-2').inputValue()==='0','new committed soundbar EQ replaces an obsolete local draft');
   state.eq={available:false,enabled:true,gains_db:[-2,0,0,0,0],status:'reset_required'};await page.waitForFunction(()=>document.querySelector('#eq-slider-0').disabled);
   check(await page.locator('#eq-reset').isEnabled() && await page.locator('#eq-apply').isDisabled() && (await page.locator('#eq-state').textContent()).includes('Reset required'),'reset-required state permits recovery but blocks further tuning');
+  state.eq={...eqFixture(),enabled:true,kept:true,gains_db:[0,0,0,-6,-6],status:'active'};await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.includes('stays through'));
+  check(await page.locator('#eq-reset').isEnabled(),'a kept EQ says it stays until Reset');
+  state.eq={...eqFixture(),available:false,enabled:false,kept:true,gains_db:[0,0,0,-6,-6],status:'waiting',error:'Your EQ is re-applied automatically when Standard audio plays.'};await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.startsWith('Your EQ is re-applied'));
+  check(await page.locator('#eq-reset').isEnabled() && await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-slider-3').inputValue()==='-6','a kept EQ waiting to be applied again shows its bands and can still be reset');
   state.eq={...eqFixture(),gains_db:[1,0,0,0,0]};await page.waitForFunction(()=>document.querySelector('#eq-gain-0').textContent==='—');
   check(await page.locator('#eq-slider-0').isDisabled() && await page.locator('#eq-preset').isDisabled() && await page.locator('#eq-graph').isHidden(),'invalid boost readback disables presets rather than showing a false setting');
   delete state.eq;await pause(100);

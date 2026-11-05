@@ -159,8 +159,10 @@ func TestEQResetBeforeControl(t *testing.T) {
 	}{
 		{"power", false, false}, // waking must not wait for an EQ restore that needs the bar on
 		{"power", true, true},
-		{"input_hdmi", true, true},
-		{"bass_next", true, true},
+		// The firmware keeps, recomputes or drops the EQ itself (eq_keep.go).
+		{"input_hdmi", true, false},
+		{"bass_next", true, false},
+		{"bluetooth_pair", true, true},
 		{"volume_up", true, false},
 		{"mute", false, false},
 		{"media_play", true, false},

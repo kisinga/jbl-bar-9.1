@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-04",
+  "scope": "One owned JBL Bar 9.1, firmware 23.06.41.80, web remote with Front EQ, over existing root SSH; no firmware flash. Native state read with a read-only probe of the audio process (HPP page, cache, mode, SHA-256 prefix of the 3,840-byte block at libhdsp+0x1df680). EQ applied and removed through the API; keys pressed on the JBL remote or sent with the same native gestures, never through the web controls (which removed the EQ first).",
+  "firmware_sha256": "86ec83472a10dd4278285123f8ecbfb96bdd97444dd98c3a56d5d87441c90b63",
+  "test_eq_gains_db": [0, 0, 0, -6, -6],
+  "route": "Bluetooth, music playing, Standard Mode, HPP page 0x840000, cache 0",
+  "without_eq_block_depends_only_on_levels": {
+    "bass_3": "2f9d99b71f2f5730", "bass_4": "96ce8192b4cba263", "bass_3_again": "2f9d99b71f2f5730",
+    "atmos_3": "e5d23ec16807ef8a", "rear_2": "bf300fee15f4f175"
+  },
+  "level_keys_with_eq": [
+    {"key": "bass", "from_level": 3, "to_level": 4, "eq_before": "d720bcb1e19fb386", "after_key": "2c367c9dc7b061ce", "eq_applied_directly_at_new_level": "2c367c9dc7b061ce", "back_to_first_level": "d720bcb1e19fb386", "mode_after_key": 5},
+    {"key": "atmos", "from_level": 2, "to_level": 3, "eq_before": "d720bcb1e19fb386", "after_key": "1aa7e638107ffa1e", "eq_applied_directly_at_new_level": "1aa7e638107ffa1e", "back_to_first_level": "d720bcb1e19fb386", "mode_after_key": 5},
+    {"key": "rear", "from_level": 1, "to_level": 2, "eq_before": "d720bcb1e19fb386", "after_key": "5c5feb95ee5a385f", "eq_applied_directly_at_new_level": "5c5feb95ee5a385f", "back_to_first_level": "d720bcb1e19fb386", "mode_after_key": 5}
+  ],
+  "night_mode_with_eq": {"eq_before": "7fdfa9585efcc039", "night_on": "7fdfa9585efcc039", "night_off": "7fdfa9585efcc039", "mode": 5},
+  "eq_dropped_by_the_firmware": {
+    "source_change": {"bluetooth_with_eq": "d720bcb1e19fb386 (mode 5)", "hdmi": "2f9d99b71f2f5730 (mode 0, page 0x840000, cache 0, Standard)", "back_to_bluetooth": "2f9d99b71f2f5730 (mode 0)"},
+    "smart_mode": {"standard_with_eq": "7fdfa9585efcc039 (mode 5)", "smart": "93e295942d05108f (mode 1, cache 1)", "back_to_standard": "9bbb7242a4104e56 (mode 0, original block)"}
+  },
+  "durations_seconds": {
+    "apply": [2.32, 2.32, 2.27, 2.14, 2.27, 2.15, 2.30, 2.33, 2.09, 2.32, 2.16, 2.33],
+    "reset": [4.09, 3.90, 3.79, 3.78, 3.94, 4.07, 4.02, 3.31, 3.76]
+  },
+  "observations": [
+    "Listening could not reliably tell the EQ apart; the block fingerprints are the evidence.",
+    "A first Smart/night run made through the web controls is not counted: the web remote removed the EQ before each gesture."
+  ]
+}

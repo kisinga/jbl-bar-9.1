@@ -563,6 +563,9 @@ func eqResetBefore(action string, on bool) bool {
 	switch {
 	case action == "mute" || action == "volume_up" || action == "volume_down" || strings.HasPrefix(action, "media_"):
 		return false
+	case eqFollowsNatively(action):
+		// The firmware keeps, recomputes or drops the EQ itself (eq_keep.go).
+		return false
 	case action == "power" && !on:
 		return false
 	}
