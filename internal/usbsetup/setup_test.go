@@ -25,7 +25,7 @@ const testConfig = "format=1\naction=check\nssh=false\nweb_remote=true\nauto_sta
 
 func fixtureFiles() map[string][]byte {
 	files := map[string][]byte{entry: []byte("CLI(CLI_exec sh /mnt/sda1/JBLToolkit/dispatch.sh &)\r\n"), configPath: []byte(testConfig), "README.txt": []byte("fixture"), "LICENSE.txt": []byte("fixture"), "SETUP.html": []byte("fixture"), "JBLToolkit/package.json": []byte(`{"schema":1,"version":"0.3.0-dev.10","model":"bar91","profile":"bar91-23.06.41.80","architecture":"linux-armv7","selection":"automatic","dispatcher_schema":1}`)}
-	for _, name := range []string{"common.sh", "dispatch.sh", "launch.sh", "recover.sh", "check.sh", "verify.sh", "parse-config.awk"} {
+	for _, name := range []string{"common.sh", "dispatch.sh", "launch.sh", "recover.sh", "check.sh", "verify.sh", "parse-config.awk", "ssh-update.sh"} {
 		files["JBLToolkit/"+name] = []byte("# fixture " + name)
 	}
 	elf := make([]byte, 32)
@@ -401,7 +401,7 @@ func TestBoundedHTTPAndOrigins(t *testing.T) {
 	}
 	w = call(s, "GET", "/", nil, false)
 	data, _ := io.ReadAll(w.Result().Body)
-	if !bytes.Contains(data, []byte("Set up your USB")) || w.Header().Get("Content-Security-Policy") == "" {
+	if !bytes.Contains(data, []byte("Set up or update your bar")) || w.Header().Get("Content-Security-Policy") == "" {
 		t.Fatal("embedded interface missing")
 	}
 }

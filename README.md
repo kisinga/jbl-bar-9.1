@@ -15,12 +15,13 @@ restart and recovery process still needs hardware testing.
 ## What you need
 
 - A **JBL Bar 9.1 True Wireless Surround** on your home network.
-- A Windows, macOS or Linux computer and a spare USB stick. The setup tool can
-  format it as **FAT32 / MBR**; back up its contents before formatting.
+- A Windows, macOS or Linux computer. First installation and recovery also need
+  a USB stick; the setup tool can format it as **FAT32 / MBR**.
 - Your phone or computer connected to the same home network as the bar.
 
 Already using an older installation? **Keep its original USB and recovery ZIP.**
-Use the latest USB and choose **Install / update everything**. It detects
+With toolkit SSH already enabled, use **Network update (SSH)** and enter your SSH
+password—no USB is needed. Otherwise, choose **USB setup** and **Install / update everything**. It detects
 your setup, updates toolkit components while keeping installed settings and SSH
 keys, or migrates the recognized older standalone setup. Unknown installations
 stop with an explanation. [Existing installation guide](models/bar91/README.md).
@@ -34,7 +35,7 @@ stop with an explanation. [Existing installation guide](models/bar91/README.md).
    and macOS, allow execution with `chmod +x <downloaded-file>` if necessary.
    The executable is unsigned; your OS may ask you to allow it.
 2. **Prepare your USB.** The app opens a local browser interface and downloads
-   and verifies the public toolkit files. Select your USB, choose your home
+   and verifies the toolkit and recovery files. Choose **USB setup**, select your USB and home
    network and features, and leave **Check compatibility first** selected.
    Enable formatting only if needed, then **Prepare selected USB**. Formatting
    erases that entire drive and asks for administrator permission. Save the
@@ -56,8 +57,8 @@ stop with an explanation. [Existing installation guide](models/bar91/README.md).
    bar and wait five minutes. Expect `VERIFIED_CURRENT_BOOT_PENDING_USER_TESTS`
    in its results. Check normal playback and volume, then remove and keep it.
 
-The interface runs locally. Credentials are derived locally and written to your
-USB; keep that stick private. The computer app checks files and reads reports;
+The interface runs locally. USB credentials are derived locally and written to your
+stick; keep it private. The computer app checks files and reads reports;
 firmware compatibility checks still run on the soundbar.
 
 For **offline setup**, download the matching `…-setup-OS-ARCH.zip`, extract it
@@ -73,17 +74,34 @@ Run its executable beside the included toolkit/recovery ZIPs. These downloads ex
 
 ## Update later
 
-Run the same setup executable and choose **Check for updates**. The app downloads
-and verifies the newest public toolkit package; **Update this setup app** also
-replaces the executable itself when a newer version is available. Restart it
-after self-update. No installation or background service is added.
+Run the same setup tool and choose **Check for updates** to get the latest toolkit
+and matching recovery files. Repository runs build the current checkout instead.
 
-Back up your old USB and use a clean stick or explicitly format it for a new
+**SSH already enabled on your bar?** Choose **Network update (SSH)**:
+
+1. Keep the bar fully on and connected to the same home network. Leave the address
+   as `jbl.local`, or enter its private IPv4 address if discovery fails.
+2. Enter your SSH password and choose **Check connection**. On the first connection,
+   confirm the speaker’s public host key; it is remembered on this computer.
+3. Choose **Update bar**. The tool verifies the transfer, runs the existing guarded
+   updater and checks the installed files. Read the result, restart and check normal playback.
+
+This works from both a downloaded executable and `go run ./apps/usbsetup --repo .`.
+SSH is built in; no SSH client installation or USB is needed for a network update.
+Your password is not saved. It uses the toolkit’s existing root login on port
+2222 and refuses changed host keys or modified installations. Physical network-update
+and reconnect qualification remains pending.
+
+**Without SSH**, choose **USB setup**. Back up your old USB and use a clean stick or explicitly format it for a new
 package; the tool refuses to mix versions on a configured stick. Choose
 **Install / update everything**, prepare the USB, insert it into the powered-on
 bar and wait **five minutes**. Read its results afterward; expect
 `INSTALLED_PENDING_REBOOT_TEST`, then repeat the restart checks above. Keep each
 installation's original recovery ZIP.
+
+**Update this setup app** updates the computer-side executable itself. Restart it
+afterward. It adds no installer or background service. First installation,
+enabling SSH, deliberate settings changes, legacy migration and recovery use USB setup.
 
 An existing toolkit keeps its installed feature/network settings, SSH credentials,
 SSH host keys and saved sound settings. The update replaces the bundled app and
@@ -117,7 +135,7 @@ rear speaker calibration and subwoofer pairing.
 
 Default setup packages include the project-owned Front EQ and Bluetooth playback
 helpers. Controls remain subject to device, firmware and audio-route checks. Front EQ is
-limited to supported Standard playback routes. System monitor shows device health
+limited to supported Standard playback routes and is kept until Reset. System monitor shows device health
 and network information when available. [Feature and setup details](docs/models/bar91/USB-TOOLKIT.md).
 
 To use the same controls from Home Assistant, install the separate

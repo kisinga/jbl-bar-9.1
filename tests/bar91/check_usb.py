@@ -217,7 +217,8 @@ func main() {
             # Provisioning is unrelated to the host LAN; never run native Wi-Fi.
             (usb / 'files/ssh/wifi.sh').write_text('exit 0\n')
             (usb / 'files/ssh/start.sh').write_text('''#!/bin/sh
-[ "$1" = --managed ] || exit 1
+case "$1" in --managed|--managed-network-update) ;; *) exit 1;; esac
+[ "$1" != --managed-network-update ] || [ ! -e "$JBL_SSH_STORE/BOOT_DISABLED" ] || exit 1
 ''' + ('exit 1\n' if fail == 'ssh' else f'''
 printf 'SSH_READY\\n' > "{ssh}/STATUS.txt"
 printf '#!/bin/sh\\nexit 0\\n' > "{ssh}/boot.sh"
@@ -297,13 +298,22 @@ exit 0
                 if migration == 'unrelated_pid':
                     unrelated_migration = subprocess.Popen(['sleep', '60'])
                     (remote / 'remote.pid').write_text(str(unrelated_migration.pid))
+            network_update = False
             def launch():
-                result = subprocess.run(['/bin/sh', str(usb / 'launch.sh')], env=env,
+                result = subprocess.run(['/bin/sh', str(usb / ('ssh-update.sh' if network_update else 'launch.sh'))], env=env,
                                         capture_output=True, text=True, timeout=70)
                 status = (usb / 'STATUS.txt').read_text().strip()
                 return result, status
             try:
+                if label.startswith('ssh_reject_'):
+                    env['JBL_TOOLKIT_TRANSPORT'] = 'ssh'
                 result, status = launch()
+                if label.startswith('ssh_reject_'):
+                    assert result.returncode != 0 and status == 'SSH_UPDATE_REQUIRES_MANAGED_INSTALLATION', status
+                    assert not store.exists() and not remote.exists()
+                    assert hook.read_bytes() == original
+                    passed(label)
+                    return
                 if migration:
                     if migration == 'missing_credentials':
                         assert result.returncode != 0 and status == 'MIGRATION_SSH_CREDENTIALS_REQUIRED_NO_CHANGES', status
@@ -393,13 +403,15 @@ exit 0
                     assert hook.read_bytes() == original
                     passed(label)
                     return
-                if label.startswith('usb_update_'):
+                if label.startswith(('usb_update_', 'ssh_update_')):
+                    update_label = label.replace('ssh_update_', 'usb_update_')
                     old_config = (store / 'config.txt').read_bytes()
                     old_pid = (remote / 'remote.pid').read_bytes()
                     old_password = (store / 'ssh-input/password.hash').read_bytes()
                     (ssh / 'host_ed25519').write_bytes(b'original-private-host-key')
                     original_keys = {n:(ssh / n).read_bytes() for n in ('host_ed25519','host_ed25519.pub')}
                     (remote / 'bass-offset.json').write_text('{"offset_db":-1.5}')
+                    (remote / 'front-eq.json').write_text('{"gains_db":[-1,0,0,0,0]}')
                     (usb / 'VERSION.txt').write_text('next-build\n')
                     with (usb / 'files/remote').open('ab') as stream:
                         stream.write(b'next-build')
@@ -411,20 +423,28 @@ exit 0
                         (usb / name).unlink()
                         immutable_names.remove(name)
                     (usb / 'config.txt').write_bytes(changed(action='update',ssh='false',web_remote='false',auto_standard='false'))
-                    if label == 'usb_update_bad_credentials':
+                    if update_label == 'usb_update_bad_credentials':
                         (store / 'ssh-input/password.hash').write_text('invalid-hash')
-                    if label == 'usb_update_runtime_corrupt':
+                    if update_label == 'usb_update_runtime_corrupt':
                         with (remote / 'start.sh').open('a') as stream: stream.write('\n# corrupt\n')
-                    if label == 'usb_update_hook_changed':
+                    if update_label == 'usb_update_hook_changed':
                         hook.write_bytes(managed + b'# foreign hook\n')
-                    if label == 'usb_update_start_failure':
+                    if update_label == 'usb_update_start_failure':
                         (usb / 'files/remote-start.sh').write_text('exit 1\n')
-                    if label == 'usb_update_preflight_failure':
+                    if update_label == 'usb_update_preflight_failure':
                         (usb / 'preflight.sh').write_text('preflight() { PREFLIGHT_REASON=FIXTURE_FAILURE; return 1; }\n')
+                    if label.startswith('ssh_update_'):
+                        network_update = True
+                        with (usb / 'files/ssh/common.sh').open('a') as stream:
+                            stream.write('\ndaemon_running() { return ' + ('1' if label == 'ssh_update_listener_missing' else '0') + '; }\n')
+                        # The outer hardware dispatcher is a separate fixture boundary.
+                        (usb / 'dispatch.sh').write_text('exec /bin/sh \"$JBL_TOOLKIT_USB/launch.sh\"\n')
                     manifest()
-                    if label == 'usb_update_bad_usb':
+                    if update_label == 'usb_update_bad_usb':
                         (usb / 'files/remote').write_bytes(b'corrupt USB')
                     result, status = launch()
+                    if network_update:
+                        assert (usb / 'SSH-EXIT.txt').read_text().strip() == str(result.returncode)
                     expected_failures = {
                         'usb_update_bad_credentials':'UPDATE_SSH_CREDENTIALS_INVALID_NO_CHANGES',
                         'usb_update_runtime_corrupt':'UPDATE_RUNTIME_INTEGRITY_FAILED_NO_CHANGES',
@@ -432,10 +452,11 @@ exit 0
                         'usb_update_preflight_failure':'PREFLIGHT_FAILED_CHECK_FIRMWARE_STORAGE_AND_NATIVE_SSH',
                         'usb_update_bad_usb':'PACKAGE_INTEGRITY_FAILED',
                         'usb_update_start_failure':'REMOTE_START_FAILED',
+                        'usb_update_listener_missing':'SSH_LISTENER_CHANGED_NO_CHANGES',
                     }
-                    if label in expected_failures:
-                        assert result.returncode != 0 and status == expected_failures[label], (status,(usb / 'setup.log').read_text())
-                        if label == 'usb_update_start_failure':
+                    if update_label in expected_failures:
+                        assert result.returncode != 0 and status == expected_failures[update_label], (status,(usb / 'setup.log').read_text())
+                        if update_label == 'usb_update_start_failure':
                             assert (store / 'DISABLED').exists() and hook.read_bytes() == original
                         else:
                             assert (remote / 'remote.pid').read_bytes() == old_pid
@@ -448,6 +469,7 @@ exit 0
                         assert (remote / 'remote').read_bytes() == (usb / 'files/remote').read_bytes()
                         assert (store / 'boot.sh').read_bytes() == (usb / 'boot.sh').read_bytes()
                         assert (remote / 'bass-offset.json').read_text() == '{"offset_db":-1.5}'
+                        assert (remote / 'front-eq.json').read_text() == '{"gains_db":[-1,0,0,0,0]}'
                         assert all((ssh / n).read_bytes() == v for n,v in original_keys.items())
                         assert hook.read_bytes() == managed and not (store / 'DISABLED').exists()
                         assert launch()[1] == 'ALREADY_INSTALLED_LOGS_EXPORTED'
@@ -560,6 +582,10 @@ exit 0
     scenario('automatic_clean_update', config=changed(action='update',ssh='false'))
     for update in ('complete','runtime_corrupt','hook_changed','bad_usb','bad_credentials','preflight_failure','start_failure'):
         scenario('usb_update_' + update, config=changed(ssh='true'))
+    for update in ('complete','runtime_corrupt','hook_changed','bad_usb','bad_credentials','preflight_failure','start_failure','listener_missing'):
+        scenario('ssh_update_' + update, config=changed(ssh='true'))
+    for action in ('install','update','configure'):
+        scenario('ssh_reject_' + action, config=changed(action=action,ssh='false'))
     scenario('install_configure_reinsert_recover_original_hook')
     scenario('check_does_not_install', config=changed(action='check', ssh='false'))
     scenario('check_collects_native_after_preflight_failure', config=changed(action='check', ssh='false'), fail='preflight')
@@ -778,6 +804,36 @@ with tempfile.TemporaryDirectory(prefix='jbl-atomic-reuse-') as temp:
     source.write_bytes(target.read_bytes()); (folder / 'target.new').write_bytes(b'interrupted')
     assert subprocess.run(args, env=env, capture_output=True).returncode != 0
     passed('same_runtime_reuse_survives_no_copy_space_and_preserves_conflicts')
+
+
+# Network staging replaces only the removable-media prerequisite. It must stay
+# private, canonical and attached to an existing managed installation.
+for mode in ('valid', 'permissions', 'symlink', 'bad_name', 'not_owned'):
+    with tempfile.TemporaryDirectory(prefix='jbl-network-stage-') as temp:
+        folder = Path(temp)
+        stage = folder / ('jbl-toolkit-ssh.' + ('a' * 32 if mode != 'bad_name' else 'bad'))
+        stage.mkdir(mode=0o700)
+        payload = stage / 'JBLToolkit'
+        payload.mkdir(mode=0o700)
+        if mode == 'permissions': stage.chmod(0o755)
+        if mode == 'symlink':
+            payload.rmdir()
+            real = folder / 'elsewhere'; real.mkdir(mode=0o700)
+            payload.symlink_to(real, target_is_directory=True)
+        wrapper = folder / 'busybox'
+        wrapper.write_text('#!/bin/sh\n'
+            + '[ "$1:$2:$3" != "stat:-c:%u" ] || { echo 0; exit; }\n'
+            + '[ "$1:$2:$3" != "readlink:-f:/tmp" ] || { echo "' + str(folder) + '"; exit; }\n'
+            + 'exec ' + BB + ' "$@"\n')
+        wrapper.chmod(0o700)
+        script = folder / 'preflight.sh'
+        script.write_text((ROOT / 'models/bar91/usb/preflight.sh').read_text().replace('/tmp/jbl-toolkit-ssh.', str(folder) + '/jbl-toolkit-ssh.'))
+        command = '. "$1"; directory() { [ -d "$1" ] && [ ! -L "$1" ]; }; owned() { [ "$MODE" != not_owned ]; }; stage=manager_cleanup_sentinel; preflight_network_stage; result=$?; [ "$stage" = manager_cleanup_sentinel ] || { echo "probe overwrote transaction cleanup" >&2; exit 99; }; exit "$result"'
+        env = dict(os.environ, BB=str(wrapper), USB=str(payload), MODE=mode)
+        result = subprocess.run(['/bin/sh', '-c', command, 'fixture', str(script)], env=env, capture_output=True, timeout=10)
+        assert result.returncode != 99, (mode, result.stderr)
+        assert (result.returncode == 0) == (mode == 'valid'), (mode, result.stderr)
+        passed('network_staging_' + mode)
 
 for script in (ROOT / 'models/bar91/usb').glob('*.sh'):
     subprocess.run([BB, 'sh', '-n', str(script)], check=True)

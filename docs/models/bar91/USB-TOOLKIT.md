@@ -105,6 +105,13 @@ To make changes, edit `JBLToolkit/config.txt`, set `action=configure`, and repea
 
 ## Update everything from USB
 
+An existing toolkit with SSH enabled can also use **Network update (SSH)** in the
+same setup tool. See the [owner workflow](../../../README.md#update-later). It uses
+the same manager and native/storage safeguards from private RAM staging, requires
+a checked managed installation and retains settings and SSH keys. No USB mount is
+required. Physical network-update/reconnect qualification is pending; retain USB
+recovery. Initial installation, legacy migration and settings changes still use USB.
+
 Use the latest USB package and choose **Install / update everything** in
 the portable setup app (`action=update`). Insert it into the powered-on bar and wait five
 minutes. Read `STATUS.txt`, remove the USB, restart and verify as above.

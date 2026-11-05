@@ -24,6 +24,26 @@ preflight_usb() {
     ' /proc/mounts || return 1
 }
 
+preflight_network_stage() {
+    PREFLIGHT_REASON=SSH_STAGING_DIRECTORY_UNSAFE
+    # The manager owns $stage for transaction cleanup. Keep probe variables
+    # isolated so its finish handler never removes the network report directory.
+    (
+        stage=${USB%/JBLToolkit}
+        suffix=${stage#/tmp/jbl-toolkit-ssh.}
+        [ "$stage" != "$suffix" ] && [ "${#suffix}" = 32 ] || return 1
+        case "$suffix" in *[!0-9a-f]*) return 1;; esac
+        [ "$USB" = "$stage/JBLToolkit" ] || return 1
+        for dir in "$stage" "$USB"; do
+            directory "$dir" && [ "$("$BB" stat -c %u "$dir")" = 0 ] &&
+                [ "$("$BB" stat -c %a "$dir")" = 700 ] || return 1
+        done
+        resolved=$("$BB" readlink -f /tmp) || return 1
+        [ "$("$BB" readlink -f "$stage")" = "$resolved/jbl-toolkit-ssh.$suffix" ] || return 1
+        owned || return 1
+    )
+}
+
 preflight_persistent() {
     PREFLIGHT_REASON=VAR_NOT_EXPECTED_PERSISTENT_PATH
     resolved=$("$BB" readlink -f /var) || return 1
@@ -122,7 +142,7 @@ preflight_atomic_io() {
             fi
             # A second publication must fail and preserve both directories.
             "$BB" mkdir "$probe/published.stage.conflict" || return 1
-            if publish_directory "$probe/published.stage.conflict" "$probe/published" ||
+            if publish_directory "$probe/published.stage.conflict" "$probe/published" >/dev/null 2>&1 ||
                [ ! -d "$probe/published.stage.conflict" ] || [ ! -d "$probe/published" ]; then
                 "$BB" rm -rf "$probe"
                 return 1
@@ -139,9 +159,17 @@ preflight_native() {
 
 # Installation stops at the first failed prerequisite. Check-only mode uses the
 # same guards but reports every independent result without changing services.
-preflight_steps() { printf 'root busybox usb persistent firmware ssh space boot_id atomic_io native\n'; }
+preflight_steps() {
+    case "${JBL_TOOLKIT_TRANSPORT:-usb}" in
+        usb) source_step=usb;;
+        ssh) source_step=network_stage;;
+        *) return 1;;
+    esac
+    printf 'root busybox %s persistent firmware ssh space boot_id atomic_io native\n' "$source_step"
+}
 preflight() {
-    for step in $(preflight_steps); do
+    steps=$(preflight_steps) || return 1
+    for step in $steps; do
         "preflight_$step" || return 1
     done
     PREFLIGHT_REASON=PASSED
@@ -152,7 +180,8 @@ preflight_all() {
     root_ok=0; busybox_ok=0; usb_ok=0; persistent_ok=0
     PREFLIGHT_NATIVE_RESULT=skipped
     : > "$USB/PREFLIGHT.txt" || return 1
-    for step in $(preflight_steps); do
+    steps=$(preflight_steps) || return 1
+    for step in $steps; do
         if { [ "$step" = atomic_io ] && [ "$root_ok:$busybox_ok:$usb_ok:$persistent_ok" != 1:1:1:1 ]; } ||
            { [ "$step" = native ] && [ "$root_ok:$busybox_ok" != 1:1 ]; }; then
             printf 'SKIP=%s:PREREQUISITES_FAILED\n' "$step" >> "$USB/PREFLIGHT.txt"
@@ -163,7 +192,7 @@ preflight_all() {
         if "preflight_$step"; then
             printf 'PASS=%s\n' "$step" >> "$USB/PREFLIGHT.txt"
             case "$step" in
-                root) root_ok=1;; busybox) busybox_ok=1;; usb) usb_ok=1;;
+                root) root_ok=1;; busybox) busybox_ok=1;; usb|network_stage) usb_ok=1;;
                 persistent) persistent_ok=1;; native) PREFLIGHT_NATIVE_RESULT=passed;;
             esac
         else

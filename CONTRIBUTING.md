@@ -4,6 +4,12 @@ The [root README](README.md) is the setup guide. Repository setup builds current
 source; downloaded platform executables use published packages without Go or
 installation. Bar 9.1 is the supported implementation; other models remain research.
 
+Both launch modes offer USB setup and **Network update (SSH)**. Network updates
+resolve `jbl.local` with native multicast DNS or accept a private IPv4 address;
+Go handles SSH directly. Passwords are request-only, and verified public host keys
+are saved in the user configuration directory. The same model updater runs from
+a private RAM staging directory, with managed-installation and firmware guards.
+
 ## Requirements and commands
 
 Use Go 1.25.7 or newer and a browser for local setup and public builds:
@@ -41,6 +47,8 @@ compares Go-built payloads with the legacy builder. Setup tests use temporary
 folders, sparse disk images and mocked native commands. Browser fixtures check
 production assets, capabilities, drafts, disclosure defaults and device states.
 These checks do not qualify physical installation, sound, standby or recovery.
+SSH fixtures use a loopback server with real authentication and encrypted channels;
+device transaction fixtures test setting/key retention and failure handling without a bar.
 
 ## Screenshots
 

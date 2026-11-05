@@ -10,6 +10,11 @@ The combined install/restart/recovery flow still needs physical qualification.
 Preserve existing recovery files. Install/update recognizes managed toolkits and
 the reviewed standalone chain; unknown installations are refused.
 
+For an existing toolkit with SSH enabled, the setup tool’s **Network update (SSH)**
+uses `jbl.local` or a private IP and your SSH password. It preserves installed settings
+and keys without a USB. Use **USB setup** for initial installation, settings changes,
+legacy migration or recovery. See the [setup and update guide](../../README.md#update-later).
+
 [Configuration and installation reference](../../docs/models/bar91/USB-TOOLKIT.md) ·
 [Standalone and historical Smart Mode releases](../../docs/models/bar91/STANDALONE.md)
 

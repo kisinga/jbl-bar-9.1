@@ -10,6 +10,8 @@ const token = "browser-fixture-session",
   errors = [],
   external = [];
 let existing = false, nativeFailure = false;
+let sshTrusted = false, sshCurrent = false, sshFailure = false, sshInterrupted = false;
+const fingerprint = "SHA256:fixture-public-speaker-host-key-0123456789abc";
 const drive = {
   id: "fixture",
   device: "/dev/fixture",
@@ -81,6 +83,27 @@ const server = createServer(async (req, res) => {
               "Setup updated. Close this window and launch the same executable again.",
           };
           break;
+        case "/api/ssh/check":
+          assert.equal(body.Password, "fixture-ssh-login");
+          if (!sshTrusted && body.Fingerprint !== fingerprint) {
+            result = {needsTrust:true, fingerprint, message:"First connection: confirm this speaker’s identity to continue."};
+          } else {
+            sshTrusted = true;
+            result = {success:true, fingerprint, current:sshCurrent, ...(sshCurrent ? {} : {ticket:"fixture-checked-package"}), message:sshCurrent ? "Your bar already has this toolkit build." : "Connected. Ready to update."};
+          }
+          break;
+        case "/api/ssh/update":
+          assert.equal(body.Password, "fixture-ssh-login");
+          assert.equal(body.Ticket, "fixture-checked-package");
+          res.setHeader("Content-Type", "application/x-ndjson");
+          res.write(JSON.stringify({progress:"Fixture transfer verified; waiting for the bar…"})+"\n");
+          await new Promise(resolve => setTimeout(resolve, 250));
+          if (sshInterrupted) {res.end();return;}
+          result = {done:true,success:!sshFailure, message:sshFailure ? "The bar stopped the update: PREFLIGHT_FAILED." : "Bar updated and installed files verified.", reports:{"STATUS.txt":sshFailure ? "PREFLIGHT_FAILED" : "INSTALLED_PENDING_REBOOT_TEST", "setup.log":"<script>window.networkInjected=true</script>"}};
+          const record=JSON.stringify(result)+"\n";
+          res.write(record.slice(0,50));
+          res.end(record.slice(50));
+          return;
         default:
           throw Error("Unexpected API " + pathname);
       }
@@ -161,8 +184,7 @@ try {
   await page.waitForFunction(() => !document.getElementById("drive-status").textContent.includes("turn the soundbar fully on before installation"));
 
   await page
-    .locator("details")
-    .last()
+    .locator("#usb-access")
     .evaluate((el) => (el.open = true));
   await page.locator("#ssh").check();
   await page.locator("#password").fill("fixture-browser-password");
@@ -230,6 +252,65 @@ try {
       .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height)))
       assert(box >= 44, "small touch target");
   }
+  const usbWrites = requests.filter(r => r.path === "/api/prepare").length;
+  await page.locator("#network-method").click();
+  assert.equal(await page.locator("#wizard").isHidden(), true);
+  assert.equal(await page.locator("#ssh-host").inputValue(), "jbl.local");
+  assert.equal(await page.locator("#ssh-update").isDisabled(), true);
+  await page.locator("#ssh-check").click();
+  assert.equal(requests.filter(r => r.path === "/api/ssh/check").length, 0);
+  await page.locator("#ssh-login-password").fill("fixture-ssh-login");
+  await page.locator("#ssh-check").click();
+  await page.locator("#ssh-trust").waitFor({state:"visible"});
+  assert.equal(await page.locator("#ssh-fingerprint").textContent(), fingerprint);
+  assert.equal(await page.locator("#ssh-update").isDisabled(), true);
+  await page.locator("#ssh-trust-button").click();
+  await page.waitForFunction(() => !document.querySelector("#ssh-update").disabled);
+  assert.equal(await page.locator("#ssh-trust").isHidden(), true);
+  // Changing the target invalidates the prior connection check.
+  await page.locator("#ssh-host").fill("192.168.1.50");
+  assert.equal(await page.locator("#ssh-update").isDisabled(), true);
+  await page.locator("#ssh-check").click();
+  await page.waitForFunction(() => !document.querySelector("#ssh-update").disabled);
+  assert.equal(requests.filter(r => r.path === "/api/ssh/check").at(-1).body.Host, "192.168.1.50");
+  assert.equal(await page.evaluate(() => JSON.stringify({...sessionStorage,...localStorage}).includes("fixture-ssh-login")), false);
+  await page.locator("#ssh-update").click();
+  await page.waitForFunction(() => document.querySelector("#ssh-result").textContent.includes("Fixture transfer verified"));
+  assert.equal(await page.locator("#usb-method").isDisabled(), true);
+  assert.equal(await page.locator("#ssh-result").getAttribute("data-busy"), "true");
+  await page.waitForFunction(() => document.querySelector("#ssh-result").textContent.includes("installed files verified"));
+  assert.equal(await page.locator("#ssh-login-password").inputValue(), "");
+  assert.equal(await page.locator("#ssh-update").isDisabled(), true);
+  assert.equal(await page.evaluate(() => window.networkInjected), undefined);
+  assert.equal(requests.filter(r => r.path === "/api/prepare").length, usbWrites);
+  sshFailure = true;
+  await page.locator("#ssh-login-password").fill("fixture-ssh-login");
+  await page.locator("#ssh-check").click();
+  await page.waitForFunction(() => !document.querySelector("#ssh-update").disabled);
+  await page.locator("#ssh-update").click();
+  await page.waitForFunction(() => document.querySelector("#ssh-result").dataset.error === "true");
+  assert.equal(await page.locator("#ssh-login-password").inputValue(), "");
+  assert.equal(await page.locator("#ssh-reports").evaluate(el => el.open), true);
+  assert.match(await page.locator("#ssh-reports-text").textContent(), /<script>/);
+  for (const width of [320, 390, 650, 900, 1440]) {
+    await page.setViewportSize({width,height:1000});
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "network form overflow at " + width);
+  }
+  sshInterrupted = true;
+  await page.locator("#ssh-login-password").fill("fixture-ssh-login");
+  await page.locator("#ssh-check").click();
+  await page.waitForFunction(() => !document.querySelector("#ssh-update").disabled);
+  await page.locator("#ssh-update").click();
+  await page.waitForFunction(() => document.querySelector("#ssh-result").textContent.includes("before the update result arrived"));
+  assert.equal(await page.locator("#ssh-result").getAttribute("data-error"), "true");
+  assert.equal(await page.locator("#ssh-login-password").inputValue(), "");
+  sshCurrent = true;
+  await page.locator("#ssh-login-password").fill("fixture-ssh-login");
+  await page.locator("#ssh-check").click();
+  await page.waitForFunction(() => document.querySelector("#ssh-result").textContent.includes("already has"));
+  assert.equal(await page.locator("#ssh-login-password").inputValue(), "");
+  assert.equal(await page.locator("#ssh-update").isDisabled(), true);
+  await page.locator("#usb-method").click();
   await page.locator("#self-update").click();
   await page.waitForFunction(() =>
     document
@@ -241,7 +322,7 @@ try {
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
   console.log(
-    "Portable setup browser: PASS (downloads, selection, credentials, reports, erase confirmation, self-update, responsive layouts)",
+    "Portable setup browser: PASS (USB, SSH discovery/credentials/trust/update/errors, downloads, self-update, responsive layouts)",
   );
 } finally {
   await browser.close();

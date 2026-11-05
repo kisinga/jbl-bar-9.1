@@ -33,6 +33,8 @@ review and promote an appropriate release in GitHub.
 - `jbl-setup-OS-ARCH` (`.exe` on Windows): one portable executable for Linux,
   macOS or Windows, Intel/AMD or ARM64. Downloads verified toolkit/recovery files
   and supports explicit self-update. No installer or runtime is required.
+  The same interface offers USB setup and password-authenticated SSH updates
+  for an existing managed bar; mDNS discovery and SSH are compiled in.
 - `jbl-bar-toolkit-v<VERSION>-setup-OS-ARCH.zip`: offline bundle containing that
   executable plus `toolkit-usb.zip` and `toolkit-recovery.zip`.
 - `jbl-bar-toolkit-v<VERSION>-usb.zip` and `…-recovery.zip`: raw installation and

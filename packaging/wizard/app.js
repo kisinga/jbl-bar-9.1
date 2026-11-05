@@ -13,7 +13,8 @@
     restartNeeded = false,
     rows = [],
     selected = null;
-  async function api(path, body) {
+  let method = "usb", sshTicket = "", sshFingerprint = "";
+  async function api(path, body, onProgress) {
     const response = await fetch("/api/" + path, {
       method: body === undefined ? "GET" : "POST",
       headers: {
@@ -29,13 +30,37 @@
         : await response.text();
       throw Error(message || "Setup request failed.");
     }
+    if (type.includes("x-ndjson") && onProgress) {
+      const reader = response.body.getReader(), decoder = new TextDecoder();
+      let buffer = "", result;
+      for (;;) {
+        const {value, done} = await reader.read();
+        buffer += decoder.decode(value, {stream: !done});
+        if (buffer.length > 2 * 1024 * 1024) throw Error("Update response exceeded its limit. Check the bar’s connection before retrying.");
+        let end;
+        while ((end = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0,end); buffer = buffer.slice(end+1);
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.progress) onProgress(event.progress);
+          if (event.done) result = event;
+        }
+        if (done) break;
+      }
+      if (!result) throw Error("The connection ended before the update result arrived. The bar may still be updating; check its connection before retrying.");
+      return result;
+    }
     return type.includes("json") ? response.json() : response;
   }
   function message(text, error = false) {
-    $("result").textContent = text;
-    $("result").dataset.error = String(error);
+    const out = $(method === "network" ? "ssh-result" : "result");
+    out.textContent = text;
+    out.dataset.error = String(error);
   }
   function state() {
+    $("ssh-check").disabled = busy || restartNeeded || !hasPackage;
+    $("ssh-trust-button").disabled = busy || restartNeeded || !hasPackage;
+    $("ssh-update").disabled = busy || restartNeeded || !hasPackage || !sshTicket;
     const d = selected?.drive,
       format = $("format").checked;
     $("format").disabled =
@@ -70,8 +95,10 @@
     busy = on;
     $("prepare").setAttribute("aria-busy", String(on));
     $("result").dataset.busy = String(on);
+    $("ssh-result").dataset.busy = String(on && method === "network");
+    $("ssh-update").setAttribute("aria-busy", String(on));
     for (const el of document.querySelectorAll(
-      "#wizard input,#wizard select,#update,#refresh,#self-update,#recovery",
+      "#wizard input,#wizard select,#network-form input,#network-form button,#usb-method,#network-method,#update,#refresh,#self-update,#recovery",
     ))
       el.disabled = on;
     state();
@@ -156,6 +183,7 @@
         "No removable USB detected. Insert one and refresh.";
   }
   async function download() {
+    resetSSH();
     working(true);
     $("package-status").textContent =
       "Finding and verifying the latest public toolkit and recovery files…";
@@ -166,7 +194,7 @@
         "Toolkit " + data.version + " · downloaded and checksum-verified";
       $("recovery").hidden = !data.recoverySaved;
       $("self-update").hidden = !data.selfUpdateAvailable;
-      message("Toolkit ready. Choose a USB to continue.");
+      message("Toolkit ready. Choose USB setup or Network update to continue.");
     } catch (e) {
       $("package-status").textContent = e.message;
       message(e.message, true);
@@ -175,6 +203,60 @@
     }
   }
   $("drive").onchange = select;
+  function resetSSH() {
+    sshTicket = ""; sshFingerprint = "";
+    $("ssh-trust").hidden = true;
+    $("ssh-check").hidden = false;
+    state();
+  }
+  function setMethod(value) {
+    if (busy) return;
+    method = value;
+    $("wizard").hidden = value !== "usb";
+    $("network-form").hidden = value !== "network";
+    $("usb-method").setAttribute("aria-pressed", String(value === "usb"));
+    $("network-method").setAttribute("aria-pressed", String(value === "network"));
+    if (value !== "network") { $("ssh-login-password").value = ""; resetSSH(); }
+  }
+  $("usb-method").onclick = () => setMethod("usb");
+  $("network-method").onclick = () => setMethod("network");
+  for (const id of ["ssh-host", "ssh-login-password"]) $(id).oninput = resetSSH;
+  const sshRequest = () => ({Host: $("ssh-host").value, Password: $("ssh-login-password").value});
+  async function checkSSH(trust = false) {
+    if (busy || !$("network-form").reportValidity()) return;
+    working(true);
+    message("Finding your bar and checking the SSH connection…");
+    sshTicket = "";
+    try {
+      const data = await api("ssh/check", {...sshRequest(), Fingerprint: trust ? sshFingerprint : ""});
+      sshFingerprint = data.fingerprint || "";
+      $("ssh-fingerprint").textContent = sshFingerprint;
+      $("ssh-trust").hidden = !data.needsTrust;
+      $("ssh-check").hidden = !!data.needsTrust;
+      sshTicket = data.ticket || "";
+      if (data.current) $("ssh-login-password").value = "";
+      message(data.message);
+    } catch (e) { message(e.message, true); }
+    finally { working(false); }
+  }
+  $("network-form").onsubmit = event => { event.preventDefault(); checkSSH(); };
+  $("ssh-trust-button").onclick = () => checkSSH(true);
+  $("ssh-update").onclick = async () => {
+    if (busy || !sshTicket || !$("network-form").reportValidity()) return;
+    const request = {...sshRequest(), Ticket: sshTicket};
+    working(true);
+    message("Transferring verified files and updating your bar. Keep the bar fully on…");
+    sshTicket = "";
+    $("ssh-reports").hidden = true;
+    try {
+      const data = await api("ssh/update", request, text => message(text));
+      message(data.message, !data.success);
+      $("ssh-reports-text").textContent = Object.entries(data.reports || {}).map(([name,text]) => name+"\n"+text).join("\n\n");
+      $("ssh-reports").hidden = !Object.keys(data.reports || {}).length;
+      $("ssh-reports").open = !data.success;
+    } catch (e) { message(e.message, true); }
+    finally { $("ssh-login-password").value = ""; working(false); }
+  };
   $("format").onchange = state;
   $("confirm").oninput = state;
   $("ssh").onchange = state;

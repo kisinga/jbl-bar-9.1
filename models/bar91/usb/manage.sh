@@ -6,6 +6,7 @@ umask 077
 mutated=0
 stage=
 update_existing=false
+keep_ssh=false
 config_source=$USB/config.txt
 finish() {
     trap '' HUP INT TERM
@@ -98,6 +99,13 @@ if ! preflight; then
     printf 'PREFLIGHT_REASON=%s\n' "${PREFLIGHT_REASON:-UNKNOWN}"
     finish PREFLIGHT_FAILED_CHECK_FIRMWARE_STORAGE_AND_NATIVE_SSH 1
 fi
+if [ "$update_existing:${JBL_TOOLKIT_TRANSPORT:-usb}:$SSH" = true:ssh:true ]; then
+    # The native daemon is unchanged. Preserve the listener that carries this
+    # update instead of trying to recreate its mount namespace from inside it.
+    (JBL_SSH_STORE="$SSH_STORE"; export JBL_SSH_STORE;
+     . "$USB/files/ssh/common.sh" && daemon_running) || finish SSH_LISTENER_CHANGED_NO_CHANGES 1
+    keep_ssh=true
+fi
 if ! owned; then
     # A power loss cannot publish half an ownership/rollback record. Orphaned
     # stage directories have no hook and can never run at boot.
@@ -121,7 +129,7 @@ fi
 mutated=1
 marker "$STORE/DISABLED" || finish DISABLE_FAILED 1
 stop_remote || finish REMOTE_STOP_FAILED_REBOOT_AND_RECOVER 1
-stop_ssh || finish SSH_STOP_FAILED_REBOOT_AND_RECOVER 1
+[ "$keep_ssh" = true ] || stop_ssh || finish SSH_STOP_FAILED_REBOOT_AND_RECOVER 1
 for name in common.sh boot.sh parse-config.awk; do
     atomic_copy "$USB/$name" "$STORE/$name" || finish MANAGER_COPY_FAILED 1
 done
@@ -165,7 +173,10 @@ if [ "$SSH" = true ]; then
         done
     fi
     (cd "$STORE/ssh-input" && "$BB" sha256sum ./*.sh settings.conf password.hash > checksums.txt) || finish SSH_MANIFEST_FAILED 1
-    JBL_SSH_USB="$STORE/ssh-input" JBL_SSH_STORE="$SSH_STORE" /bin/sh "$STORE/ssh-input/start.sh" --managed || finish SSH_INSTALL_FAILED 1
+    ssh_mode=--managed
+    [ "$keep_ssh" != true ] || ssh_mode=--managed-network-update
+    "$BB" rm -f "$STORE/ssh-input/STATUS.txt" || finish SSH_STATUS_CLEAR_FAILED 1
+    JBL_SSH_USB="$STORE/ssh-input" JBL_SSH_STORE="$SSH_STORE" /bin/sh "$STORE/ssh-input/start.sh" "$ssh_mode" || finish SSH_INSTALL_FAILED 1
     marker "$SSH_STORE/TOOLKIT" || finish SSH_OWNERSHIP_FAILED 1
     "$BB" rm -f "$SSH_STORE/BOOT_DISABLED" || finish SSH_ENABLE_FAILED 1
 fi

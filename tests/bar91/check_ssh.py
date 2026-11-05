@@ -194,7 +194,7 @@ def address_tests():
 def installer_tests():
     # Actual control flow and hooks, adapted to isolated temp paths. Only root
     # metadata, native-tool checks and live-daemon detection are fixture stubs.
-    for case in ("live_upgrade", "live_other_pc", "bad_integrity", "wrong_native_build", "boot_wait_bounded"):
+    for case in ("live_upgrade", "live_network_update", "network_listener_missing", "live_other_pc", "bad_integrity", "wrong_native_build", "boot_wait_bounded"):
         with tempfile.TemporaryDirectory(prefix="jbl-ssh-install-") as tmp:
             folder = Path(tmp)
             usb, store, ram = folder / "usb", folder / "store", folder / "ram"
@@ -222,7 +222,7 @@ def installer_tests():
                 (usb / path.name).write_text(adapt(path.read_text()))
             common = (usb / "common.sh").read_text()
             common += "\nverify_tools() { return " + ("1" if case == "wrong_native_build" else "0") + "; }\n"
-            common += "daemon_running() { return " + ("1" if case == "boot_wait_bounded" else "0") + "; }\n"
+            common += "daemon_running() { return " + ("1" if case in ("boot_wait_bounded", "network_listener_missing") else "0") + "; }\n"
             if case == "boot_wait_bounded":
                 common += "find_address() { return 0; }\n"
             (usb / "common.sh").write_text(common)
@@ -241,14 +241,23 @@ def installer_tests():
                 status = (store / "BOOT_STATUS.txt").read_text().strip()
                 assert status == "NO_ALLOWED_LAN_WITHIN_180_SECONDS", (status, result.stderr)
             else:
-                result = run(["/bin/sh", str(usb / "start.sh")], env=env)
+                args = ["/bin/sh", str(usb / "start.sh")]
+                if case in ("live_network_update", "network_listener_missing"):
+                    args.append("--managed-network-update")
+                result = run(args, env=env)
                 status = (usb / "STATUS.txt").read_text().strip()
-                expected = {"live_upgrade": "ALREADY_RUNNING_PASSWORD_UNCHANGED", "live_other_pc": "RUNNING_ALLOWED_PC_DIFFERS",
+                expected = {"live_upgrade": "ALREADY_RUNNING_PASSWORD_UNCHANGED", "live_network_update":"ALREADY_RUNNING_PASSWORD_UNCHANGED", "network_listener_missing":"SSH_LISTENER_CHANGED_NO_RESTART", "live_other_pc": "RUNNING_ALLOWED_PC_DIFFERS",
                             "bad_integrity": "USB_INTEGRITY_FAILED", "wrong_native_build": "UNSUPPORTED_NATIVE_SSH_BUILD"}[case]
                 assert status == expected, (status, result.stderr, (usb / "setup.log").read_text())
                 assert (store / "password.hash").read_text() == "preserve-existing-private-hash\n"
                 if case == "live_upgrade":
                     assert (store / "boot.sh").exists() and b"/boot.sh &)" in hook.read_bytes()
+                    for name in ("namespace.sh", "session.sh"):
+                        assert (store / name).read_bytes() == (usb / name).read_bytes()
+                elif case == "live_network_update":
+                    assert b"/JBLLocalSSH/boot.sh" not in hook.read_bytes()
+                    for name in ("namespace.sh", "session.sh"):
+                        assert (store / name).read_bytes() == (usb / name).read_bytes()
                 else:
                     assert b"/JBLLocalSSH/boot.sh" not in hook.read_bytes()
             passed("installer_" + case)
