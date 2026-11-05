@@ -120,6 +120,10 @@ helpers. Controls remain subject to device, firmware and audio-route checks. Fro
 limited to supported Standard playback routes. System monitor shows device health
 and network information when available. [Feature and setup details](docs/models/bar91/USB-TOOLKIT.md).
 
+To use the same controls from Home Assistant, install the separate
+[JBL Bar Toolkit for Home Assistant](https://github.com/naonak/jbl-bar-toolkit-ha)
+integration ([setup](docs/models/bar91/STANDALONE.md#home-assistant)).
+
 ![Sound levels, five-band Front EQ, bass offset, audio sync and expanded Room setup using sample data](docs/web-remote-advanced.png)
 
 ## Need help?
