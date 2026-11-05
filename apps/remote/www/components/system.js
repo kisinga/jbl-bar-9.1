@@ -81,7 +81,7 @@ export function createSystem(root) {
     $('system-processes').textContent = data.processes ?? '—';
     $('system-temperature-row').hidden = !Number.isFinite(data.temperature_c);
     $('system-temperature').textContent = Number.isFinite(data.temperature_c) ? data.temperature_c.toFixed(1) + ' °C' : '—';
-    $('system-note').textContent = !connected ? 'Connection lost. Vitals will resume with fresh samples.' : stale ? 'These readings have stopped updating. Waiting for a fresh sample.' : valid ? 'Real device samples. History builds while this page is open.' : 'System vitals are not available from this version of the remote.';
+    $('system-note').textContent = !connected ? 'Connection lost. Vitals will resume with fresh samples.' : stale ? 'These readings have stopped updating. Waiting for a fresh sample.' : valid ? 'History builds while this page is open.' : 'System vitals are not available from this version of the remote.';
     const wifi=s.wifi || {};
     $('wifi-name').textContent=wifi.available ? wifi.connected ? wifi.ssid || 'Connected network' : 'Not connected' : 'Status unavailable';
     const signal = wifi.signal_dbm;

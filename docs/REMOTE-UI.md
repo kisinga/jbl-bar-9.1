@@ -31,6 +31,10 @@ manual disclosure choices; reload restores defaults. EQ and offset are gated ind
 Apricot highlights actions, violet EQ and teal diagnostics; labels and selection
 markers retain meaning without color.
 
+**Typography:** relative sizes respect browser preferences: 13px supporting text,
+14–16px controls, with extra scaling at ≥1600px. Short help copy and stronger
+headings preserve hierarchy; supporting text meets 4.5:1 contrast on panel backgrounds.
+
 **State:** speaker rendering adds no connections or timers. Docking does not prove
 charging; subwoofer messages are transient. Bass rings show a reported setting,
 not measured audio. The existing shell, APIs and hardware guards remain unchanged.

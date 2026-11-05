@@ -87,7 +87,7 @@ function render() {
     b.classList.toggle('selected', selected);
     b.setAttribute('aria-pressed', String(selected));
   });
-  $('volume-hint').textContent = standby ? 'Turn the bar on to adjust volume.' : !knownPower ? 'Power state is unavailable.' : s.muted ? 'Sound is muted. Tap above to unmute.' : 'Tap to adjust. Hold to keep going.';
+  $('volume-hint').textContent = standby ? 'Turn the bar on to adjust volume.' : !knownPower ? 'Power state is unavailable.' : s.muted ? 'Sound is muted. Tap above to unmute.' : 'Tap to adjust · hold to repeat.';
   buttons.forEach(b => {
     const action = b.dataset.action;
     b.disabled = !ready || !['On', 'Standby'].includes(s.power) || (action !== 'power' && !awake) || (pending && !(isVolume(action) && isVolume(active))) || ((action === 'standard' || action === 'smart') && !['Standard','Smart'].includes(s.mode));

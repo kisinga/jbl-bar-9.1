@@ -39,7 +39,7 @@ export function createBassOffset(root) {
     $('bass-offset-save').disabled = select.disabled;
     $('bass-offset-save').textContent = active === 'bass_offset_set' ? 'Saving…' : 'Save offset';
     const changed = known && draft !== db;
-    $('bass-offset-state').textContent = !known ? 'Unavailable' : !ready ? 'Last saved: ' + format(db) + '. Connection unavailable.' : changed ? format(draft) + ' selected. Select Save offset to keep it.' : format(db) + ' set. Offsets all five bass levels. ' + (b.status === 'original' ? 'Original tuning.' : 'Saved for startup.') + explain(b);
+    $('bass-offset-state').textContent = !known ? 'Unavailable' : !ready ? 'Last saved: ' + format(db) + '. Connection unavailable.' : changed ? format(draft) + ' selected. Select Save offset to keep it.' : format(db) + ' set. ' + (b.status === 'original' ? 'Original tuning.' : 'Saved for startup.') + explain(b);
   }
   select.addEventListener('change', () => {
     const value = Number(select.value);
