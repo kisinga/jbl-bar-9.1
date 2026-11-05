@@ -49,13 +49,22 @@ Also available: `volume up|down`, `mute`, `power`, `source tv|hdmi|bluetooth` an
 
 ### Home Assistant
 
-[naonak/jbl-bar-9.1-ha](https://github.com/naonak/jbl-bar-9.1-ha) is a separate integration, installable through HACS, for the Bar 9.1 browser remote. It uses the remote's local API (`/api/state`, `/api/events`, `/api/action`) over the LAN, with no cloud or extra hardware, and has not been tested with other bars. It provides a media player (power, volume, mute, source, playback and now playing), bass, center, Atmos and rear levels, Night and Smart Mode switches, Front EQ, audio sync, surround calibration and subwoofer pairing buttons, the audio format and diagnostics. Entities appear only for the controls the installed remote reports.
+[JBL Bar Toolkit for Home Assistant](https://github.com/naonak/jbl-bar-toolkit-ha) (`naonak/jbl-bar-toolkit-ha`, formerly `naonak/jbl-bar-9.1-ha`) is a separate integration, installable through HACS. It talks to this browser remote's local API (`/api/state`, `/api/events`, `/api/action`, `/api/features`) on the LAN, with no cloud or extra hardware. Like the packaged remote it supports the Bar 9.1 only: setup checks the model the remote reports and refuses another bar.
 
-1. In HACS, add `https://github.com/naonak/jbl-bar-9.1-ha` as a custom repository (Integration) and install **JBL Bar 9.1 (web remote)**, then restart Home Assistant.
-2. Add the integration and enter the bar's IP address (port `8080` by default, as the browser remote).
+It provides:
+- a media player: power, volume, mute, source, playback and now playing;
+- bass, center (1–6), Atmos and rear levels, and the experimental bass offset;
+- Night and Smart Mode switches, Front EQ presets and bands, and audio sync;
+- surround calibration and subwoofer pairing buttons;
+- the audio format, a "Command running" sensor, the mode restored after standby (with `smart_mode_memory`), and diagnostics.
+
+Entities appear only for the controls the installed remote reports. Commands wait for a control already running on the bar, whoever sent it.
+
+1. In HACS, add `https://github.com/naonak/jbl-bar-toolkit-ha` as a custom repository (Integration), install **JBL Bar Toolkit (Bar 9.1)**, then restart Home Assistant. If you added the old `jbl-bar-9.1-ha` URL, replace it: the domain and entities are unchanged.
+2. Add the integration and enter the bar's IP address. Without a port it uses `8080`, which the remote also answers on port 80. Include the port if you set a custom `web_port`.
 3. Home Assistant's address must be inside the remote's trusted LAN (`allowed_cidr`); otherwise the remote answers 403.
 
-Report integration issues in its repository.
+Report integration issues in [its repository](https://github.com/naonak/jbl-bar-toolkit-ha/issues).
 
 ## Smart Mode off
 
