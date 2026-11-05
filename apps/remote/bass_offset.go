@@ -164,12 +164,15 @@ func (r *remote) monitorBass(ctx context.Context) {
 			return
 		case <-ticker.C:
 		}
-		if !r.actionMu.TryLock() {
+		// A short monitor: take the shared gate unreported, so state reads
+		// and new streams use the cached state instead of waiting.
+		release, _, held := r.hold("")
+		if !held {
 			continue
 		}
 		r.device.mu.Lock()
 		r.device.bassTick()
 		r.device.mu.Unlock()
-		r.actionMu.Unlock()
+		release()
 	}
 }

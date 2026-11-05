@@ -32,6 +32,24 @@ func (b bar91Backend) Features() server.Features {
 	actions = append(actions, aliases...)
 	return server.Features{Schema: 1, Model: "bar91", Name: "JBL Bar 9.1", Actions: actions, Extensions: b.remote.extensions.List()}
 }
+
+// hold takes the shared action gate for a native background writer. action
+// names a control clients should wait for; empty keeps a short monitor out of
+// the reported control while state reads still use the cached snapshot.
+func (r *remote) hold(action string) (release func(), report func(string), ok bool) {
+	if r.http == nil {
+		if !r.actionMu.TryLock() {
+			return nil, nil, false
+		}
+		return r.actionMu.Unlock, func(string) {}, true
+	}
+	h, ok := r.http.TryHold(action)
+	if !ok {
+		return nil, nil, false
+	}
+	return h.Release, h.Report, true
+}
+
 func (b bar91Backend) Execute(ctx context.Context, request server.Command) (state, error) {
 	return b.remote.execute(ctx, request)
 }

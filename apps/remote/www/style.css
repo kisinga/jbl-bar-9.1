@@ -125,3 +125,8 @@ input[type=range]{height:44px}
 .feedback[data-kind=success]{color:var(--green)}
 .feedback[data-kind=error]{background:#f2a5a508;border-radius:8px}
 .connection[data-state=connecting]:before{background:var(--subtle)}
+
+/* Typed audio delay from the shared upstream control. */
+.sync-field{display:flex;align-items:center;gap:4px;min-height:44px;padding:0 8px;border:1px solid var(--line);border-radius:10px;font-size:10px;color:var(--muted)}.sync-field:focus-within{border-color:var(--orange)}.sync-field input{width:3.6em;min-height:42px;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;text-align:right;-moz-appearance:textfield;appearance:textfield}.sync-field input::-webkit-inner-spin-button,.sync-field input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.sync-field input:focus{outline:none}.sync-field:has(input:disabled){opacity:.38}
+.sync-row{flex-wrap:wrap}.sync-row>.stepper{flex:0 0 auto}
+@media(max-width:759px){.sync-row>.stepper{flex:1 1 100%}.sync-row .sync-field{flex:1;justify-content:center}}

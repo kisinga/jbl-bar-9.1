@@ -262,7 +262,8 @@ func (r *remote) monitorCenter(ctx context.Context) {
 			return
 		case <-ticker.C:
 		}
-		if !r.actionMu.TryLock() {
+		release, _, held := r.hold("")
+		if !held {
 			continue
 		}
 		d := r.device
@@ -280,6 +281,6 @@ func (r *remote) monitorCenter(ctx context.Context) {
 			}
 		}
 		d.mu.Unlock()
-		r.actionMu.Unlock()
+		release()
 	}
 }

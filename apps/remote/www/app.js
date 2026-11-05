@@ -27,7 +27,18 @@ const advanced=createAdvanced($('advanced'),$('room-setup'));
 const speakers=createSpeakers($('speaker-view'));
 const components=[bluetooth,sound,playback,system,equalizer,details,advanced,bassOffset,speakers];
 let syncTimer=null;
-const context=()=>({state:capabilities.state(current),deviceName:capabilities.name(),online,ready:online && !!current?.available,awake:current?.power==='On',active,queued:queue.length,pending:active?[active,...queue]:[...queue],csrf});
+// Readiness shared by the shell and every component. A control sent from
+// elsewhere (another page, Home Assistant, the wake automation) holds the bar:
+// wait for it like for one of ours.
+function readiness() {
+  const reachable = online && !!current?.available;
+  const elsewhere = reachable && !!current?.control?.busy && active === null;
+  return {reachable, elsewhere, ready: reachable && !elsewhere};
+}
+const context=()=>{
+  const status=readiness();
+  return {state:capabilities.state(current),deviceName:capabilities.name(),online,reachable:status.reachable,ready:status.ready,busy:status.elsewhere ? current.control : null,awake:current?.power==='On',active,queued:queue.length,pending:active?[active,...queue]:[...queue],csrf};
+};
 function feedback(text, kind = '') {
   $('message-text').textContent = text;
   $('message').dataset.kind = kind;
@@ -38,14 +49,14 @@ function pendingVolume() { return (active ? delta(active) : 0) + queue.reduce((n
 function render() {
   const s = current;
   if (!s) return;
-  const ready = online && s.available;
+  const {reachable, elsewhere, ready} = readiness();
   const awake = s.power === 'On';
   const standby = s.power === 'Standby';
   const knownPower = awake || standby;
-  const pending = active !== null || queue.length > 0;
-  $('connection').dataset.state = ready ? 'online' : online ? 'connecting' : 'offline';
-  $('connection-label').textContent = ready ? 'Connected' : online ? 'Starting' : 'Offline';
-  $('summary').textContent = !online ? 'Connection lost. Showing the last known settings.' : !s.available ? (s.error || 'Waiting for your soundbar…') : awake ? sourceName(s) + (['Smart','Standard'].includes(s.mode) ? ' · ' + s.mode + ' mode' : '') : standby ? 'In standby. Ready when you are.' : s.power === 'Starting' ? 'Your soundbar is starting…' : 'Connected. Power state is not reported.';
+  const pending = active !== null || queue.length > 0 || elsewhere;
+  $('connection').dataset.state = reachable ? 'online' : online ? 'connecting' : 'offline';
+  $('connection-label').textContent = reachable ? 'Connected' : online ? 'Starting' : 'Offline';
+  $('summary').textContent = !online ? 'Connection lost. Showing the last known settings.' : !s.available ? (s.error || 'Waiting for your soundbar…') : elsewhere ? 'Another control is running; controls return when it finishes.' : awake ? sourceName(s) + (['Smart','Standard'].includes(s.mode) ? ' · ' + s.mode + ' mode' : '') : standby ? 'In standby. Ready when you are.' : s.power === 'Starting' ? 'Your soundbar is starting…' : 'Connected. Power state is not reported.';
   const offset = pendingVolume();
   $('volume').textContent = s.volume == null ? '—' : Math.max(0, s.volume + offset);
   $('volume-caption').textContent = standby ? 'IN STANDBY' : !knownPower ? 'POWER UNKNOWN' : s.muted ? 'SOUND MUTED' : '';
@@ -207,15 +218,27 @@ function pendingMessage() {
   return active === 'power' ? 'Changing power state…' : 'Applying your change…';
 }
 function clearSyncDraft(){clearTimeout(syncTimer);syncTimer=null;advanced.clear();}
-function avSyncTap(action){
-  if(!advanced.adjust(action,current)) return;
+// One submit path for the sync draft: taps wait until they stop, a typed
+// value (Enter or blur) goes at once. Both become a single av_sync_set.
+function submitSync(delay){
   clearTimeout(syncTimer);
   syncTimer=setTimeout(()=>{
     syncTimer=null;
     if(!online || active || advanced.target()===current?.sound?.av_sync_ms){advanced.clear();render();return;}
-    queue.push('av_sync_set');void pump();
-  },900);
-  render();feedback('Audio sync '+advanced.target()+' ms · sending when you stop tapping…','pending');
+    if(!queue.includes('av_sync_set')) queue.push('av_sync_set');
+    void pump();
+  },delay);
+  render();
+}
+function avSyncTap(action){
+  if(!advanced.adjust(action,current)) return;
+  submitSync(900);
+  feedback('Audio sync '+advanced.target()+' ms · sending when you stop tapping…','pending');
+}
+function avSyncTyped(){
+  if(!csrf || active) return;
+  if(advanced.type(current)) submitSync(0);
+  else {clearTimeout(syncTimer);syncTimer=null;render();}
 }
 // A segment (level or mode) becomes the confirmed steps that reach it, run
 // one by one through the same queue and capability mapping as other controls.
@@ -323,6 +346,8 @@ document.addEventListener('visibilitychange', () => {
   stopHold();
   if (document.hidden) {stream?.close();stream=null;} else connectStream();
 });
+$('av-sync-input').addEventListener('change', avSyncTyped);
+$('av-sync-input').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); } });
 $('refresh').addEventListener('click', () => { connectStream(); void refresh(); });
 $('cancel-volume').addEventListener('click', () => {
   queue = [];

@@ -62,6 +62,7 @@ type state struct {
 	Revision      uint64           `json:"revision"`
 	Sound         *soundState      `json:"sound,omitempty"`
 	Setup         *setupState      `json:"setup,omitempty"`
+	Control       *server.Control  `json:"control,omitempty"` // server-owned: the control holding the gate
 	Streaming     *streamState     `json:"streaming,omitempty"`
 	SourceState   *uint32          `json:"source_state,omitempty"`
 	WiFi          wifiState        `json:"wifi"`

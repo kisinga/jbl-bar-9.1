@@ -21,4 +21,5 @@ func (f *stateFeed) publish(s state) {
 func (f *stateFeed) run(ctx context.Context, snapshot func() state) { f.Run(ctx, snapshot) }
 func (s state) StateRevision() uint64                               { return s.Revision }
 func (s state) PublicState(token string) any                        { s.CSRF = token; return s }
+func (s state) WithControl(c server.Control) state                  { s.Control = &c; return s }
 func (s state) ChangeState() any                                    { s.Uptime = 0; s.Revision = 0; s.CSRF = ""; return s }

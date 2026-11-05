@@ -12,7 +12,7 @@ against the [frozen baseline](../tests/fixtures/remote-ui-baseline.json) by
 | Volume | Tap/hold, keyboard, mute, pending values and queue cancellation |
 | Playback | Service/status, metadata, progress, previous/play/pause/next/stop and source-specific availability |
 | Sound | Standard/Smart, five bass levels, six center levels, Atmos/rear levels, night mode, audio format |
-| Audio sync | 0–250 ms in 10 ms steps; existing draft, debounce and source guards |
+| Audio sync | 0–250 ms typed input or 10 ms taps; draft, debounce and source guards |
 | Front EQ | Eight presets, five −6..0 dB bands in 0.5 dB steps, curve, draft, Apply/Reset and error states |
 | Bass offset | −3..+3 dB in 0.5 dB steps, explicit Save, startup/status/errors and permitted standby saves |
 | Room setup | Two-stage calibration, subwoofer pairing, instructions and operation guards |

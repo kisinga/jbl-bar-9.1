@@ -25,6 +25,12 @@ contributor workflows. Extracting the shared server does not make those files
 generic. The local adapter uses their existing methods; a future backend can
 implement the public shared contract without importing them.
 
+The shared server reports the action gate holder in `state.control` for
+`server.ControlState` snapshots and serves cached reads/new streams during a
+control. Background writers use `TryHold`; Bar 9.1 reports its Standard Mode
+wake gesture as `auto_standard` and keeps short monitors unreported. Read-only
+speaker telemetry uses reachability separately from control availability.
+
 ## Backend contract
 
 `server.Backend[S]` has three operations:

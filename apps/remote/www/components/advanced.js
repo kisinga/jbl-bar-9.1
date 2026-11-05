@@ -8,7 +8,19 @@ export function createAdvanced(root, setupRoot=root) {
   let draft=null;
   return {
     target:()=>draft,
-    clear(){draft=null;},
+    // Also discards text typed but not yet applied (disconnect, error, other control).
+    clear(){draft=null;const input=$('av-sync-input');if(input)input.dataset.stale='true';},
+    // Typed value, read on Enter or blur: rounded to 10 ms and limited to the
+    // native range. Returns true when it differs from the current delay.
+    type(state){
+      const input=$('av-sync-input'), sync=state?.sound?.av_sync_ms, typed=Number(input.value);
+      if(input.disabled || !Number.isInteger(sync)) return false;
+      if(input.value.trim()==='' || !Number.isFinite(typed)){input.value=draft ?? sync;return false;}
+      const value=Math.max(0,Math.min(maxSync,Math.round(typed/10)*10));
+      input.value=value;
+      draft=value===sync ? null : value;
+      return draft!==null;
+    },
     adjust(action,state){
       const base=draft ?? state?.sound?.av_sync_ms;
       if(!Number.isInteger(base)) return false;
@@ -22,6 +34,9 @@ export function createAdvanced(root, setupRoot=root) {
       $('av-sync-value').textContent=sync==null ? 'Unavailable' : shown+' ms'+(draft!=null && draft!==sync ? ' (now '+sync+' ms)' : '')+(tvInput?'':' · select TV or HDMI to adjust');
       $('av-sync-down').disabled=!ready || !awake || !!active || sync==null || !tvInput || shown<=0;
       $('av-sync-up').disabled=!ready || !awake || !!active || sync==null || !tvInput || shown>=maxSync;
+      const input=$('av-sync-input');
+      input.disabled=!ready || !awake || !!active || sync==null || !tvInput;
+      if(input.dataset.stale || root.ownerDocument.activeElement!==input){input.value=shown ?? '';delete input.dataset.stale;}
       const setup=s.setup, calibration=setup?.calibration || '';
       const measuring=/starting|Starting in|Measuring/.test(calibration);
       if(setupRoot!==root) setupRoot.hidden=!setup;
