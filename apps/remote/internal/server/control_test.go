@@ -69,10 +69,14 @@ type busyFixture struct {
 }
 
 func newBusyFixture(t *testing.T) *busyFixture {
+	return newBusyFixtureWait(t, 300*time.Millisecond)
+}
+
+func newBusyFixtureWait(t *testing.T, wait time.Duration) *busyFixture {
 	t.Helper()
 	b := &deviceBackend{started: make(chan struct{}, 1), release: make(chan struct{})}
 	gate := &sync.Mutex{}
-	app, err := server.New[busyState](b, server.Options[busyState]{AllowedCIDR: "127.0.0.0/8", Gate: gate, Feed: &server.Feed[busyState]{}, Assets: fstest.MapFS{"index.html": {Data: []byte("fixture")}}})
+	app, err := server.New[busyState](b, server.Options[busyState]{AllowedCIDR: "127.0.0.0/8", Gate: gate, Feed: &server.Feed[busyState]{}, BackgroundWait: wait, Assets: fstest.MapFS{"index.html": {Data: []byte("fixture")}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,8 +256,14 @@ func TestBackgroundWritersKeepReadsResponsive(t *testing.T) {
 	if _, again := f.app.TryHold(""); again {
 		t.Fatal("two writers held the gate")
 	}
-	if r := within(t, "a control during a monitor", f.action); r.code != 409 {
+	// A control waits for the monitor (up to the background wait), then is
+	// refused if the monitor is still there.
+	start := time.Now()
+	if r := within(t, "a control during a long monitor", f.action); r.code != 409 {
 		t.Fatalf("control during a monitor: %d", r.code)
+	}
+	if waited := time.Since(start); waited < 200*time.Millisecond {
+		t.Fatalf("a control was refused after %v while only a monitor held the gate", waited)
 	}
 	// A native gesture reports itself once it starts.
 	hold.Report("auto_standard")
@@ -269,4 +279,62 @@ func TestBackgroundWritersKeepReadsResponsive(t *testing.T) {
 		t.Fatal("released hold kept the gate")
 	}
 	f.gate.Unlock()
+}
+
+// Monitors hold the gate for milliseconds without reporting a control. A
+// control sent meanwhile used to be refused with "Another control is
+// running" although nothing visible was running; it now waits for them.
+func TestAControlWaitsForAShortMonitor(t *testing.T) {
+	f := newBusyFixture(t)
+	f.state()
+	hold, ok := f.app.TryHold("")
+	if !ok {
+		t.Fatal("gate unavailable")
+	}
+	time.AfterFunc(60*time.Millisecond, hold.Release)
+	result := make(chan reply, 1)
+	go func() { result <- f.action() }()
+	<-f.backend.started
+	close(f.backend.release)
+	if r := <-result; r.code != 200 {
+		t.Fatalf("control after a short monitor: %d %s", r.code, r.body["error"])
+	}
+}
+
+// A reported background control (a native gesture) is refused at once, so
+// clients wait for it through the reported state instead of the request.
+func TestAControlIsRefusedAtOnceDuringAReportedGesture(t *testing.T) {
+	f := newBusyFixtureWait(t, 5*time.Second)
+	f.state()
+	hold, ok := f.app.TryHold("auto_standard")
+	if !ok {
+		t.Fatal("gate unavailable")
+	}
+	defer hold.Release()
+	start := time.Now()
+	r := within(t, "a control during a gesture", f.action)
+	if r.code != 409 || !strings.Contains(string(r.body["state"]), `"action":"auto_standard"`) {
+		t.Fatalf("control during a gesture: %d %s", r.code, r.body["state"])
+	}
+	if waited := time.Since(start); waited > time.Second {
+		t.Fatalf("refusal took %v", waited)
+	}
+}
+
+// A negative wait keeps the old immediate refusal.
+func TestBackgroundWaitCanBeDisabled(t *testing.T) {
+	f := newBusyFixtureWait(t, -1)
+	f.state()
+	hold, ok := f.app.TryHold("")
+	if !ok {
+		t.Fatal("gate unavailable")
+	}
+	defer hold.Release()
+	start := time.Now()
+	if r := f.action(); r.code != 409 {
+		t.Fatalf("control: %d", r.code)
+	}
+	if waited := time.Since(start); waited > 100*time.Millisecond {
+		t.Fatalf("refusal took %v", waited)
+	}
 }

@@ -28,7 +28,10 @@ implement the public shared contract without importing them.
 The shared server reports the action gate holder in `state.control` for
 `server.ControlState` snapshots and serves cached reads/new streams during a
 control. Background writers use `TryHold`; Bar 9.1 reports its Standard Mode
-wake gesture as `auto_standard` and keeps short monitors unreported. Read-only
+wake gesture as `auto_standard` and keeps short monitors unreported. A control
+that arrives while only an unreported monitor holds the gate waits for it (up
+to `BackgroundWait`, one second by default) instead of being refused; a
+reported control is still refused at once. Read-only
 speaker telemetry uses reachability separately from control availability.
 
 ## Backend contract

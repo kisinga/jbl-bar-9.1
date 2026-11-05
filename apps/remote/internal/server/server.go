@@ -63,19 +63,24 @@ type Options[S State] struct {
 	// Hotspot is optional, passive model-specific network discovery.
 	Hotspot func() *net.IPNet
 	Done    func() <-chan struct{}
+	// BackgroundWait bounds how long a control waits while an unreported
+	// background hold (TryHold("")) has the gate, instead of being refused.
+	// Zero selects one second; a negative value refuses at once.
+	BackgroundWait time.Duration
 }
 type Server[S State] struct {
-	backend       Backend[S]
-	network       *net.IPNet
-	hostname      string
-	csrf          string
-	assets        fs.FS
-	publicAssets  map[string]bool
-	actionMu      *sync.Mutex
-	feed          *Feed[S]
-	hotspot       func() *net.IPNet
-	done          func() <-chan struct{}
-	actionTimeout func(Command) time.Duration
+	backend        Backend[S]
+	network        *net.IPNet
+	hostname       string
+	csrf           string
+	assets         fs.FS
+	publicAssets   map[string]bool
+	actionMu       *sync.Mutex
+	feed           *Feed[S]
+	hotspot        func() *net.IPNet
+	done           func() <-chan struct{}
+	actionTimeout  func(Command) time.Duration
+	backgroundWait time.Duration
 }
 
 func New[S State](backend Backend[S], options Options[S]) (*Server[S], error) {
@@ -91,7 +96,10 @@ func New[S State](backend Backend[S], options Options[S]) (*Server[S], error) {
 		return nil, err
 	}
 	r := &Server[S]{backend: backend, network: network, hostname: options.Hostname, csrf: hex.EncodeToString(token), assets: options.Assets,
-		publicAssets: map[string]bool{"index.html": true, "app.js": true, "style.css": true, "favicon.svg": true}, actionMu: options.Gate, feed: options.Feed, hotspot: options.Hotspot, done: options.Done, actionTimeout: options.ActionTimeout}
+		publicAssets: map[string]bool{"index.html": true, "app.js": true, "style.css": true, "favicon.svg": true}, actionMu: options.Gate, feed: options.Feed, hotspot: options.Hotspot, done: options.Done, actionTimeout: options.ActionTimeout, backgroundWait: options.BackgroundWait}
+	if r.backgroundWait == 0 {
+		r.backgroundWait = time.Second
+	}
 	if r.actionMu == nil {
 		r.actionMu = &sync.Mutex{}
 	}
@@ -185,7 +193,7 @@ func (r *Server[S]) ServeHTTP(w http.ResponseWriter, q *http.Request) {
 			http.Error(w, "Invalid control request", 400)
 			return
 		}
-		if !r.actionMu.TryLock() {
+		if !r.takeGate(q.Context()) {
 			// The state names the running control so a client can wait for it.
 			writeJSON(w, 409, map[string]any{"error": "Another control is running", "state": r.snapshot().PublicState(r.csrf)})
 			return
