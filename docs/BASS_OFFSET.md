@@ -123,3 +123,15 @@ steps and mixed EQ/offset requests are rejected. `GET /api/state` includes:
 ```
 
 `error`, when present, explains why the saved value is not currently applied.
+While waiting it is a code, which the page states in words:
+
+| `error` | Meaning |
+| --- | --- |
+| `WAITING_FOR_STANDARD_PLAYBACK` | the bar is off, in Smart Mode, or not playing |
+| `WAITING_FOR_FRONT_EQ` | a Front EQ is applied (or its reset is pending); Reset the Front EQ to use the offset |
+| `WAITING_FOR_CALIBRATION` | surround calibration is running |
+| `WAITING_FOR_NATIVE_CONTROLS` | a key or a control is in progress |
+| `WAITING_FOR_AUDIO_ROUTE` | the audio route cannot be read yet |
+| `WAITING_FOR_SUPPORTED_DSP_MODE` | this sound mode or input is not supported |
+
+Other errors are sentences, shown as they are.

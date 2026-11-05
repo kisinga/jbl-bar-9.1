@@ -76,6 +76,17 @@ try {
   state.extensions['fixture.bass']={offset_db:0,status:'paused',error:'Readback failed'};
   await page.waitForFunction(()=>document.querySelector('#bass-offset-state').textContent.includes('Readback failed'));
   check((await page.locator('#bass-offset-state').textContent()).includes('paused'),'pause and reason are visible');
+  state.extensions['fixture.bass']={offset_db:-1.5,status:'waiting',error:'WAITING_FOR_FRONT_EQ'};
+  await page.waitForFunction(()=>document.querySelector('#bass-offset-state').textContent.includes('Front EQ'));
+  check((await page.locator('#bass-offset-state').textContent())==='-1.5 dB set. Offsets all five bass levels. Saved for startup. Paused while a Front EQ is applied. Reset the Front EQ to use the bass offset.','Front EQ pause explained in words, without the generic wait');
+  state.extensions['fixture.bass']={offset_db:-1.5,status:'waiting',error:'WAITING_FOR_STANDARD_PLAYBACK'};
+  await page.waitForFunction(()=>!document.querySelector('#bass-offset-state').textContent.includes('Front EQ'));
+  check(!(await page.locator('#bass-offset-state').textContent()).includes('WAITING_FOR'),'wait codes never shown raw');
+  check((await page.locator('#bass-offset-state').textContent()).endsWith('Waiting for supported Standard playback.'),'standard playback wait keeps its sentence');
+  state.extensions['fixture.bass']={offset_db:-1.5,status:'waiting',error:'WAITING_FOR_SUPPORTED_DSP_MODE'};
+  await page.waitForFunction(()=>document.querySelector('#bass-offset-state').textContent.includes('sound mode'));
+  check((await page.locator('#bass-offset-state').textContent()).endsWith('Not supported in this sound mode or on this input.'),'unsupported route explained');
+  state.extensions['fixture.bass']={offset_db:0,status:'paused',error:'Readback failed'};
   state.setup={calibration:'Measuring'};
   await page.waitForFunction(()=>document.querySelector('#bass-offset').disabled);
   check(await page.locator('#bass-offset-save').isDisabled(),'calibration blocks saving and editing');
