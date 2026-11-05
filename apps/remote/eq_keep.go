@@ -118,7 +118,15 @@ func (d *device) followFrontEQ(ctx context.Context, report func(string)) {
 	n, readErr := d.readEQNative()
 	levels, known := d.eqLevels()
 	changed := known && m.levelsKnown && levels != m.levels
-	switch eqFollowDecision(n, readErr, m.native, m.expected, d.smartModeNow(), changed) {
+	decision := eqFollowDecision(n, readErr, m.native, m.expected, d.smartModeNow(), changed)
+	// A reset that failed is retried only once the native state changes:
+	// retrying it every tick reported a control every two seconds, and the
+	// page flashed "Another control is running" with its controls disabled.
+	key := eqFollowKey(n, readErr)
+	if !eqFollowRetry(decision, m.followBlocked, key) {
+		return
+	}
+	switch decision {
 	case eqFollowOK:
 		return
 	case eqFollowLevels:
@@ -136,7 +144,7 @@ func (d *device) followFrontEQ(ctx context.Context, report func(string)) {
 		// the chosen EQ again.
 		report("eq_reset")
 		if e := d.resetFrontEQ(ctx); e != nil {
-			m.problem = eqPendingProblem(e, d.readHPPMode)
+			m.problem, m.followBlocked = eqPendingProblem(e, d.readHPPMode), key
 			m.note("Front EQ cleanup pending: %v", e)
 			return
 		}
@@ -144,9 +152,24 @@ func (d *device) followFrontEQ(ctx context.Context, report func(string)) {
 	default:
 		report("eq_reset")
 		if e := d.resetFrontEQ(ctx); e != nil {
-			m.problem = eqPendingProblem(e, d.readHPPMode)
+			m.problem, m.followBlocked = eqPendingProblem(e, d.readHPPMode), key
+			m.note("Front EQ reset pending: %v", e)
 		}
 	}
+}
+
+// eqFollowRetry reports whether the monitor acts on decision: a reset is not
+// tried again on the native state where it last failed.
+func eqFollowRetry(decision eqFollow, blocked, key string) bool {
+	return (decision != eqFollowDropped && decision != eqFollowReset) || blocked == "" || blocked != key
+}
+
+// eqFollowKey identifies the native state a reset decision was made on.
+func eqFollowKey(n eqNativeState, readErr error) string {
+	if readErr != nil {
+		return "error: " + readErr.Error()
+	}
+	return fmt.Sprintf("mode %d cache %d element %#x rate %d %s", n.Mode, n.Cache, n.Element, n.SampleRate, eqDigest(n.Block))
 }
 
 // keepFrontEQ applies the kept EQ again once it is not applied, for one
