@@ -56,7 +56,7 @@ const server = createServer(async (req, res) => {
       if (action === 'eq_apply' && state.eq?.available===false && typeof state.eq.kept==='boolean' && payload.gains_db.some(value=>value!==0)) {
         // A remote that keeps the EQ saves one it cannot apply now.
         state.eq={...state.eq,enabled:false,kept:true,gains_db:[...payload.gains_db],status:'waiting',error:'Your EQ is re-applied automatically when Standard audio plays.'};
-      } else if (action === 'eq_apply') {state.eq={...state.eq,enabled:payload.gains_db.some(value=>value!==0),gains_db:[...payload.gains_db],status:payload.gains_db.some(value=>value!==0)?'custom':'original'};}
+      } else if (action === 'eq_apply') {state.eq={...state.eq,enabled:payload.gains_db.some(value=>value!==0),gains_db:[...payload.gains_db],status:payload.gains_db.some(value=>value!==0)?'active':'ready'};}
       if (action === 'eq_reset') state.eq={...eqFixture()};
       if (action === 'night_toggle') state.sound.night=!state.sound.night;
       // A2DP can remain Streaming while the app handles AVRCP Play/Pause.
@@ -184,11 +184,14 @@ try {
   check(await page.locator('#eq-panel input[type=range]').count()===5 && await page.locator('#eq-panel input').evaluateAll(inputs=>inputs.every(input=>input.min==='-6'&&input.max==='0'&&input.step==='0.5')),'five real cuts-only half-decibel sliders');
   check(await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-reset').isDisabled(),'unchanged original tuning offers no unnecessary write');
   check(await page.locator('#eq-preset').inputValue()==='original','committed factory tuning selects Original preset');
+  const badge=async()=>page.evaluate(()=>{const b=document.querySelector('#eq-badge');return b.hidden?'hidden':b.dataset.state+':'+b.textContent;});
+  check(await badge()==='off:Off' && (await page.locator('#eq-badge').getAttribute('title'))==='Original tuning: no EQ is applied.','the EQ badge says Off for the original tuning');
   await page.locator('#eq-preset').selectOption('less_bass');
   check(calls.length===0 && state.eq.gains_db.every(value=>value===0) && await page.locator('#eq-slider-0').inputValue()==='-4' && await page.locator('#eq-slider-1').inputValue()==='-2','preset selection changes draft and graph only, without a POST');
   check(await page.locator('#eq-apply').isEnabled() && (await page.locator('#eq-graph svg').getAttribute('aria-label')).includes('Unapplied'),'preset remains explicitly unapplied');
   await page.locator('#eq-apply').click();await page.waitForFunction(()=>document.querySelector('#message-text').textContent==='Front EQ applied.');
   check(JSON.stringify(lastPayload.gains_db)==='[-4,-2,0,0,0]' && await page.locator('#eq-preset').inputValue()==='less_bass','preset Apply commits the exact named curve and keeps selection');
+  check(await badge()==='active:Active' && (await page.locator('#eq-badge').getAttribute('aria-label')).startsWith('Front EQ status: Active.'),'the EQ badge says Active once the bar confirms the EQ');
   await page.locator('#eq-slider-0').evaluate(input=>{input.value='-3.5';input.dispatchEvent(new Event('input',{bubbles:true}));});
   check(await page.locator('#eq-preset').inputValue()==='custom','manual tuning of a preset switches to Custom');
   await page.locator('#eq-preset').selectOption('custom');
@@ -227,7 +230,7 @@ try {
   await page.locator('#eq-slider-2').evaluate(input=>{input.value='-1';input.dispatchEvent(new Event('input',{bubbles:true}));});
   failure='EQ application refused';await page.locator('#eq-apply').click();await page.waitForFunction(()=>document.querySelector('#message').dataset.kind==='error');
   check(!state.eq.enabled && await page.locator('#eq-slider-2').inputValue()==='-1' && await page.locator('#eq-apply').isEnabled(),'refused EQ preserves the unapplied draft without claiming success');
-  failure='';state.eq={...eqFixture(),enabled:true,gains_db:[-2,0,0,0,0],status:'custom'};await page.waitForFunction(()=>document.querySelector('#eq-slider-0').value==='-2');
+  failure='';state.eq={...eqFixture(),enabled:true,gains_db:[-2,0,0,0,0],status:'active'};await page.waitForFunction(()=>document.querySelector('#eq-slider-0').value==='-2');
   check(await page.locator('#eq-slider-2').inputValue()==='0','new committed soundbar EQ replaces an obsolete local draft');
   state.bass_offset={offset_db:-1.5,status:'waiting',error:'WAITING_FOR_FRONT_EQ'};
   await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.includes('Bass offset paused'));
@@ -238,10 +241,18 @@ try {
   delete state.bass_offset;
   state.eq={available:false,enabled:true,gains_db:[-2,0,0,0,0],status:'reset_required'};await page.waitForFunction(()=>document.querySelector('#eq-slider-0').disabled);
   check(await page.locator('#eq-reset').isEnabled() && await page.locator('#eq-apply').isDisabled() && (await page.locator('#eq-state').textContent()).includes('Reset required'),'reset-required state permits recovery but blocks further tuning');
+  check(await badge()==='reset:Reset needed','the EQ badge asks for a reset');
+  // Smart Mode on HDMI: the remote still owns the applied EQ (enabled) but cannot
+  // confirm it, and the bar does not play it there. Not "Active".
+  state.mode='Smart';state.eq={...eqFixture(),available:false,enabled:true,kept:true,gains_db:[-2,0,0,0,0],status:'unavailable',error:'native EQ is not ready on this audio route'};
+  await page.waitForFunction(()=>document.querySelector('#eq-badge').dataset.state==='waiting');
+  check((await page.locator('#eq-badge').getAttribute('title'))==='Smart Mode is on. Your EQ is applied when Standard audio plays.','an applied EQ the bar cannot confirm (Smart Mode) is shown as Waiting, not Active');
+  state.mode='Standard';
   state.eq={...eqFixture(),enabled:true,kept:true,gains_db:[0,0,0,-6,-6],status:'active'};await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.includes('stays through'));
   check(await page.locator('#eq-reset').isEnabled(),'a kept EQ says it stays until Reset');
   state.eq={...eqFixture(),available:false,enabled:false,kept:true,gains_db:[0,0,0,-6,-6],status:'waiting',error:'Your EQ is re-applied automatically when Standard audio plays.'};await page.waitForFunction(()=>document.querySelector('#eq-state').textContent.startsWith('Your EQ is re-applied'));
   check(await page.locator('#eq-reset').isEnabled() && await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-slider-3').inputValue()==='-6','a kept EQ waiting to be applied again shows its bands and can still be reset');
+  check(await badge()==='waiting:Waiting' && (await page.locator('#eq-badge').getAttribute('title'))==='The EQ does not apply on this audio route. Your EQ is applied when Standard audio plays.','the EQ badge says Waiting, and why');
   // The EQ stays adjustable while it cannot be applied: it is saved and applied later.
   check(await page.locator('#eq-slider-0').isEnabled() && await page.locator('#eq-preset').isEnabled() && (await page.locator('#eq-apply').textContent())==='Save EQ','a waiting EQ can still be changed, with Save instead of Apply');
   await page.locator('#eq-preset').selectOption('warm');
@@ -262,8 +273,10 @@ try {
   state.power='On';
   state.eq={...eqFixture(),gains_db:[1,0,0,0,0]};await page.waitForFunction(()=>document.querySelector('#eq-gain-0').textContent==='—');
   check(await page.locator('#eq-slider-0').isDisabled() && await page.locator('#eq-preset').isDisabled() && await page.locator('#eq-graph').isHidden(),'invalid boost readback disables presets rather than showing a false setting');
+  check(await badge()==='hidden','no EQ badge for an unreadable EQ');
   delete state.eq;await pause(100);
   check(await page.locator('#eq-apply').isDisabled() && await page.locator('#eq-reset').isDisabled() && (await page.locator('#eq-state').textContent()).includes('unavailable'),'older backend has no pretend active EQ controls');
+  check(await badge()==='hidden','no EQ badge without EQ support');
   state.eq=eqFixture();state.system=systemFixture();calls=[];lastPayload=null;await pause(100);
 
   check(await page.locator('.panel').first().evaluate(e=>getComputedStyle(e).animationName)==='none','reduced-motion preference removes entry animation');
