@@ -50,6 +50,19 @@ export function createEqualizer(root) {
     // A saved non-zero bass offset does not run while an EQ is applied.
     const offsetPaused = s.bass_offset?.error === 'WAITING_FOR_FRONT_EQ' && s.bass_offset.offset_db !== 0 ? ' Bass offset paused meanwhile.' : '';
     const notNow = !awake ? (s.power === 'Standby' ? 'The bar is in standby.' : 'Power state is unavailable.') : s.mode === 'Smart' ? 'Smart Mode is on.' : 'The EQ does not apply on this audio route.';
+    // Status at a glance: is the EQ heard now, waiting to apply, or off?
+    // "Active" needs the native confirmation (status "active"): eq.enabled
+    // alone stays true while the bar is in Smart Mode or on another route,
+    // where the applied EQ is not heard and is applied again afterwards.
+    const badge = $('eq-badge');
+    const shown = ready && valid && eq.error !== 'EQ support is not installed';
+    const confirmed = eq.status === 'active' || (eq.enabled === true && eq.status === undefined);
+    const kind = eq.status === 'reset_required' ? 'reset' : eq.enabled === true ? (confirmed ? 'active' : 'waiting') : eq.status === 'waiting' ? 'waiting' : 'off';
+    badge.hidden = !shown;
+    badge.dataset.state = kind;
+    badge.textContent = {active: 'Active', waiting: 'Waiting', off: 'Off', reset: 'Reset needed'}[kind];
+    badge.title = {active: 'Your EQ is applied and heard now.', waiting: notNow + ' Your EQ is applied when Standard audio plays.', off: 'Original tuning: no EQ is applied.', reset: 'An earlier EQ must be reset before adjusting.'}[kind];
+    badge.setAttribute('aria-label', 'Front EQ status: ' + badge.textContent + '. ' + badge.title);
     $('eq-state').textContent = !online ? 'Offline. Reconnect to adjust EQ.' : !ready ? 'Waiting for the soundbar.' : saveLater && eq.status !== 'reset_required' ? (active === 'eq_apply' ? 'Saving your settings…' : changed ? 'Unsaved changes. Select Save EQ: it is applied when Standard audio plays.' : eq.status === 'waiting' && eq.error ? eq.error : notNow + ' Choose an EQ now: it is applied when Standard audio plays.') : !awake ? (s.power === 'Standby' ? 'Turn on the bar to adjust EQ.' : 'Power state is unavailable.') : eq.status === 'reset_required' ? 'Reset required before making further changes.' : eq.error ? eq.error : !eq.available || !valid ? 'EQ is unavailable on this firmware or audio path.' : active === 'eq_apply' ? 'Applying your settings…' : active === 'eq_reset' ? 'Restoring original processing…' : changed ? 'Unapplied changes. Select Apply EQ to listen.' : eq.enabled ? (eq.kept ? 'Custom EQ active. It stays through sound, input and power changes until Reset.' : 'Custom EQ active. Reset restores original processing.') + offsetPaused : 'Original tuning. Adjust a band, then apply.';
     $('eq-graph').hidden = !draftValid;
     if (draftValid) {
